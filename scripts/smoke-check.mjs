@@ -28,11 +28,17 @@ for (const file of requiredFiles) {
 
 const headersPath = join(distDir, '_headers');
 const headers = existsSync(headersPath) ? readFileSync(headersPath, 'utf8') : '';
+const indexPath = join(distDir, 'index.html');
+const indexHtml = existsSync(indexPath) ? readFileSync(indexPath, 'utf8') : '';
 
 for (const header of requiredHeaders) {
   if (!headers.includes(header)) {
     failures.push(`missing header: ${header}`);
   }
+}
+
+if (process.env.GITHUB_PAGES === 'true' && !indexHtml.includes('/code_visualizer/assets/')) {
+  failures.push('GitHub Pages build does not use /code_visualizer/ as the Vite asset base');
 }
 
 if (existsSync(join(distDir, 'assets/pyodide/node_modules'))) {

@@ -12,6 +12,9 @@ const PYODIDE_ASSETS = [
   'python_stdlib.zip',
 ];
 
+const appBase =
+  process.env.VITE_BASE ?? (process.env.GITHUB_PAGES === 'true' ? '/code_visualizer/' : '/');
+
 const crossOriginIsolationHeaders = {
   'Cross-Origin-Opener-Policy': 'same-origin',
   'Cross-Origin-Embedder-Policy': 'require-corp',
@@ -32,6 +35,7 @@ function copyPyodideAssets() {
 }
 
 export default defineConfig({
+  base: appBase,
   optimizeDeps: {
     exclude: ['pyodide'],
   },
