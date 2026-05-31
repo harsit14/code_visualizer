@@ -1,6 +1,12 @@
 node_modules
 dist
 coverage
+
+# Local planning / agent notes
+PROGRESS.md
+plan.md
+notes/
+
 .DS_Store
 .env
 .env.local
