@@ -111,6 +111,12 @@ button:disabled {
   justify-content: flex-end;
 }
 
+.editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .icon-button {
   min-block-size: 40px;
   display: inline-flex;
@@ -144,6 +150,26 @@ button:disabled {
 .icon-button.ghost {
   background: rgba(255, 255, 255, 0.52);
   border: 1px solid rgba(44, 49, 55, 0.1);
+}
+
+.compact-icon-button {
+  min-block-size: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(44, 49, 55, 0.12);
+  border-radius: var(--radius-sm);
+  padding: 0 9px;
+  background: rgba(255, 255, 255, 0.62);
+  color: var(--ink-650);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.compact-icon-button:hover:not(:disabled) {
+  color: var(--ink-950);
+  box-shadow: 0 8px 18px rgba(28, 33, 39, 0.08);
 }
 
 .spin {

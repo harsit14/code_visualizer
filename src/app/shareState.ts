@@ -1,4 +1,8 @@
-import { DEFAULT_EXAMPLE_ID, pythonExamples } from '../examples/pythonExamples';
+import {
+  CUSTOM_SNIPPET_ID,
+  DEFAULT_EXAMPLE_ID,
+  isPythonExampleId,
+} from '../examples/pythonExamples';
 
 export const SHARE_HASH_PREFIX = '#cv=';
 
@@ -51,7 +55,7 @@ export function decodeShareHash(hash: string): SharedCodeState | null {
       code: rawState.code,
       exampleId:
         typeof rawState.exampleId === 'string' &&
-        pythonExamples.some((example) => example.id === rawState.exampleId)
+        (rawState.exampleId === CUSTOM_SNIPPET_ID || isPythonExampleId(rawState.exampleId))
           ? rawState.exampleId
           : DEFAULT_EXAMPLE_ID,
     };

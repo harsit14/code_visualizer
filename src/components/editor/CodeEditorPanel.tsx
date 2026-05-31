@@ -1,4 +1,4 @@
-import { Braces, FileCode2 } from 'lucide-react';
+import { Braces, FileCode2, Trash2 } from 'lucide-react';
 import type { PythonStaticDiagnostic } from '../../languages/python/runtimeTypes';
 
 type CodeEditorPanelProps = {
@@ -6,8 +6,11 @@ type CodeEditorPanelProps = {
   code: string;
   diagnostics: PythonStaticDiagnostic[];
   executedLines: number[];
+  isCustomSnippet: boolean;
+  onClear: () => void;
   onChange: (code: string) => void;
   onLineSelect: (line: number) => void;
+  sourceTitle: string;
 };
 
 export function CodeEditorPanel({
@@ -15,8 +18,11 @@ export function CodeEditorPanel({
   code,
   diagnostics,
   executedLines,
+  isCustomSnippet,
+  onClear,
   onChange,
   onLineSelect,
+  sourceTitle,
 }: CodeEditorPanelProps) {
   const lines = code.split('\n');
   const executedLineSet = new Set(executedLines);
@@ -33,13 +39,27 @@ export function CodeEditorPanel({
           <span className="eyebrow">Source</span>
           <h2>
             <FileCode2 size={18} />
-            Python
+            {sourceTitle}
           </h2>
         </div>
-        <span className="panel-chip">
-          <Braces size={14} />
-          {lines.length} lines
-        </span>
+        <div className="editor-actions">
+          <span className="panel-chip">
+            <Braces size={14} />
+            {lines.length} lines
+          </span>
+          {isCustomSnippet ? (
+            <button
+              className="compact-icon-button"
+              disabled={code.length === 0}
+              onClick={onClear}
+              title="Clear custom snippet"
+              type="button"
+            >
+              <Trash2 size={14} />
+              <span>Clear</span>
+            </button>
+          ) : null}
+        </div>
       </header>
 
       <div className="editor-shell">
@@ -75,6 +95,7 @@ export function CodeEditorPanel({
           aria-label="Python code"
           className="code-input"
           onChange={(event) => onChange(event.target.value)}
+          placeholder={isCustomSnippet ? 'Paste or type Python here' : undefined}
           spellCheck={false}
           value={code}
           wrap="off"

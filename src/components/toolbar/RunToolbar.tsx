@@ -1,5 +1,9 @@
 import { Download, LoaderCircle, Play, RotateCcw, Share2, Sparkles } from 'lucide-react';
-import type { PythonExample } from '../../examples/pythonExamples';
+import {
+  CUSTOM_SNIPPET_ID,
+  CUSTOM_SNIPPET_TITLE,
+  type PythonExample,
+} from '../../examples/pythonExamples';
 import type { PythonRuntimeStatus } from '../../languages/python/runtimeTypes';
 
 type RunToolbarProps = {
@@ -60,20 +64,23 @@ export function RunToolbar({
       </div>
 
       <div className="toolbar-group">
-        <label className="select-label" htmlFor="example-select">
-          Example
+        <label className="select-label" htmlFor="source-select">
+          Source
         </label>
         <select
           className="example-select"
-          id="example-select"
+          id="source-select"
           onChange={(event) => onExampleChange(event.target.value)}
           value={selectedExampleId}
         >
-          {examples.map((example) => (
-            <option key={example.id} value={example.id}>
-              {example.title}
-            </option>
-          ))}
+          <option value={CUSTOM_SNIPPET_ID}>{CUSTOM_SNIPPET_TITLE}</option>
+          <optgroup label="Examples">
+            {examples.map((example) => (
+              <option key={example.id} value={example.id}>
+                {example.title}
+              </option>
+            ))}
+          </optgroup>
         </select>
       </div>
 

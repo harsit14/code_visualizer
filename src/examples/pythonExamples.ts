@@ -67,7 +67,13 @@ print(data)`,
   },
 ];
 
+export const CUSTOM_SNIPPET_ID = 'custom-snippet';
+export const CUSTOM_SNIPPET_TITLE = 'Custom snippet';
 export const DEFAULT_EXAMPLE_ID = 'loop-total';
+
+export function isPythonExampleId(id: string): boolean {
+  return pythonExamples.some((example) => example.id === id);
+}
 
 export function getPythonExample(id: string): PythonExample {
   return pythonExamples.find((example) => example.id === id) ?? pythonExamples[0];

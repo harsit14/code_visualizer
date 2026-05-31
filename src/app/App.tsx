@@ -6,7 +6,14 @@ import { TimelineScrubber } from '../components/timeline/TimelineScrubber';
 import { RunToolbar } from '../components/toolbar/RunToolbar';
 import { VisualizationStage } from '../components/visualization/VisualizationStage';
 import { decodeShareHash, encodeShareState, type SharedCodeState } from './shareState';
-import { DEFAULT_EXAMPLE_ID, getPythonExample, pythonExamples } from '../examples/pythonExamples';
+import {
+  CUSTOM_SNIPPET_ID,
+  CUSTOM_SNIPPET_TITLE,
+  DEFAULT_EXAMPLE_ID,
+  getPythonExample,
+  isPythonExampleId,
+  pythonExamples,
+} from '../examples/pythonExamples';
 import { usePythonRuntime } from '../languages/python/usePythonRuntime';
 import type {
   PythonRunResult,
@@ -64,11 +71,17 @@ export function App() {
   const [selectedExampleId, setSelectedExampleId] = useState(
     initialShareState?.exampleId ?? DEFAULT_EXAMPLE_ID,
   );
-  const selectedExample = useMemo(() => getPythonExample(selectedExampleId), [selectedExampleId]);
+  const selectedExample = useMemo(
+    () => (isPythonExampleId(selectedExampleId) ? getPythonExample(selectedExampleId) : null),
+    [selectedExampleId],
+  );
   const [code, setCode] = useState(
     () =>
       initialShareState?.code ??
       getPythonExample(initialShareState?.exampleId ?? DEFAULT_EXAMPLE_ID).code,
+  );
+  const [customCode, setCustomCode] = useState(() =>
+    initialShareState?.exampleId === CUSTOM_SNIPPET_ID ? initialShareState.code : '',
   );
   const [currentStep, setCurrentStep] = useState(0);
   const [exportState, setExportState] = useState<'idle' | 'done'>('idle');
@@ -85,6 +98,8 @@ export function App() {
   const staticAnalysis = runResult?.staticAnalysis ?? EMPTY_STATIC_ANALYSIS;
   const totalSteps = Math.max(traceEvents.length, 1);
   const currentEvent: PythonTraceEvent | null = traceEvents[currentStep] ?? null;
+  const isCustomSnippet = selectedExampleId === CUSTOM_SNIPPET_ID;
+  const sourceTitle = selectedExample?.title ?? CUSTOM_SNIPPET_TITLE;
   const activeLine = currentEvent?.line;
   const executedLines = useMemo(
     () =>
@@ -191,22 +206,42 @@ export function App() {
   };
 
   const handleReset = () => {
-    setCode(selectedExample.code);
+    if (selectedExample) {
+      setCode(selectedExample.code);
+    }
+
     setShareState('idle');
     clearRunState();
   };
 
   const handleCodeChange = (nextCode: string) => {
     setCode(nextCode);
+    setCustomCode(nextCode);
+    setSelectedExampleId(CUSTOM_SNIPPET_ID);
     setShareState('idle');
     clearRunState();
   };
 
   const handleExampleChange = (id: string) => {
+    if (id === CUSTOM_SNIPPET_ID) {
+      setSelectedExampleId(CUSTOM_SNIPPET_ID);
+      setCode(customCode);
+      setShareState('idle');
+      clearRunState();
+      return;
+    }
+
     const nextExample = getPythonExample(id);
 
     setSelectedExampleId(id);
     setCode(nextExample.code);
+    setShareState('idle');
+    clearRunState();
+  };
+
+  const handleClearCustomSnippet = () => {
+    setCode('');
+    setCustomCode('');
     setShareState('idle');
     clearRunState();
   };
@@ -250,11 +285,15 @@ export function App() {
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
 
-    downloadJson(`code-visualizer-${selectedExample.id}-${timestamp}.json`, {
+    downloadJson(`code-visualizer-${selectedExample?.id ?? CUSTOM_SNIPPET_ID}-${timestamp}.json`, {
       exportedAt: new Date().toISOString(),
       code,
       currentStep,
-      example: selectedExample,
+      source: {
+        id: selectedExample?.id ?? CUSTOM_SNIPPET_ID,
+        title: sourceTitle,
+        type: selectedExample ? 'example' : 'custom',
+      },
       runResult,
       selectedExampleId,
     });
@@ -307,14 +346,17 @@ export function App() {
           code={code}
           diagnostics={staticAnalysis.diagnostics}
           executedLines={executedLines}
+          isCustomSnippet={isCustomSnippet}
+          onClear={handleClearCustomSnippet}
           onChange={handleCodeChange}
           onLineSelect={handleLineSelect}
+          sourceTitle={sourceTitle}
         />
 
         <VisualizationStage
           currentEvent={currentEvent}
           currentStep={currentStep}
-          exampleTitle={selectedExample.title}
+          exampleTitle={sourceTitle}
           onObjectSelect={handleObjectSelect}
           selectedObjectId={selectedObjectId}
           staticAnalysis={staticAnalysis}
@@ -331,7 +373,7 @@ export function App() {
           />
           <OutputPanel
             currentEvent={currentEvent}
-            exampleTitle={selectedExample.title}
+            exampleTitle={sourceTitle}
             runResult={runResult}
             runtimeStatus={runtimeStatus}
           />

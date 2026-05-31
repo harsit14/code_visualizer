@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_EXAMPLE_ID } from '../examples/pythonExamples';
+import { CUSTOM_SNIPPET_ID, DEFAULT_EXAMPLE_ID } from '../examples/pythonExamples';
 import { decodeShareHash, encodeShareState, SHARE_HASH_PREFIX } from './shareState';
 
 describe('share state encoding', () => {
@@ -19,6 +19,18 @@ describe('share state encoding', () => {
   it('rejects malformed hashes', () => {
     expect(decodeShareHash('#missing')).toBeNull();
     expect(decodeShareHash(`${SHARE_HASH_PREFIX}bad-payload`)).toBeNull();
+  });
+
+  it('preserves shared custom snippets', () => {
+    const hash = encodeShareState({
+      code: 'name = "Ada"\nprint(name)',
+      exampleId: CUSTOM_SNIPPET_ID,
+    });
+
+    expect(decodeShareHash(hash)).toEqual({
+      code: 'name = "Ada"\nprint(name)',
+      exampleId: CUSTOM_SNIPPET_ID,
+    });
   });
 
   it('falls back when a shared example id is unknown', () => {
