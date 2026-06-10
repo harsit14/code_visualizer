@@ -1,0 +1,278 @@
+/**
+ * Pure helpers over the engine's trace schema: compact value formatting,
+ * step-to-step variable diffing, pointer-marker detection for arrays and
+ * linked lists, and complexity growth-curve labeling.
+ */
+import type {
+  ComplexitySample,
+  EncodedValue,
+  FrameSnapshot,
+  TraceStep,
+} from './types';
+
+/** Render an encoded value as a compact one-line preview. */
+export function formatValue(value: EncodedValue | null | undefined, depth = 0): string {
+  if (!value) {
+    return '';
+  }
+
+  switch (value.k) {
+    case 'none':
+      return 'None';
+    case 'num':
+      return value.v;
+    case 'str':
+      return `'${value.v}'${value.truncated ? '…' : ''}`;
+    case 'seq': {
+      if (depth > 2) {
+        return '[…]';
+      }
+      const items = value.items.map((item) => formatValue(item, depth + 1));
+      if (value.truncated) {
+        items.push(`…+${value.len - value.items.length}`);
+      }
+      const body = items.join(', ');
+      if (value.t === 'tuple') {
+        return `(${body})`;
+      }
+      if (value.t === 'set' || value.t === 'frozenset') {
+        return value.len === 0 ? 'set()' : `{${body}}`;
+      }
+      return `[${body}]`;
+    }
+    case 'dict': {
+      if (depth > 2) {
+        return '{…}';
+      }
+      const entries = value.entries.map(
+        ([key, item]) => `${formatValue(key, depth + 1)}: ${formatValue(item, depth + 1)}`,
+      );
+      if (value.truncated) {
+        entries.push(`…+${value.len - value.entries.length}`);
+      }
+      return `{${entries.join(', ')}}`;
+    }
+    case 'tree':
+      return `Tree(${countTreeNodes(value)} nodes)`;
+    case 'listnode': {
+      const chain = value.nodes.map((node) => formatValue(node.val, depth + 1)).join(' → ');
+      return `${chain}${value.cyclic ? ' ↻' : value.truncated ? ' →…' : ''}`;
+    }
+    case 'func':
+      return `${value.name}()`;
+    case 'obj':
+      return value.preview;
+    case 'ref':
+      return `↺ ref`;
+    case 'repr':
+      return value.v;
+    default:
+      return '';
+  }
+}
+
+function countTreeNodes(value: EncodedValue): number {
+  if (!value || value.k !== 'tree') {
+    return 0;
+  }
+  return (
+    1 +
+    (value.left ? countTreeNodes(value.left) : 0) +
+    (value.right ? countTreeNodes(value.right) : 0)
+  );
+}
+
+/** Type name shown next to a variable. */
+export function typeNameOf(value: EncodedValue): string {
+  switch (value.k) {
+    case 'none':
+      return 'None';
+    case 'num':
+      return value.t;
+    case 'str':
+      return 'str';
+    case 'seq':
+      return value.t;
+    case 'dict':
+      return 'dict';
+    case 'tree':
+      return 'TreeNode';
+    case 'listnode':
+      return 'ListNode';
+    case 'func':
+      return 'function';
+    case 'obj':
+      return value.t;
+    case 'ref':
+      return 'ref';
+    case 'repr':
+      return value.t;
+    default:
+      return '';
+  }
+}
+
+export type LocalsDiff = {
+  added: Set<string>;
+  changed: Set<string>;
+  removed: Set<string>;
+};
+
+/** Diff two locals maps structurally (order-insensitive). */
+export function diffLocals(
+  previous: Record<string, EncodedValue> | undefined,
+  current: Record<string, EncodedValue>,
+): LocalsDiff {
+  const added = new Set<string>();
+  const changed = new Set<string>();
+  const removed = new Set<string>();
+  const prev = previous ?? {};
+
+  for (const [name, value] of Object.entries(current)) {
+    if (!(name in prev)) {
+      added.add(name);
+    } else if (JSON.stringify(prev[name]) !== JSON.stringify(value)) {
+      changed.add(name);
+    }
+  }
+  for (const name of Object.keys(prev)) {
+    if (!(name in current)) {
+      removed.add(name);
+    }
+  }
+  return { added, changed, removed };
+}
+
+/** Find the frame in `step` matching `frame.id`, or undefined. */
+export function findMatchingFrame(
+  step: TraceStep | undefined,
+  frameId: string,
+): FrameSnapshot | undefined {
+  return step?.stack.find((frame) => frame.id === frameId);
+}
+
+const POINTER_NAMES = new Set([
+  'i', 'j', 'k', 'l', 'r', 'p', 'q',
+  'left', 'right', 'lo', 'hi', 'low', 'high', 'mid', 'middle',
+  'start', 'end', 'begin', 'stop', 'first', 'last',
+  'index', 'idx', 'pos', 'ptr', 'cur', 'curr', 'current',
+  'p1', 'p2', 'i1', 'i2', 'fast', 'slow', 'read', 'write',
+]);
+
+export type ArrayPointer = { name: string; index: number };
+
+/**
+ * Map sequence-valued locals to the integer locals that index into them
+ * ("i", "left", "hi", ...) so the UI can draw markers on the array boxes.
+ */
+export function findArrayPointers(
+  locals: Record<string, EncodedValue>,
+): Map<string, ArrayPointer[]> {
+  const result = new Map<string, ArrayPointer[]>();
+  const intLocals: { name: string; value: number }[] = [];
+
+  for (const [name, value] of Object.entries(locals)) {
+    if (value.k === 'num' && value.t === 'int' && POINTER_NAMES.has(name)) {
+      intLocals.push({ name, value: Number(value.v) });
+    }
+  }
+
+  for (const [name, value] of Object.entries(locals)) {
+    if ((value.k === 'seq' || value.k === 'str') && intLocals.length > 0) {
+      const length = value.k === 'seq' ? value.len : value.v.length;
+      const pointers = intLocals
+        .filter((pointer) => pointer.value >= 0 && pointer.value <= length)
+        .map((pointer) => ({ name: pointer.name, index: pointer.value }));
+      if (pointers.length > 0) {
+        result.set(name, pointers);
+      }
+    }
+  }
+  return result;
+}
+
+export type ChainPointer = { name: string; nodeId: number };
+
+/**
+ * Locals that point at nodes inside another local's linked-list chain
+ * ("slow", "fast", "prev"), keyed by the chain variable's name.
+ */
+export function findChainPointers(
+  locals: Record<string, EncodedValue>,
+): Map<string, ChainPointer[]> {
+  const result = new Map<string, ChainPointer[]>();
+  const chains = Object.entries(locals).filter(
+    (entry): entry is [string, Extract<EncodedValue, { k: 'listnode' }>] =>
+      entry[1].k === 'listnode',
+  );
+
+  for (const [chainName, chain] of chains) {
+    const nodeIds = new Set(chain.nodes.map((node) => node.id));
+    const pointers: ChainPointer[] = [];
+    for (const [name, value] of Object.entries(locals)) {
+      if (name === chainName || value.k !== 'listnode' || value.nodes.length === 0) {
+        continue;
+      }
+      const headId = value.nodes[0].id;
+      if (nodeIds.has(headId)) {
+        pointers.push({ name, nodeId: headId });
+      }
+    }
+    if (pointers.length > 0) {
+      result.set(chainName, pointers);
+    }
+  }
+  return result;
+}
+
+export type GrowthLabel = 'O(1)' | 'O(log n)' | 'O(n)' | 'O(n log n)' | 'O(n²)' | 'O(n³) or worse';
+
+/**
+ * Fit a growth label to (n, ops) samples by comparing against candidate
+ * curves with least relative error. Needs >= 3 samples.
+ */
+export function fitGrowth(samples: ComplexitySample[]): GrowthLabel | null {
+  const usable = samples.filter((sample) => sample.n > 1 && sample.ops > 0);
+  if (usable.length < 3) {
+    return null;
+  }
+
+  const candidates: { label: GrowthLabel; fn: (n: number) => number }[] = [
+    { label: 'O(1)', fn: () => 1 },
+    { label: 'O(log n)', fn: (n) => Math.log2(n) },
+    { label: 'O(n)', fn: (n) => n },
+    { label: 'O(n log n)', fn: (n) => n * Math.log2(n) },
+    { label: 'O(n²)', fn: (n) => n * n },
+    { label: 'O(n³) or worse', fn: (n) => n * n * n },
+  ];
+
+  let best: GrowthLabel | null = null;
+  let bestError = Number.POSITIVE_INFINITY;
+  for (const candidate of candidates) {
+    // Scale each candidate to match the first sample, then measure error.
+    const scale = usable[0].ops / candidate.fn(usable[0].n);
+    let error = 0;
+    for (const sample of usable) {
+      const predicted = scale * candidate.fn(sample.n);
+      error += Math.abs(Math.log(sample.ops / predicted));
+    }
+    if (error < bestError) {
+      bestError = error;
+      best = candidate.label;
+    }
+  }
+  return best;
+}
+
+/** Slice the final stdout down to what was printed by step `step`. */
+export function stdoutAtStep(fullStdout: string, step: TraceStep | undefined): string {
+  if (!step) {
+    return '';
+  }
+  return fullStdout.slice(0, step.stdoutLen);
+}
+
+/** Index of the first exception step, or -1. */
+export function firstExceptionStep(steps: TraceStep[]): number {
+  return steps.findIndex((step) => step.event === 'exception');
+}
