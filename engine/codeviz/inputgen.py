@@ -109,13 +109,20 @@ def generate_input(
     return GeneratedInput(name=param.name, type=kind, literal=literal)
 
 
-def _coordinate(inputs: list[GeneratedInput], params: list[Param], rng: random.Random) -> None:
+def _coordinate(
+    inputs: list[GeneratedInput],
+    params: list[Param],
+    rng: random.Random,
+    make_solvable: bool = True,
+) -> None:
     """Make related parameters consistent so runs are meaningful.
 
     * ``target`` next to a ``list[int]`` becomes the sum of two distinct
-      elements (the two-sum family has an answer).
+      elements (the two-sum family has an answer). Skipped when
+      ``make_solvable`` is False — complexity measurement wants the
+      no-early-exit path, not a lucky hit.
     * ``k``/index-like ints are clamped into the bounds of a sibling list
-      or string.
+      or string (always — out-of-range indices just crash).
     """
     by_name = {generated.name: generated for generated in inputs}
     list_values: Optional[list[int]] = None
@@ -129,9 +136,17 @@ def _coordinate(inputs: list[GeneratedInput], params: list[Param], rng: random.R
             sized_length = len(ast.literal_eval(generated.literal))
 
     target = by_name.get("target")
-    if target is not None and target.type == "int" and list_values and len(list_values) >= 2:
+    if (
+        make_solvable
+        and target is not None
+        and target.type == "int"
+        and list_values
+        and len(list_values) >= 2
+    ):
         first, second = rng.sample(range(len(list_values)), 2)
         target.literal = repr(list_values[first] + list_values[second])
+    elif not make_solvable and target is not None and target.type == "int" and list_values:
+        target.literal = repr(-1)  # unreachable: forces the full scan
 
     if sized_length:
         for name in ("k", "idx", "index"):
@@ -141,16 +156,21 @@ def _coordinate(inputs: list[GeneratedInput], params: list[Param], rng: random.R
 
 
 def generate_inputs(
-    function: FunctionInfo, seed: Optional[int] = None, size: Optional[int] = None
+    function: FunctionInfo,
+    seed: Optional[int] = None,
+    size: Optional[int] = None,
+    make_solvable: bool = True,
 ) -> tuple[list[GeneratedInput], int]:
     """Generate inputs for every parameter of ``function``.
 
     Returns ``(inputs, seed_used)`` — pass the seed back in to reproduce.
+    Set ``make_solvable=False`` for complexity measurement (avoids
+    early-exit-friendly coordination like reachable two-sum targets).
     """
     seed_used = seed if seed is not None else random.SystemRandom().randint(0, 999_999)
     rng = random.Random(seed_used)
     inputs = [generate_input(param, rng, size) for param in function.params]
-    _coordinate(inputs, function.params, rng)
+    _coordinate(inputs, function.params, rng, make_solvable=make_solvable)
     return inputs, seed_used
 
 

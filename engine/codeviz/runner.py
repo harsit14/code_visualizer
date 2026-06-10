@@ -309,7 +309,7 @@ def measure_complexity(
     used_seed = seed if seed is not None else 1234
     payload["seed"] = used_seed
     for size in sizes or [4, 8, 16, 32, 64]:
-        generated, _ = generate_inputs(info, seed=used_seed, size=size)
+        generated, _ = generate_inputs(info, seed=used_seed, size=size, make_solvable=False)
         try:
             arguments = [evaluate_input(item.literal) for item in generated]
         except BaseException:

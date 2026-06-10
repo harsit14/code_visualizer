@@ -1,0 +1,130 @@
+/**
+ * Console panel: stdout up to the current step, return value, exceptions,
+ * stderr, truncation notices, and complexity hints.
+ */
+import { AlertTriangle, Terminal, TrendingUp } from 'lucide-react';
+import { fitGrowth, formatValue, stdoutAtStep } from '../engine/trace';
+import type { ComplexityResult, SessionResult, TraceStep } from '../engine/types';
+
+type ConsolePanelProps = {
+  result: SessionResult | null;
+  currentStep: TraceStep | undefined;
+  atLastStep: boolean;
+  complexity: ComplexityResult | null;
+  complexityBusy: boolean;
+  onMeasureComplexity: () => void;
+  canMeasureComplexity: boolean;
+};
+
+export function ConsolePanel({
+  result,
+  currentStep,
+  atLastStep,
+  complexity,
+  complexityBusy,
+  onMeasureComplexity,
+  canMeasureComplexity,
+}: ConsolePanelProps) {
+  const run = result?.run ?? null;
+  const stdout = run ? stdoutAtStep(run.stdout, currentStep) : '';
+  const exception = run?.exception ?? run?.setupError ?? null;
+  const error = result?.error ?? null;
+  const growth =
+    complexity && complexity.samples.length >= 3 ? fitGrowth(complexity.samples) : null;
+  const maxOps = complexity ? Math.max(...complexity.samples.map((sample) => sample.ops), 1) : 1;
+
+  return (
+    <section className="panel console-panel" aria-label="Output console">
+      <header className="panel-header">
+        <h2>
+          <Terminal size={14} /> Console
+        </h2>
+        {run ? (
+          <span className="panel-hint">
+            {run.opCount} ops · {Math.round(result?.durationMs ?? 0)}ms
+          </span>
+        ) : null}
+      </header>
+
+      <div className="panel-scroll console-body">
+        {stdout ? <pre className="console-stdout">{stdout}</pre> : null}
+        {!stdout && run && !exception && !error ? (
+          <p className="panel-empty">No output yet at this step.</p>
+        ) : null}
+
+        {atLastStep && run?.returnValue ? (
+          <p className="console-return">
+            <span>returned</span> {formatValue(run.returnValue)}
+          </p>
+        ) : null}
+
+        {exception ? (
+          <div className="console-error" role="alert">
+            <AlertTriangle size={14} />
+            <div>
+              <strong>
+                {exception.type}: {exception.msg}
+              </strong>
+              {currentStep?.exc ? <p>raised at line {currentStep.line}</p> : null}
+            </div>
+          </div>
+        ) : null}
+
+        {error && !exception ? (
+          <div className="console-error" role="alert">
+            <AlertTriangle size={14} />
+            <strong>
+              {error.type}: {error.msg}
+            </strong>
+          </div>
+        ) : null}
+
+        {run?.truncated ? <p className="console-note">{run.truncationReason}</p> : null}
+        {run?.stderr ? <pre className="console-stderr">{run.stderr}</pre> : null}
+
+        <div className="complexity-block">
+          <button
+            className="ghost-button"
+            disabled={!canMeasureComplexity || complexityBusy}
+            onClick={onMeasureComplexity}
+            title="Run the function at several input sizes and fit a growth curve"
+            type="button"
+          >
+            <TrendingUp size={13} />
+            {complexityBusy ? 'Measuring…' : 'Estimate complexity'}
+          </button>
+
+          {complexity?.error ? (
+            <p className="console-note">
+              {complexity.error.type}: {complexity.error.msg}
+            </p>
+          ) : null}
+
+          {complexity && complexity.samples.length > 0 ? (
+            <div className="complexity-result">
+              {growth ? (
+                <p className="complexity-label">
+                  steps grow like <strong>{growth}</strong>
+                </p>
+              ) : null}
+              <div className="complexity-bars">
+                {complexity.samples.map((sample) => (
+                  <div className="complexity-bar-row" key={sample.n}>
+                    <span className="complexity-n">n={sample.n}</span>
+                    <div className="complexity-bar-track">
+                      <div
+                        className="complexity-bar"
+                        style={{ width: `${Math.max(2, (sample.ops / maxOps) * 100)}%` }}
+                      />
+                    </div>
+                    <span className="complexity-ops">{sample.ops}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </section>
+  );
+}

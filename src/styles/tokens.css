@@ -1,46 +1,52 @@
-:root {
+/* Theme tokens. The default theme is dark; [data-theme='light'] overrides. */
+
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #0e1117;
+  --bg-raised: #161b24;
+  --bg-inset: #0a0d12;
+  --border: #232a36;
+  --border-strong: #2f3949;
+  --text: #e6ebf2;
+  --text-dim: #8b96a8;
+  --text-faint: #5d6678;
+  --accent: #4f8ef7;
+  --accent-soft: rgba(79, 142, 247, 0.16);
+  --green: #3fb97f;
+  --green-soft: rgba(63, 185, 127, 0.16);
+  --amber: #e0a93e;
+  --amber-soft: rgba(224, 169, 62, 0.16);
+  --red: #e5604f;
+  --red-soft: rgba(229, 96, 79, 0.14);
+  --purple: #a584f5;
+  --exec-line: rgba(79, 142, 247, 0.18);
+  --error-line: rgba(229, 96, 79, 0.22);
+  --shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+  --mono: 'SF Mono', ui-monospace, 'Cascadia Code', Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, sans-serif;
+}
+
+:root[data-theme='light'] {
   color-scheme: light;
-  font-family:
-    Inter,
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
-  font-synthesis: none;
-  text-rendering: geometricPrecision;
-  --font-mono: 'SFMono-Regular', 'Cascadia Code', 'Liberation Mono', Menlo, Consolas, monospace;
-
-  --ink-950: #161616;
-  --ink-800: #2c3137;
-  --ink-650: #59616d;
-  --ink-500: #7a8491;
-  --paper: #fbfcf8;
-  --panel: #ffffff;
-  --panel-strong: #f4f7f4;
-  --field: #eef3f1;
-  --line: #d8ded9;
-
-  --teal: #087f72;
-  --teal-soft: #cfeee6;
-  --coral: #d94f35;
-  --coral-soft: #ffddd3;
-  --amber: #c77f10;
-  --amber-soft: #ffe7b2;
-  --leaf: #4f8a3d;
-  --leaf-soft: #dcefd6;
-  --violet: #6654b8;
-  --violet-soft: #e8e3ff;
-
-  --stage: #191a1d;
-  --stage-2: #24262b;
-  --stage-line: #51545c;
-  --stage-text: #f9fbf6;
-
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 18px;
-  --shadow-soft: 0 18px 55px rgba(35, 42, 52, 0.14);
-  --shadow-small: 0 10px 28px rgba(35, 42, 52, 0.1);
+  --bg: #f3f5f8;
+  --bg-raised: #ffffff;
+  --bg-inset: #e9edf2;
+  --border: #d8dee8;
+  --border-strong: #c3ccd9;
+  --text: #1c2330;
+  --text-dim: #5a6577;
+  --text-faint: #8b95a6;
+  --accent: #2769d8;
+  --accent-soft: rgba(39, 105, 216, 0.12);
+  --green: #1d8a58;
+  --green-soft: rgba(29, 138, 88, 0.13);
+  --amber: #b07f1a;
+  --amber-soft: rgba(176, 127, 26, 0.14);
+  --red: #c93f2e;
+  --red-soft: rgba(201, 63, 46, 0.12);
+  --purple: #6d48cf;
+  --exec-line: rgba(39, 105, 216, 0.14);
+  --error-line: rgba(201, 63, 46, 0.16);
+  --shadow: 0 4px 14px rgba(23, 32, 51, 0.1);
 }

@@ -1,395 +1,244 @@
-import { useEffect, useMemo, useState } from 'react';
-import { CodeEditorPanel } from '../components/editor/CodeEditorPanel';
-import { ScopeInspector } from '../components/inspector/ScopeInspector';
-import { OutputPanel } from '../components/panels/OutputPanel';
-import { TimelineScrubber } from '../components/timeline/TimelineScrubber';
-import { RunToolbar } from '../components/toolbar/RunToolbar';
-import { VisualizationStage } from '../components/visualization/VisualizationStage';
-import { decodeShareHash, encodeShareState, type SharedCodeState } from './shareState';
-import {
-  CUSTOM_SNIPPET_ID,
-  CUSTOM_SNIPPET_TITLE,
-  DEFAULT_EXAMPLE_ID,
-  getPythonExample,
-  isPythonExampleId,
-  pythonExamples,
-} from '../examples/pythonExamples';
-import { usePythonRuntime } from '../languages/python/usePythonRuntime';
-import type {
-  PythonRunResult,
-  PythonRuntimePhase,
-  PythonStaticAnalysis,
-  PythonTraceEvent,
-} from '../languages/python/runtimeTypes';
+/**
+ * App shell: layout, theme, share links, trace export/import, and wiring
+ * between the session hook and the dashboard panels.
+ */
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { CallStackPanel } from '../components/CallStackPanel';
+import { ConsolePanel } from '../components/ConsolePanel';
+import { ControlsBar } from '../components/ControlsBar';
+import { DataPanel } from '../components/DataPanel';
+import { EditorPanel } from '../components/EditorPanel';
+import { InputsPanel } from '../components/InputsPanel';
+import { TopBar } from '../components/TopBar';
+import { VariablesPanel } from '../components/VariablesPanel';
+import type { SessionResult } from '../engine/types';
+import { DEFAULT_EXAMPLE_ID, getExample } from '../examples/examples';
+import { decodeShareHash, encodeShareState } from './shareState';
+import { useSession } from './useSession';
 
-const RUNTIME_BUSY_PHASES = new Set<PythonRuntimePhase>([
-  'loading',
-  'running',
-  'interrupting',
-  'restarting',
-]);
-const EMPTY_TRACE_EVENTS: PythonTraceEvent[] = [];
-const EMPTY_STATIC_ANALYSIS: PythonStaticAnalysis = {
-  diagnostics: [],
-  lineToNodeIds: {},
-  nodes: [],
-  summary: {
-    assignments: 0,
-    branches: 0,
-    functions: 0,
-    loops: 0,
-  },
-  symbols: [],
-};
-const BASE_PLAYBACK_DELAY_MS = 820;
+type Theme = 'light' | 'dark';
 
-function readShareState(): SharedCodeState | null {
-  if (typeof window === 'undefined') {
-    return null;
+const EXPORT_VERSION = 2;
+
+function initialTheme(): Theme {
+  const stored = window.localStorage.getItem('cv-theme');
+  if (stored === 'light' || stored === 'dark') {
+    return stored;
   }
+  return window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+}
 
+function initialShare() {
   return decodeShareHash(window.location.hash);
 }
 
-function downloadJson(filename: string, data: unknown) {
-  const blob = new Blob([JSON.stringify(data, null, 2)], {
-    type: 'application/json;charset=utf-8',
-  });
-  const url = window.URL.createObjectURL(blob);
-  const link = document.createElement('a');
-
-  link.href = url;
-  link.download = filename;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => window.URL.revokeObjectURL(url), 1000);
-}
-
 export function App() {
-  const [initialShareState] = useState(readShareState);
-  const [selectedExampleId, setSelectedExampleId] = useState(
-    initialShareState?.exampleId ?? DEFAULT_EXAMPLE_ID,
+  const [shared] = useState(initialShare);
+  const [exampleId, setExampleId] = useState<string | null>(
+    shared ? (shared.exampleId ?? null) : DEFAULT_EXAMPLE_ID,
   );
-  const selectedExample = useMemo(
-    () => (isPythonExampleId(selectedExampleId) ? getPythonExample(selectedExampleId) : null),
-    [selectedExampleId],
+  const [theme, setTheme] = useState<Theme>(initialTheme);
+  const [shareLabel, setShareLabel] = useState('Share');
+
+  const initialCode = shared?.code ?? getExample(DEFAULT_EXAMPLE_ID)?.code ?? '';
+  const session = useSession(initialCode);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    window.localStorage.setItem('cv-theme', theme);
+  }, [theme]);
+
+  // Analyze the initial snippet so the inputs panel is ready pre-run.
+  useEffect(() => {
+    session.scheduleAnalyze(session.code);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleCodeChange = useCallback(
+    (code: string) => {
+      setExampleId(null);
+      session.setCode(code);
+    },
+    [session],
   );
-  const [code, setCode] = useState(
-    () =>
-      initialShareState?.code ??
-      getPythonExample(initialShareState?.exampleId ?? DEFAULT_EXAMPLE_ID).code,
-  );
-  const [customCode, setCustomCode] = useState(() =>
-    initialShareState?.exampleId === CUSTOM_SNIPPET_ID ? initialShareState.code : '',
-  );
-  const [currentStep, setCurrentStep] = useState(0);
-  const [exportState, setExportState] = useState<'idle' | 'done'>('idle');
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [playbackSpeed, setPlaybackSpeed] = useState(1);
-  const [runResult, setRunResult] = useState<PythonRunResult | null>(null);
-  const [selectedObjectId, setSelectedObjectId] = useState<string | undefined>(undefined);
-  const [shareState, setShareState] = useState<'idle' | 'copied' | 'linked'>(
-    initialShareState ? 'linked' : 'idle',
-  );
-  const { runPython, runtimeStatus } = usePythonRuntime();
-  const isRuntimeBusy = RUNTIME_BUSY_PHASES.has(runtimeStatus.phase);
-  const traceEvents = runResult?.traceEvents ?? EMPTY_TRACE_EVENTS;
-  const staticAnalysis = runResult?.staticAnalysis ?? EMPTY_STATIC_ANALYSIS;
-  const totalSteps = Math.max(traceEvents.length, 1);
-  const currentEvent: PythonTraceEvent | null = traceEvents[currentStep] ?? null;
-  const isCustomSnippet = selectedExampleId === CUSTOM_SNIPPET_ID;
-  const sourceTitle = selectedExample?.title ?? CUSTOM_SNIPPET_TITLE;
-  const activeLine = currentEvent?.line;
-  const executedLines = useMemo(
-    () =>
-      Array.from(
-        new Set(traceEvents.map((event) => event.line).filter((line): line is number => !!line)),
-      ),
-    [traceEvents],
-  );
-  const lineToStep = useMemo(() => {
-    const map = new Map<number, number>();
-    traceEvents.forEach((event, index) => {
-      if (event.line && !map.has(event.line)) {
-        map.set(event.line, index);
+
+  const handleExampleChange = useCallback(
+    (id: string) => {
+      const example = getExample(id);
+      if (!example) {
+        return;
       }
-    });
-    return map;
-  }, [traceEvents]);
+      setExampleId(id);
+      session.setCode(example.code);
+    },
+    [session],
+  );
 
-  const clearRunState = () => {
-    setCurrentStep(0);
-    setExportState('idle');
-    setIsPlaying(false);
-    setRunResult(null);
-    setSelectedObjectId(undefined);
-  };
-
-  useEffect(() => {
-    if (!isPlaying) {
-      return;
-    }
-
-    const timer = window.setInterval(
-      () => {
-        setCurrentStep((step) => {
-          if (step >= totalSteps - 1) {
-            setIsPlaying(false);
-            return step;
-          }
-
-          return step + 1;
-        });
-      },
-      Math.max(120, Math.round(BASE_PLAYBACK_DELAY_MS / playbackSpeed)),
-    );
-
-    return () => window.clearInterval(timer);
-  }, [isPlaying, playbackSpeed, totalSteps]);
-
-  useEffect(() => {
-    if (currentStep > totalSteps - 1) {
-      setCurrentStep(Math.max(totalSteps - 1, 0));
-    }
-  }, [currentStep, totalSteps]);
-
-  useEffect(() => {
-    if (
-      selectedObjectId &&
-      !currentEvent?.objects.some(
-        (object) => object.id === selectedObjectId && object.kind !== 'primitive',
-      )
-    ) {
-      setSelectedObjectId(undefined);
-    }
-  }, [currentEvent, selectedObjectId]);
-
-  const handleRun = async () => {
-    if (isRuntimeBusy) {
-      return;
-    }
-
-    setCurrentStep(0);
-    setExportState('idle');
-    setIsPlaying(false);
-    setRunResult(null);
-    setSelectedObjectId(undefined);
-
-    try {
-      const result = await runPython(code, { timeoutMs: 5000 });
-      const errorStep = result.traceEvents.reduce(
-        (lastExceptionStep, event, index) =>
-          event.type === 'exception' ? index : lastExceptionStep,
-        -1,
-      );
-      const failureStep = errorStep >= 0 ? errorStep : result.traceEvents.length - 1;
-      setRunResult(result);
-      setCurrentStep(result.status === 'ok' ? 0 : Math.max(failureStep, 0));
-      setIsPlaying(result.status === 'ok' && result.traceEvents.length > 1);
-    } catch (error) {
-      setRunResult({
-        requestId: 'client-error',
-        status: 'error',
-        stdout: '',
-        stderr: '',
-        traceEvents: [],
-        diagnostics: [],
-        durationMs: 0,
-        interruptMode: 'none',
-        error: {
-          name: error instanceof Error ? error.name : 'ClientError',
-          message: error instanceof Error ? error.message : String(error),
-        },
-      });
-    }
-  };
-
-  const handleReset = () => {
-    if (selectedExample) {
-      setCode(selectedExample.code);
-    }
-
-    setShareState('idle');
-    clearRunState();
-  };
-
-  const handleCodeChange = (nextCode: string) => {
-    setCode(nextCode);
-    setCustomCode(nextCode);
-    setSelectedExampleId(CUSTOM_SNIPPET_ID);
-    setShareState('idle');
-    clearRunState();
-  };
-
-  const handleExampleChange = (id: string) => {
-    if (id === CUSTOM_SNIPPET_ID) {
-      setSelectedExampleId(CUSTOM_SNIPPET_ID);
-      setCode(customCode);
-      setShareState('idle');
-      clearRunState();
-      return;
-    }
-
-    const nextExample = getPythonExample(id);
-
-    setSelectedExampleId(id);
-    setCode(nextExample.code);
-    setShareState('idle');
-    clearRunState();
-  };
-
-  const handleClearCustomSnippet = () => {
-    setCode('');
-    setCustomCode('');
-    setShareState('idle');
-    clearRunState();
-  };
-
-  const handleLineSelect = (line: number) => {
-    const nextStep = lineToStep.get(line);
-    if (nextStep === undefined) {
-      return;
-    }
-
-    setIsPlaying(false);
-    setCurrentStep(nextStep);
-  };
-
-  const handleTimelineChange = (step: number) => {
-    setIsPlaying(false);
-    setCurrentStep(step);
-  };
-
-  const handleObjectSelect = (objectId: string) => {
-    setIsPlaying(false);
-    setSelectedObjectId((currentObjectId) => (currentObjectId === objectId ? undefined : objectId));
-  };
-
-  const handleTogglePlayback = () => {
-    if (traceEvents.length <= 1) {
-      return;
-    }
-
-    if (!isPlaying && currentStep >= totalSteps - 1) {
-      setCurrentStep(0);
-    }
-
-    setIsPlaying((playing) => !playing);
-  };
-
-  const handleExport = () => {
-    if (!runResult || typeof window === 'undefined') {
-      return;
-    }
-
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-
-    downloadJson(`code-visualizer-${selectedExample?.id ?? CUSTOM_SNIPPET_ID}-${timestamp}.json`, {
-      exportedAt: new Date().toISOString(),
-      code,
-      currentStep,
-      source: {
-        id: selectedExample?.id ?? CUSTOM_SNIPPET_ID,
-        title: sourceTitle,
-        type: selectedExample ? 'example' : 'custom',
-      },
-      runResult,
-      selectedExampleId,
-    });
-    setExportState('done');
-    window.setTimeout(() => setExportState('idle'), 1600);
-  };
-
-  const handleShare = async () => {
-    if (typeof window === 'undefined' || code.trim().length === 0) {
-      return;
-    }
-
+  const handleShare = useCallback(async () => {
     const url = new URL(window.location.href);
-    url.hash = encodeShareState({ code, exampleId: selectedExampleId });
+    url.hash = encodeShareState({
+      code: session.code,
+      exampleId: exampleId ?? undefined,
+      seed: session.seed ?? undefined,
+      functionName: session.functionOverride ?? undefined,
+    });
     window.history.replaceState(null, '', url);
-
     try {
-      await window.navigator.clipboard?.writeText(url.toString());
-      setShareState('copied');
+      await navigator.clipboard?.writeText(url.toString());
+      setShareLabel('Copied!');
     } catch {
-      setShareState('linked');
+      setShareLabel('Link set');
     }
+    window.setTimeout(() => setShareLabel('Share'), 1800);
+  }, [exampleId, session.code, session.functionOverride, session.seed]);
 
-    window.setTimeout(() => setShareState('linked'), 1800);
-  };
+  const handleExport = useCallback(() => {
+    if (!session.result) {
+      return;
+    }
+    const payload = {
+      version: EXPORT_VERSION,
+      exportedAt: new Date().toISOString(),
+      code: session.code,
+      step: session.step,
+      result: session.result,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: 'application/json;charset=utf-8',
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `code-visualizer-trace-${Date.now()}.json`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }, [session.code, session.result, session.step]);
+
+  const handleImport = useCallback(
+    (file: File) => {
+      void file.text().then((text) => {
+        try {
+          const payload = JSON.parse(text) as {
+            version?: number;
+            code?: string;
+            result?: SessionResult;
+          };
+          if (typeof payload.code === 'string' && payload.result) {
+            setExampleId(null);
+            session.importSession(payload.code, payload.result);
+          }
+        } catch {
+          /* invalid file — ignore */
+        }
+      });
+    },
+    [session],
+  );
+
+  const run = session.result?.run ?? null;
+  const errorLine = useMemo(() => {
+    if (session.currentStep?.exc) {
+      return session.currentStep.line;
+    }
+    if (session.result?.error?.line) {
+      return session.result.error.line;
+    }
+    return null;
+  }, [session.currentStep, session.result]);
+
+  const atLastStep = session.totalSteps > 0 && session.step === session.totalSteps - 1;
+  const previousStep = session.step > 0 ? session.steps[session.step - 1] : undefined;
+  const showInputs = session.analysis?.mode === 'function';
 
   return (
-    <main className="app-shell">
-      <RunToolbar
-        activeStep={currentStep}
-        canExport={Boolean(runResult)}
-        canShare={code.trim().length > 0}
-        examples={pythonExamples}
-        exportState={exportState}
-        isBusy={isRuntimeBusy}
+    <div className="app-shell">
+      <TopBar
+        canExport={Boolean(session.result?.run)}
+        exampleId={exampleId}
         onExampleChange={handleExampleChange}
         onExport={handleExport}
-        onReset={handleReset}
-        onRun={handleRun}
-        onShare={handleShare}
-        runtimeStatus={runtimeStatus}
-        selectedExampleId={selectedExampleId}
-        shareState={shareState}
-        totalSteps={totalSteps}
+        onImport={handleImport}
+        onShare={() => void handleShare()}
+        onToggleTheme={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))}
+        shareLabel={shareLabel}
+        status={session.status}
+        theme={theme}
       />
 
-      <section className="workbench" aria-label="Code visualizer workspace">
-        <CodeEditorPanel
-          activeLine={activeLine}
-          code={code}
-          diagnostics={staticAnalysis.diagnostics}
-          executedLines={executedLines}
-          isCustomSnippet={isCustomSnippet}
-          onClear={handleClearCustomSnippet}
-          onChange={handleCodeChange}
-          onLineSelect={handleLineSelect}
-          sourceTitle={sourceTitle}
-        />
-
-        <VisualizationStage
-          currentEvent={currentEvent}
-          currentStep={currentStep}
-          exampleTitle={sourceTitle}
-          onObjectSelect={handleObjectSelect}
-          selectedObjectId={selectedObjectId}
-          staticAnalysis={staticAnalysis}
-          totalSteps={totalSteps}
-        />
-
-        <aside className="inspector-stack" aria-label="Runtime inspector">
-          <ScopeInspector
-            currentEvent={currentEvent}
-            currentStep={currentStep}
-            onObjectSelect={handleObjectSelect}
-            selectedObjectId={selectedObjectId}
-            totalSteps={totalSteps}
+      <main className="workbench">
+        <div className="column column-left">
+          <EditorPanel
+            activeLine={session.currentStep?.line ?? null}
+            code={session.code}
+            diagnostics={session.analysis?.diagnostics ?? []}
+            errorLine={errorLine}
+            onChange={handleCodeChange}
+            theme={theme}
           />
-          <OutputPanel
-            currentEvent={currentEvent}
-            exampleTitle={sourceTitle}
-            runResult={runResult}
-            runtimeStatus={runtimeStatus}
-          />
-        </aside>
-      </section>
+          {showInputs ? (
+            <InputsPanel
+              activeFunction={session.activeFunction}
+              analysis={session.analysis}
+              drafts={session.inputDrafts}
+              isBusy={session.isBusy}
+              lastInputs={run?.inputs ?? null}
+              onDraftsChange={session.setInputDrafts}
+              onFunctionChange={session.setFunctionOverride}
+              onRegenerate={session.regenerateInputs}
+              onSeedChange={session.setSeed}
+              seed={session.seed}
+            />
+          ) : null}
+        </div>
 
-      <TimelineScrubber
-        currentStep={currentStep}
-        events={traceEvents}
-        isPlaying={isPlaying}
-        onChange={handleTimelineChange}
-        onPlaybackSpeedChange={setPlaybackSpeed}
-        onTogglePlayback={handleTogglePlayback}
-        playbackSpeed={playbackSpeed}
-        totalSteps={totalSteps}
+        <div className="column column-center">
+          <DataPanel
+            atLastStep={atLastStep}
+            currentStep={session.currentStep}
+            frameIndex={session.selectedFrameIndex}
+            returnValue={run?.returnValue ?? null}
+          />
+        </div>
+
+        <div className="column column-right">
+          <VariablesPanel
+            currentStep={session.currentStep}
+            frameIndex={session.selectedFrameIndex}
+            previousStep={previousStep}
+          />
+          <CallStackPanel
+            currentStep={session.currentStep}
+            onSelectFrame={session.setSelectedFrameIndex}
+            selectedFrameIndex={session.selectedFrameIndex}
+          />
+          <ConsolePanel
+            atLastStep={atLastStep}
+            canMeasureComplexity={showInputs && !session.isBusy}
+            complexity={session.complexity}
+            complexityBusy={session.complexityBusy}
+            currentStep={session.currentStep}
+            onMeasureComplexity={() => void session.measureComplexity()}
+            result={session.result}
+          />
+        </div>
+      </main>
+
+      <ControlsBar
+        currentStep={session.currentStep}
+        isBusy={session.isBusy}
+        onJump={session.jumpToStep}
+        onRun={() => void session.run()}
+        onSpeedChange={session.setSpeed}
+        onStepBack={session.stepBack}
+        onStepForward={session.stepForward}
+        onTogglePlay={session.togglePlay}
+        playing={session.playing}
+        speed={session.speed}
+        step={session.step}
+        totalSteps={session.totalSteps}
       />
-    </main>
+    </div>
   );
 }

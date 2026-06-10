@@ -164,13 +164,7 @@ export type EngineRequest =
   | { op: 'analyze'; source: string }
   | { op: 'complexity'; source: string; function?: string; seed?: number };
 
-export type RuntimePhase =
-  | 'idle'
-  | 'loading'
-  | 'ready'
-  | 'running'
-  | 'interrupting'
-  | 'restarting';
+export type RuntimePhase = 'idle' | 'loading' | 'ready' | 'running' | 'interrupting' | 'restarting';
 
 export type RuntimeStatus = {
   phase: RuntimePhase;

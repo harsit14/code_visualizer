@@ -1,47 +1,28 @@
 import { describe, expect, it } from 'vitest';
-import { CUSTOM_SNIPPET_ID, DEFAULT_EXAMPLE_ID } from '../examples/pythonExamples';
-import { decodeShareHash, encodeShareState, SHARE_HASH_PREFIX } from './shareState';
+import { decodeShareHash, encodeShareState } from './shareState';
 
-describe('share state encoding', () => {
-  it('round-trips code and example id through a URL hash', () => {
-    const hash = encodeShareState({
-      code: 'nums = [1, 2, 3]\nprint(nums)',
-      exampleId: 'list-alias',
-    });
-
-    expect(hash.startsWith(SHARE_HASH_PREFIX)).toBe(true);
-    expect(decodeShareHash(hash)).toEqual({
-      code: 'nums = [1, 2, 3]\nprint(nums)',
-      exampleId: 'list-alias',
-    });
+describe('share state', () => {
+  it('round-trips code with metadata', () => {
+    const state = {
+      code: 'def f(nums):\n    return nums # ünïcode ✓',
+      exampleId: 'two-sum',
+      seed: 42,
+      functionName: 'Solution.twoSum',
+    };
+    expect(decodeShareHash(encodeShareState(state))).toEqual(state);
   });
 
-  it('rejects malformed hashes', () => {
-    expect(decodeShareHash('#missing')).toBeNull();
-    expect(decodeShareHash(`${SHARE_HASH_PREFIX}bad-payload`)).toBeNull();
+  it('round-trips minimal state', () => {
+    expect(decodeShareHash(encodeShareState({ code: 'x = 1' }))).toEqual({ code: 'x = 1' });
   });
 
-  it('preserves shared custom snippets', () => {
-    const hash = encodeShareState({
-      code: 'name = "Ada"\nprint(name)',
-      exampleId: CUSTOM_SNIPPET_ID,
-    });
-
-    expect(decodeShareHash(hash)).toEqual({
-      code: 'name = "Ada"\nprint(name)',
-      exampleId: CUSTOM_SNIPPET_ID,
-    });
+  it('rejects unknown hashes', () => {
+    expect(decodeShareHash('')).toBeNull();
+    expect(decodeShareHash('#other=abc')).toBeNull();
+    expect(decodeShareHash('#cv=!!!not-base64!!!')).toBeNull();
   });
 
-  it('falls back when a shared example id is unknown', () => {
-    const hash = encodeShareState({
-      code: 'print("hello")',
-      exampleId: 'unknown-example',
-    });
-
-    expect(decodeShareHash(hash)).toEqual({
-      code: 'print("hello")',
-      exampleId: DEFAULT_EXAMPLE_ID,
-    });
+  it('rejects payloads without code', () => {
+    expect(decodeShareHash('#cv=' + btoa(JSON.stringify({ seed: 1 })))).toBeNull();
   });
 });

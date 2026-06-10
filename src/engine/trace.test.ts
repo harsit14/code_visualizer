@@ -2,12 +2,20 @@ import { describe, expect, it } from 'vitest';
 import {
   diffLocals,
   findArrayPointers,
-  findChainPointers,
   fitGrowth,
   formatValue,
+  groupChains,
   stdoutAtStep,
 } from './trace';
 import type { EncodedValue, TraceStep } from './types';
+
+const chain = (id: number, nodeIds: number[], values: number[]): EncodedValue => ({
+  k: 'listnode',
+  id,
+  nodes: nodeIds.map((nodeId, index) => ({ id: nodeId, val: num(values[index]) })),
+  cyclic: false,
+  truncated: false,
+});
 
 const num = (v: number): EncodedValue => ({ k: 'num', t: 'int', v: String(v) });
 const str = (v: string): EncodedValue => ({ k: 'str', v, truncated: false });
@@ -120,31 +128,38 @@ describe('findArrayPointers', () => {
   });
 });
 
-describe('findChainPointers', () => {
-  it('finds locals pointing into another chain', () => {
-    const head: EncodedValue = {
-      k: 'listnode',
-      id: 1,
-      nodes: [
-        { id: 1, val: num(1) },
-        { id: 2, val: num(2) },
-        { id: 3, val: num(3) },
-      ],
-      cyclic: false,
-      truncated: false,
-    };
-    const slow: EncodedValue = {
-      k: 'listnode',
-      id: 2,
-      nodes: [
-        { id: 2, val: num(2) },
-        { id: 3, val: num(3) },
-      ],
-      cyclic: false,
-      truncated: false,
-    };
-    const pointers = findChainPointers({ head, slow });
-    expect(pointers.get('head')).toEqual([{ name: 'slow', nodeId: 2 }]);
+describe('groupChains', () => {
+  it('renders mid-chain pointers as markers on the owning chain', () => {
+    const groups = groupChains({
+      head: chain(1, [1, 2, 3], [1, 2, 3]),
+      slow: chain(2, [2, 3], [2, 3]),
+    });
+    expect(groups).toHaveLength(1);
+    expect(groups[0].names).toEqual(['head']);
+    expect(groups[0].labels.get(2)).toEqual(['slow']);
+  });
+
+  it('merges aliases sharing a head node into one card', () => {
+    // curr and nxt both start at node 5 (the reverse-list `nxt = curr` moment)
+    const groups = groupChains({
+      curr: chain(5, [5, 6, 7], [5, 6, 7]),
+      nxt: chain(5, [5, 6, 7], [5, 6, 7]),
+    });
+    expect(groups).toHaveLength(1);
+    expect(groups[0].names).toEqual(['curr', 'nxt']);
+    expect(groups[0].labels.get(5)).toEqual(['curr', 'nxt']);
+  });
+
+  it('keeps disjoint chains as separate cards', () => {
+    const groups = groupChains({
+      prev: chain(1, [1, 2], [13, 15]),
+      curr: chain(3, [3, 4], [2, 19]),
+    });
+    expect(groups.map((group) => group.names[0]).sort()).toEqual(['curr', 'prev']);
+  });
+
+  it('ignores empty chains and non-chain locals', () => {
+    expect(groupChains({ x: num(1) })).toEqual([]);
   });
 });
 

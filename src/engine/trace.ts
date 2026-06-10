@@ -3,12 +3,7 @@
  * step-to-step variable diffing, pointer-marker detection for arrays and
  * linked lists, and complexity growth-curve labeling.
  */
-import type {
-  ComplexitySample,
-  EncodedValue,
-  FrameSnapshot,
-  TraceStep,
-} from './types';
+import type { ComplexitySample, EncodedValue, FrameSnapshot, TraceStep } from './types';
 
 /** Render an encoded value as a compact one-line preview. */
 export function formatValue(value: EncodedValue | null | undefined, depth = 0): string {
@@ -152,11 +147,42 @@ export function findMatchingFrame(
 }
 
 const POINTER_NAMES = new Set([
-  'i', 'j', 'k', 'l', 'r', 'p', 'q',
-  'left', 'right', 'lo', 'hi', 'low', 'high', 'mid', 'middle',
-  'start', 'end', 'begin', 'stop', 'first', 'last',
-  'index', 'idx', 'pos', 'ptr', 'cur', 'curr', 'current',
-  'p1', 'p2', 'i1', 'i2', 'fast', 'slow', 'read', 'write',
+  'i',
+  'j',
+  'k',
+  'l',
+  'r',
+  'p',
+  'q',
+  'left',
+  'right',
+  'lo',
+  'hi',
+  'low',
+  'high',
+  'mid',
+  'middle',
+  'start',
+  'end',
+  'begin',
+  'stop',
+  'first',
+  'last',
+  'index',
+  'idx',
+  'pos',
+  'ptr',
+  'cur',
+  'curr',
+  'current',
+  'p1',
+  'p2',
+  'i1',
+  'i2',
+  'fast',
+  'slow',
+  'read',
+  'write',
 ]);
 
 export type ArrayPointer = { name: string; index: number };
@@ -191,38 +217,58 @@ export function findArrayPointers(
   return result;
 }
 
-export type ChainPointer = { name: string; nodeId: number };
+export type ChainValue = Extract<EncodedValue, { k: 'listnode' }>;
+
+export type ChainGroup = {
+  /** Variables whose head IS this card's head node (aliases). */
+  names: string[];
+  value: ChainValue;
+  /** nodeId -> variable names pointing at that node (markers). */
+  labels: Map<number, string[]>;
+};
 
 /**
- * Locals that point at nodes inside another local's linked-list chain
- * ("slow", "fast", "prev"), keyed by the chain variable's name.
+ * Group linked-list locals into renderable chains.
+ *
+ * Longest chains claim their nodes first; any other variable whose head
+ * node is already claimed (aliases like `curr`/`nxt`, or mid-chain
+ * pointers like `slow`/`fast`) becomes a label on the owning chain
+ * instead of its own card.
  */
-export function findChainPointers(
-  locals: Record<string, EncodedValue>,
-): Map<string, ChainPointer[]> {
-  const result = new Map<string, ChainPointer[]>();
-  const chains = Object.entries(locals).filter(
-    (entry): entry is [string, Extract<EncodedValue, { k: 'listnode' }>] =>
-      entry[1].k === 'listnode',
-  );
+export function groupChains(locals: Record<string, EncodedValue>): ChainGroup[] {
+  const chains = Object.entries(locals)
+    .filter(
+      (entry): entry is [string, ChainValue] =>
+        entry[1].k === 'listnode' && entry[1].nodes.length > 0,
+    )
+    .sort((a, b) => b[1].nodes.length - a[1].nodes.length);
 
-  for (const [chainName, chain] of chains) {
-    const nodeIds = new Set(chain.nodes.map((node) => node.id));
-    const pointers: ChainPointer[] = [];
-    for (const [name, value] of Object.entries(locals)) {
-      if (name === chainName || value.k !== 'listnode' || value.nodes.length === 0) {
-        continue;
+  const owners = new Map<number, ChainGroup>();
+  const groups: ChainGroup[] = [];
+
+  for (const [name, value] of chains) {
+    const headId = value.nodes[0].id;
+    const owner = owners.get(headId);
+    if (owner) {
+      owner.labels.set(headId, [...(owner.labels.get(headId) ?? []), name]);
+      if (headId === owner.value.nodes[0].id) {
+        owner.names.push(name);
       }
-      const headId = value.nodes[0].id;
-      if (nodeIds.has(headId)) {
-        pointers.push({ name, nodeId: headId });
-      }
+      continue;
     }
-    if (pointers.length > 0) {
-      result.set(chainName, pointers);
+    const group: ChainGroup = {
+      names: [name],
+      value,
+      labels: new Map([[headId, [name]]]),
+    };
+    groups.push(group);
+    for (const node of value.nodes) {
+      if (!owners.has(node.id)) {
+        owners.set(node.id, group);
+      }
     }
   }
-  return result;
+  return groups;
 }
 
 export type GrowthLabel = 'O(1)' | 'O(log n)' | 'O(n)' | 'O(n log n)' | 'O(n²)' | 'O(n³) or worse';

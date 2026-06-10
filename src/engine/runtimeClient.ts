@@ -5,12 +5,7 @@
  * timeout with SharedArrayBuffer interrupt support when cross-origin
  * isolated, and falls back to restarting the worker otherwise.
  */
-import type {
-  EngineRequest,
-  RuntimeStatus,
-  WorkerInbound,
-  WorkerOutbound,
-} from './types';
+import type { EngineRequest, RuntimeStatus, WorkerInbound, WorkerOutbound } from './types';
 
 export type InterruptMode = 'shared-array-buffer' | 'worker-terminate' | 'none';
 
@@ -98,8 +93,7 @@ export class RuntimeClient {
     this.worker = new Worker(new URL('./pyodideWorker.ts', import.meta.url), {
       type: 'module',
     });
-    this.worker.onmessage = (event: MessageEvent<WorkerOutbound>) =>
-      this.handleMessage(event.data);
+    this.worker.onmessage = (event: MessageEvent<WorkerOutbound>) => this.handleMessage(event.data);
     this.worker.onerror = (event) => {
       this.failPending(new Error(event.message || 'Python worker crashed.'));
       this.restartWorker();

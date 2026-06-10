@@ -70,7 +70,7 @@ async function ensurePyodide(): Promise<PyodideAPI> {
         ].join('\n'),
       );
 
-      emitStatus('ready', `Python ${pyodideVersion} ready`);
+      emitStatus('ready', `Pyodide ${pyodideVersion} ready`);
       return pyodide;
     });
   }
@@ -98,7 +98,7 @@ async function handleRequest(requestId: string, request: unknown) {
       data,
       durationMs: performance.now() - startedAt,
     });
-    emitStatus('ready', `Python ${pyodideVersion} ready`);
+    emitStatus('ready', `Pyodide ${pyodideVersion} ready`);
   } catch (error) {
     // handle_request never throws for Python-level errors, so anything here
     // is a worker/runtime failure (including interrupt during dispatch).
@@ -115,7 +115,7 @@ async function handleRequest(requestId: string, request: unknown) {
       },
       durationMs: performance.now() - startedAt,
     });
-    emitStatus('ready', `Python ${pyodideVersion} ready`);
+    emitStatus('ready', `Pyodide ${pyodideVersion} ready`);
   }
 }
 
