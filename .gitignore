@@ -2,6 +2,12 @@ node_modules
 dist
 coverage
 
+# Python engine
+engine/.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
 # Local planning / agent notes
 PROGRESS.md
 plan.md
