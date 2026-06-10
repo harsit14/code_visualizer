@@ -276,6 +276,12 @@ export function useSession(initialCode: string) {
 
   /** Restore an exported session (replay without re-running). */
   const importSession = useCallback((importedCode: string, imported: SessionResult) => {
+    if (analyzeTimer.current) {
+      // A debounced analyze from a recent edit would overwrite the
+      // imported analysis (and e.g. hide the inputs panel) — drop it.
+      window.clearTimeout(analyzeTimer.current);
+      analyzeTimer.current = null;
+    }
     setCodeState(importedCode);
     setResult(imported);
     setAnalysis(imported.analysis ?? null);

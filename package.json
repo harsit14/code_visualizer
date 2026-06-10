@@ -13,7 +13,8 @@
     "lint": "eslint .",
     "format": "prettier --check .",
     "format:write": "prettier --write .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:engine": "cd engine && .venv/bin/pytest -q"
   },
   "dependencies": {
     "@codemirror/lang-python": "^6.2.1",

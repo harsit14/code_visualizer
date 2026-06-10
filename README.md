@@ -1,137 +1,133 @@
 # Code Visualizer
 
-Code Visualizer is a Python-first runtime visualization app for learning how code actually executes. Paste Python, run it in the browser, and scrub through a visual trace of lines, variables, scopes, references, loops, functions, objects, mutations, stdout, and errors.
+Paste **any** Python code — a script, or a bare LeetCode-style function with no
+entry point and no inputs — and watch it execute step by step: variables,
+call stack, arrays with pointer markers, dicts, binary trees, linked lists,
+stdout, return values, and exceptions, all on a scrubable timeline.
 
-![Code Visualizer runtime map](docs/assets/runtime-map.png)
+Everything runs **in your browser** (Pyodide / WebAssembly). No server, no
+setup, nothing leaves your machine.
 
-## What It Does
+> 🖼️ _Screenshot placeholder: dashboard running `Solution.twoSum` with
+> generated inputs, array pointer markers, and the dict build-up._
+>
+> 🎞️ _GIF placeholder: scrubbing back and forth through a linked-list
+> reversal._
 
-- Runs Python entirely in the browser with Pyodide and a Web Worker.
-- Records line-by-line execution using `sys.settrace`.
-- Shows variables as live scope entries and object references as arrows.
-- Preserves Python object identity so aliases and mutations are shown truthfully.
-- Visualizes loop progress, function calls, recursion, return values, and runtime errors.
-- Lets users play, pause, step, scrub, change speed, inspect objects, share code links, and export trace JSON.
+## Highlights
 
-## Why This Exists
+- **Universal code support.** Scripts run as-is. Code with no entry point
+  (e.g. `class Solution: def twoSum(self, nums, target): ...`) is analyzed
+  with `ast`: the tool finds callables, infers parameter types from type
+  hints, usage patterns (`p.next`, `grid[i][j]`, `s.lower()`), and naming
+  conventions (`nums`, `root`, `head`, `intervals`…), then **generates
+  seeded random test inputs** and calls the function for you.
+- **Built-in LeetCode structures.** `TreeNode` / `ListNode` are injected when
+  referenced, with `tree([3, 9, 20, None, None, 15, 7])` and
+  `linked([1, 2, 3])` literals you can edit in the UI. Trees render as node
+  diagrams, linked lists as chained boxes — including aliases and mid-chain
+  pointers (`slow`, `fast`, `prev`) during rewiring.
+- **Time-travel debugging.** The full trace is recorded; play, pause, step
+  forward/back, jump to any step, or drag the scrubber. The Variables panel
+  highlights exactly what changed at each step.
+- **Pointer-aware arrays.** Index variables (`i`, `j`, `left`, `right`, `lo`,
+  `hi`, …) are drawn as markers on the arrays and strings they index.
+- **Exceptions land where they happened.** A crash highlights the failing
+  line, jumps to that step, and shows the live state at failure.
+- **Complexity hints.** One click runs the function at n = 4…64 and fits a
+  growth label (O(n), O(n²), …) to the measured step counts.
+- **Sessions.** Export a trace as JSON and re-import it later to replay
+  without re-running; share code + seed via URL. Dark/light mode.
+- **Safeguards.** Step cap, wall-clock cap, interrupt-based timeout, deep
+  structure truncation, deep-recursion frame eliding.
 
-Most beginner debugging tools show text tables, raw stack traces, or isolated line highlights. This project tries to make execution feel spatial: scopes become containers, values become objects, references become arrows, and the timeline becomes a replayable story.
-
-The goal is not to replace a debugger. It is to make Python execution easier to explain, teach, and reason about.
-
-## Architecture
-
-```mermaid
-flowchart LR
-  User["User Python Code"] --> Editor["React Editor"]
-  Editor --> RuntimeClient["Runtime Client"]
-  RuntimeClient --> Worker["Pyodide Web Worker"]
-  Worker --> Trace["sys.settrace Events"]
-  Worker --> Static["AST Static Analysis"]
-  Trace --> Normalize["Trace Normalization"]
-  Static --> Normalize
-  Normalize --> Frames["Runtime Frames"]
-  Frames --> Timeline["Timeline Scrubber"]
-  Frames --> Stage["Hybrid Visualization"]
-  Frames --> Inspector["Scope/Object Inspector"]
-  Frames --> Output["Output Panel"]
-  Frames --> Export["Trace JSON Export"]
-```
-
-## Runtime Model
-
-The app uses a snapshot-first tracing model:
-
-1. User code is compiled as `<user_code>`.
-2. `sys.settrace` records call, line, return, exception, and trace-limit events.
-3. Each step snapshots locals, scopes, stdout/stderr prefix lengths, object ids, object previews, and shallow collection entries.
-4. Snapshots are diffed to infer variable creation, value updates, reference changes, and in-place object mutations.
-5. Static AST analysis maps runtime line events back to assignments, calls, loops, branches, functions, and returns.
-6. The React UI renders the normalized trace as a scrubable runtime map.
-
-This keeps the system faithful to Python semantics without relying on brittle AST instrumentation for basic behavior.
-
-## Current Capabilities
-
-- Python examples for variables, loops, list aliasing, recursion, and dictionary mutation.
-- Line highlighting and line-to-step jumping.
-- Timeline playback with `0.5x`, `1x`, `2x`, and `4x` speed controls.
-- Compact timeline rendering for large traces.
-- Hybrid visual map with scope boxes, reference arrows, loop lanes, function frames, and output nodes.
-- Scope inspector with variable status markers and object detail tables.
-- Shallow structured object serialization for lists, tuples, dictionaries, sets, and simple custom objects.
-- Timeout handling with `SharedArrayBuffer` interrupt support when available and worker restart fallback.
-- Shareable `#cv=` code links.
-- JSON trace export.
-
-## Tech Stack
-
-- React
-- TypeScript
-- Vite
-- Pyodide
-- Web Workers
-- SVG
-- Vitest
-- ESLint
-- Prettier
-
-## Getting Started
+## Quick start
 
 ```bash
 npm install
-npm run dev
+npm run dev          # open the printed URL
 ```
 
-Then open the local URL printed by Vite.
+Paste code or pick an example, hit **Run**. For function-only code, check the
+**Test inputs** panel: edit the literals, change the seed, or
+**Regenerate & run**.
 
-## Scripts
+## Architecture
+
+Two halves, one repo:
+
+```
+engine/                  Python — the tracing/analysis engine (pure stdlib)
+  codeviz/
+    analyzer.py          ast: mode detection, callables, type inference
+    inputgen.py          seeded input generation + literal DSL (tree/linked)
+    tracer.py            sys.settrace tracer with step/time safeguards
+    serialize.py         structure-aware value snapshots (stable object ids)
+    structures.py        TreeNode / ListNode + builders
+    runner.py            orchestration: analyze → generate → trace → report
+    api.py               JSON request/response boundary for the worker
+  tests/                 pytest suite incl. LeetCode fixtures
+
+src/                     TypeScript — the dashboard
+  engine/                worker (loads engine/*.py into Pyodide), client,
+                         schema types, pure trace helpers (diff, pointers,
+                         growth fitting)
+  app/                   App shell, session state hook, share links
+  components/            Editor, data panel, variables, call stack,
+                         console, inputs, transport controls
+```
+
+The Python engine is plain stdlib Python: the **same files** run under
+CPython for tests and are written into the Pyodide filesystem by the Web
+Worker at startup. The worker speaks JSON to the main thread; the UI never
+touches Python objects directly.
+
+```mermaid
+flowchart LR
+  Editor["CodeMirror editor"] --> Client["RuntimeClient"]
+  Client --> Worker["Pyodide worker"]
+  Worker --> Engine["codeviz engine (analyze · generate · trace)"]
+  Engine --> Steps["JSON trace steps"]
+  Steps --> UI["Data / Variables / Stack / Console panels"]
+  Steps --> Transport["Time-travel transport"]
+```
+
+## Examples to try
+
+| Snippet                                    | What you'll see                                                           |
+| ------------------------------------------ | ------------------------------------------------------------------------- |
+| Two Sum (`class Solution`, no entry point) | generated `nums`/`target`, dict building up, `i` marker walking the array |
+| Reverse Linked List                        | chains splitting and re-pointing, `prev`/`curr`/`nxt` markers             |
+| Binary Tree Inorder Traversal              | tree diagram + recursive call stack                                       |
+| Binary Search                              | `lo`/`mid`/`hi` markers converging on a sorted array                      |
+| Any script with `print`                    | stdout appearing at the step that printed it                              |
+
+## Development
 
 ```bash
-npm run dev         # start local dev server
-npm run build       # typecheck and build production assets
-npm run preview     # preview the production build
-npm run typecheck   # TypeScript project check
-npm run lint        # ESLint
-npm run test        # Vitest
-npm run smoke       # production asset/header smoke checks
-npm run ci          # full verification pipeline
-npm run format      # check formatting
+npm run ci             # typecheck + lint + vitest + build + smoke
+npm run test           # frontend unit tests (vitest)
+npm run test:engine    # Python engine tests (pytest, needs engine/.venv)
 ```
 
-## Project Structure
-
-```text
-src/
-  app/                  App shell and share-link helpers
-  components/           Editor, toolbar, timeline, inspector, visualization
-  examples/             Built-in Python examples
-  languages/python/     Pyodide worker, runtime client, trace types
-  styles/               Theme tokens and app CSS
-  tests/                App-level tests
-  visualization/        Visualization model types
-scripts/
-  smoke-check.mjs       Production build smoke check
-docs/
-  assets/               README screenshots and media
-```
-
-## Verification
-
-The current verification target is:
+Engine test setup (once):
 
 ```bash
-npm run ci
-npm run format
+python3 -m venv engine/.venv
+engine/.venv/bin/pip install pytest
 ```
 
-The test suite includes runtime client helpers, built-in example checks, and share-link encoding/decoding.
+The engine targets Python ≥ 3.11 (Pyodide currently ships 3.13) and has no
+runtime dependencies.
 
-## Roadmap
+## Deployment
 
-- Expand nested object inspection.
-- Improve `while`, `break`, `continue`, and deeply nested loop visuals.
-- Add richer recursion compression and exception unwinding views.
-- Export the visualization as SVG/PNG.
-- Add JavaScript and TypeScript adapters.
-- Add guided explanations for each step.
+Static hosting with cross-origin isolation headers (COOP/COEP) for
+SharedArrayBuffer interrupts — see `public/_headers` and
+[docs/deployment.md](docs/deployment.md). GitHub Pages deploys via
+`.github/workflows/pages.yml`.
+
+## The previous version
+
+The original implementation (v1, the "runtime map" visualizer) is preserved
+on the [`legacy/v1`](../../tree/legacy/v1) branch and the `v1-legacy` tag.

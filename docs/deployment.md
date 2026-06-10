@@ -66,9 +66,10 @@ The smoke check verifies:
 After deployment:
 
 1. Open the Cloudflare Pages URL.
-2. Run `Loop accumulator`; confirm final stdout is `10`.
-3. Run `List alias mutation`; confirm two variables point to one list object.
-4. Select the object box; confirm the Inspector highlights it.
+2. Run `Loop accumulator`; confirm stdout shows `10` at the final step.
+3. Run `Two Sum (no entry point)`; confirm inputs are generated and the
+   return value shows two indices.
+4. Run `Reverse Linked List`; confirm chains render with pointer markers.
 5. Click `Share`; reload the copied link and confirm the code is restored.
-6. Click `Export`; confirm a JSON trace downloads.
-7. Run `while True: pass`; confirm timeout behavior.
+6. Click `Export`; confirm a JSON trace downloads, then `Import` it back.
+7. Run `while True: pass`; confirm the run truncates with a step-limit note.
