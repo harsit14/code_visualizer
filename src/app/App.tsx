@@ -195,6 +195,7 @@ export function App() {
 
         <div className="column column-center">
           <DataPanel
+            analysis={session.analysis}
             atLastStep={atLastStep}
             currentStep={session.currentStep}
             frameIndex={session.selectedFrameIndex}

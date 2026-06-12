@@ -140,3 +140,39 @@ def test_reverse_list_inference():
     analysis = analyze(REVERSE_LIST)
     param = analysis.functions[0].params[0]
     assert param.inferred == "listnode"
+
+
+def test_pointer_hints_capture_index_usage():
+    analysis = analyze(
+        "def f(nums, s, k):\n"
+        "    total = nums[k]\n"
+        "    for i, ch in enumerate(s):\n"
+        "        total += i\n"
+        "    for j in range(len(nums)):\n"
+        "        total += nums[j]\n"
+        "    return total\n"
+    )
+    assert analysis.functions[0].pointer_hints == {
+        "nums": ["j", "k"],
+        "s": ["i"],
+    }
+
+
+def test_pointer_hints_capture_slice_bounds():
+    analysis = analyze("def f(nums, left, right):\n    return nums[left:right]\n")
+    assert analysis.functions[0].pointer_hints == {"nums": ["left", "right"]}
+
+
+def test_pointer_hints_capture_range_with_start_bound():
+    analysis = analyze("def f(nums, k):\n    for right in range(k, len(nums)):\n        nums[right]\n")
+    assert analysis.functions[0].pointer_hints == {"nums": ["right"]}
+
+
+def test_pointer_hints_ignore_computed_offsets():
+    analysis = analyze("def f(nums, right, k):\n    return nums[right - k]\n")
+    assert analysis.functions[0].pointer_hints == {}
+
+
+def test_module_pointer_hints_capture_script_indexes():
+    analysis = analyze("nums = [1, 2, 3]\nfor i in range(len(nums)):\n    print(nums[i])\n")
+    assert analysis.module_pointer_hints == {"nums": ["i"]}

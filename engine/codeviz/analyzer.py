@@ -127,6 +127,7 @@ class FunctionInfo:
     is_generator: bool
     docstring: Optional[str]
     returns: Optional[str]
+    pointer_hints: dict[str, list[str]] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -138,6 +139,7 @@ class FunctionInfo:
             "isGenerator": self.is_generator,
             "docstring": self.docstring,
             "returns": self.returns,
+            "pointerHints": self.pointer_hints,
         }
 
 
@@ -152,6 +154,7 @@ class Analysis:
     defines_list_node: bool = False
     references_tree_node: bool = False
     references_list_node: bool = False
+    module_pointer_hints: dict[str, list[str]] = field(default_factory=dict)
     diagnostics: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
@@ -163,6 +166,7 @@ class Analysis:
             "definesListNode": self.defines_list_node,
             "referencesTreeNode": self.references_tree_node,
             "referencesListNode": self.references_list_node,
+            "modulePointerHints": self.module_pointer_hints,
             "diagnostics": self.diagnostics,
         }
 
@@ -314,6 +318,84 @@ def _infer_params(node: ast.FunctionDef | ast.AsyncFunctionDef, is_method: bool)
     return params
 
 
+class _PointerHintVisitor(ast.NodeVisitor):
+    """Collect sequence -> integer names that source uses as indexes.
+
+    This keeps the UI from treating every in-range variable named ``i`` or
+    ``left`` as a marker for every list/string in scope. Only direct index
+    names, slice bounds, ``enumerate(seq)``, and ``range(len(seq))`` are
+    considered strong enough hints.
+    """
+
+    def __init__(self) -> None:
+        self.hints: dict[str, set[str]] = {}
+
+    def result(self) -> dict[str, list[str]]:
+        return {name: sorted(pointers) for name, pointers in sorted(self.hints.items())}
+
+    def _add(self, sequence_name: Optional[str], pointer_name: Optional[str]) -> None:
+        if not sequence_name or not pointer_name:
+            return
+        self.hints.setdefault(sequence_name, set()).add(pointer_name)
+
+    @staticmethod
+    def _name(node: ast.AST | None) -> Optional[str]:
+        if isinstance(node, ast.Name):
+            return node.id
+        return None
+
+    def _record_slice(self, sequence_name: str, slice_node: ast.expr) -> None:
+        if isinstance(slice_node, ast.Name):
+            self._add(sequence_name, slice_node.id)
+        elif isinstance(slice_node, ast.Slice):
+            self._add(sequence_name, self._name(slice_node.lower))
+            self._add(sequence_name, self._name(slice_node.upper))
+
+    def visit_Subscript(self, node: ast.Subscript) -> None:
+        sequence_name = self._name(node.value)
+        if sequence_name:
+            self._record_slice(sequence_name, node.slice)
+        self.generic_visit(node)
+
+    def visit_For(self, node: ast.For) -> None:
+        target_name: Optional[str] = None
+        if isinstance(node.target, ast.Name):
+            target_name = node.target.id
+        elif isinstance(node.target, (ast.Tuple, ast.List)) and node.target.elts:
+            target_name = self._name(node.target.elts[0])
+
+        iter_node = node.iter
+        if isinstance(iter_node, ast.Call) and isinstance(iter_node.func, ast.Name):
+            if iter_node.func.id == "enumerate" and iter_node.args:
+                self._add(self._name(iter_node.args[0]), target_name)
+            elif iter_node.func.id == "range" and iter_node.args:
+                length_arg = iter_node.args[1] if len(iter_node.args) > 1 else iter_node.args[0]
+                if (
+                    isinstance(length_arg, ast.Call)
+                    and isinstance(length_arg.func, ast.Name)
+                    and length_arg.func.id == "len"
+                    and length_arg.args
+                ):
+                    self._add(self._name(length_arg.args[0]), target_name)
+        self.generic_visit(node)
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+        return
+
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+        return
+
+    def visit_ClassDef(self, node: ast.ClassDef) -> None:
+        return
+
+
+def _pointer_hints_for_body(body: list[ast.stmt]) -> dict[str, list[str]]:
+    visitor = _PointerHintVisitor()
+    for statement in body:
+        visitor.visit(statement)
+    return visitor.result()
+
+
 def _is_generator(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
     for child in ast.walk(node):
         if isinstance(child, (ast.Yield, ast.YieldFrom)):
@@ -391,6 +473,7 @@ def analyze(source: str) -> Analysis:
                     is_generator=_is_generator(node),
                     docstring=ast.get_docstring(node),
                     returns=ast.unparse(node.returns) if node.returns else None,
+                    pointer_hints=_pointer_hints_for_body(node.body),
                 )
             )
         elif isinstance(node, ast.ClassDef):
@@ -412,6 +495,7 @@ def analyze(source: str) -> Analysis:
                             is_generator=_is_generator(item),
                             docstring=ast.get_docstring(item),
                             returns=ast.unparse(item.returns) if item.returns else None,
+                            pointer_hints=_pointer_hints_for_body(item.body),
                         )
                     )
 
@@ -440,6 +524,7 @@ def analyze(source: str) -> Analysis:
         defines_list_node=defines_list,
         references_tree_node=references_tree,
         references_list_node=references_list,
+        module_pointer_hints=_pointer_hints_for_body(tree.body),
     )
     if mode == "empty" and not functions:
         analysis.diagnostics.append(

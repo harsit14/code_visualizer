@@ -10,12 +10,25 @@
  */
 import { Boxes } from 'lucide-react';
 import type { JSX } from 'react';
-import { findArrayPointers, formatValue, groupChains, type ArrayPointer } from '../engine/trace';
-import type { EncodedValue, TraceStep } from '../engine/types';
+import {
+  findArrayPointers,
+  formatValue,
+  groupChains,
+  type ArrayPointer,
+  type ArrayPointerHints,
+} from '../engine/trace';
+import type {
+  AnalysisInfo,
+  EncodedValue,
+  FrameSnapshot,
+  FunctionInfo,
+  TraceStep,
+} from '../engine/types';
 
 type TreeValue = Extract<EncodedValue, { k: 'tree' }>;
 type ChainValue = Extract<EncodedValue, { k: 'listnode' }>;
 type SeqValue = Extract<EncodedValue, { k: 'seq' }>;
+type StringValue = Extract<EncodedValue, { k: 'str' }>;
 type DictValue = Extract<EncodedValue, { k: 'dict' }>;
 
 // ---------------------------------------------------------------- arrays
@@ -71,15 +84,18 @@ function ArrayBoxes({ value, pointers }: { value: SeqValue; pointers: ArrayPoint
   );
 }
 
-function StringBoxes({ text, pointers }: { text: string; pointers: ArrayPointer[] }) {
+function StringBoxes({ value, pointers }: { value: StringValue; pointers: ArrayPointer[] }) {
   const labels = new Map<number, string[]>();
   for (const pointer of pointers) {
     labels.set(pointer.index, [...(labels.get(pointer.index) ?? []), pointer.name]);
   }
+  const chars = [...value.v];
+  const endPointers = pointers.filter((pointer) => pointer.index === chars.length);
+
   return (
     <div className="array-render">
       <div className="array-row">
-        {[...text].map((char, index) => (
+        {chars.map((char, index) => (
           <div className="array-cell-wrap" key={index}>
             <span className="array-index">{index}</span>
             <span className={`array-cell${labels.has(index) ? ' has-pointer' : ''}`}>{char}</span>
@@ -88,6 +104,15 @@ function StringBoxes({ text, pointers }: { text: string; pointers: ArrayPointer[
             ) : null}
           </div>
         ))}
+        {endPointers.length > 0 && !value.truncated ? (
+          <div className="array-cell-wrap">
+            <span className="array-index">{chars.length}</span>
+            <span className="array-cell is-ellipsis">end</span>
+            <span className="array-pointer">
+              ▲ {endPointers.map((pointer) => pointer.name).join(', ')}
+            </span>
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -268,6 +293,7 @@ function ChainDiagram({
 // ------------------------------------------------------------- the panel
 
 type DataPanelProps = {
+  analysis: AnalysisInfo | null;
   currentStep: TraceStep | undefined;
   frameIndex: number | null;
   returnValue: EncodedValue | null;
@@ -276,8 +302,45 @@ type DataPanelProps = {
 
 type Card = { names: string[]; value: EncodedValue; render: JSX.Element };
 
-function buildCards(locals: Record<string, EncodedValue>): Card[] {
-  const arrayPointers = findArrayPointers(locals);
+function pointerHintsForFrame(
+  analysis: AnalysisInfo | null,
+  frame: FrameSnapshot | undefined,
+): ArrayPointerHints | null | undefined {
+  if (!analysis || !frame) {
+    return undefined;
+  }
+  if (frame.func === '<module>') {
+    return analysis.modulePointerHints ?? undefined;
+  }
+
+  const exact = analysis.functions.find((fn) => fn.qualname === frame.qualname);
+  if (exact) {
+    return exact.pointerHints;
+  }
+  const byName = analysis.functions.filter((fn) => fn.name === frame.func);
+  return byName.length === 1 ? byName[0].pointerHints : undefined;
+}
+
+function findFunctionInfo(
+  analysis: AnalysisInfo | null,
+  frame: FrameSnapshot | undefined,
+): FunctionInfo | undefined {
+  if (!analysis || !frame || frame.func === '<module>') {
+    return undefined;
+  }
+  const exact = analysis.functions.find((fn) => fn.qualname === frame.qualname);
+  if (exact) {
+    return exact;
+  }
+  const byName = analysis.functions.filter((fn) => fn.name === frame.func);
+  return byName.length === 1 ? byName[0] : undefined;
+}
+
+function buildCards(
+  locals: Record<string, EncodedValue>,
+  pointerHints: ArrayPointerHints | null | undefined,
+): Card[] {
+  const arrayPointers = findArrayPointers(locals, pointerHints);
 
   const byId = new Map<string, Card>();
   const cards: Card[] = [];
@@ -320,7 +383,7 @@ function buildCards(locals: Record<string, EncodedValue>): Card[] {
       continue; // handled by groupChains above
     } else if (value.k === 'str' && (arrayPointers.get(name)?.length ?? 0) > 0) {
       identity = `str-${name}`;
-      render = <StringBoxes pointers={arrayPointers.get(name) ?? []} text={value.v} />;
+      render = <StringBoxes pointers={arrayPointers.get(name) ?? []} value={value} />;
     } else if (value.k === 'obj') {
       identity = `obj-${value.id}`;
       render = (
@@ -352,12 +415,20 @@ function buildCards(locals: Record<string, EncodedValue>): Card[] {
   return cards;
 }
 
-export function DataPanel({ currentStep, frameIndex, returnValue, atLastStep }: DataPanelProps) {
+export function DataPanel({
+  analysis,
+  currentStep,
+  frameIndex,
+  returnValue,
+  atLastStep,
+}: DataPanelProps) {
   const stack = currentStep?.stack ?? [];
   const index = frameIndex !== null && frameIndex < stack.length ? frameIndex : stack.length - 1;
   const frame = index >= 0 ? stack[index] : undefined;
+  const functionInfo = findFunctionInfo(analysis, frame);
+  const pointerHints = pointerHintsForFrame(analysis, frame);
   const locals = { ...(currentStep?.globals ?? {}), ...(frame?.locals ?? {}) };
-  const cards = frame ? buildCards(locals) : [];
+  const cards = frame ? buildCards(locals, pointerHints) : [];
 
   return (
     <section className="panel data-panel" aria-label="Data structures">
@@ -367,7 +438,9 @@ export function DataPanel({ currentStep, frameIndex, returnValue, atLastStep }: 
         </h2>
         {frame ? (
           <span className="panel-hint">
-            {frame.func === '<module>' ? 'module scope' : `${frame.func}()`}
+            {frame.func === '<module>'
+              ? 'module scope'
+              : `${functionInfo?.qualname ?? frame.qualname ?? frame.func}()`}
           </span>
         ) : null}
       </header>

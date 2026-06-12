@@ -137,6 +137,7 @@ class Tracer:
             entry: dict[str, Any] = {
                 "id": f"frame-{id(current)}",
                 "func": current.f_code.co_name,
+                "qualname": getattr(current.f_code, "co_qualname", current.f_code.co_name),
                 "line": current.f_lineno,
             }
             if position < MAX_DETAILED_FRAMES:

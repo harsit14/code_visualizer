@@ -27,6 +27,14 @@ const list = (id: number, values: number[]): EncodedValue => ({
   len: values.length,
   truncated: false,
 });
+const set = (id: number, values: number[]): EncodedValue => ({
+  k: 'seq',
+  t: 'set',
+  id,
+  items: values.map(num),
+  len: values.length,
+  truncated: false,
+});
 
 describe('formatValue', () => {
   it('formats primitives', () => {
@@ -133,6 +141,36 @@ describe('findArrayPointers', () => {
       { name: 'l', index: 0 },
       { name: 'r', index: 1 },
     ]);
+  });
+
+  it('uses source hints to avoid attaching indexes to unrelated arrays', () => {
+    const pointers = findArrayPointers(
+      {
+        nums: list(1, [4, 5, 6]),
+        window: list(2, [5, 6]),
+        i: num(1),
+      },
+      { nums: ['i'] },
+    );
+    expect(pointers.get('nums')).toEqual([{ name: 'i', index: 1 }]);
+    expect(pointers.has('window')).toBe(false);
+  });
+
+  it('does not fall back to name guesses when source hints are present', () => {
+    const pointers = findArrayPointers({ nums: list(1, [4, 5, 6]), i: num(1) }, {});
+    expect(pointers.has('nums')).toBe(false);
+  });
+
+  it('does not mark pointers on sets', () => {
+    const pointers = findArrayPointers({ seen: set(1, [4, 5, 6]), i: num(1) }, { seen: ['i'] });
+    expect(pointers.has('seen')).toBe(false);
+  });
+
+  it('shares source-hinted pointers across list aliases', () => {
+    const shared = list(1, [4, 5, 6]);
+    const pointers = findArrayPointers({ nums: shared, arr: shared, i: num(1) }, { arr: ['i'] });
+    expect(pointers.get('nums')).toEqual([{ name: 'i', index: 1 }]);
+    expect(pointers.get('arr')).toEqual([{ name: 'i', index: 1 }]);
   });
 });
 

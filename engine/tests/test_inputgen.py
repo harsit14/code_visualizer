@@ -52,13 +52,35 @@ def test_two_sum_target_is_reachable():
         ), f"seed {seed}: target {target} unreachable in {nums}"
 
 
-def test_k_clamped_to_list_length():
-    fn = _function("def f(nums, k):\n    pass")
+def test_k_clamped_to_list_length_when_used_as_slice_bound():
+    fn = _function("def f(nums, k):\n    return nums[:k]")
     for seed in range(20):
         inputs, _ = generate_inputs(fn, seed=seed)
         nums = ast.literal_eval(inputs[0].literal)
         k = ast.literal_eval(inputs[1].literal)
         assert 1 <= k < len(nums)
+
+
+def test_index_clamped_to_list_length_when_used_as_index():
+    fn = _function("def f(nums, index):\n    return nums[index]")
+    for seed in range(20):
+        inputs, _ = generate_inputs(fn, seed=seed)
+        nums = ast.literal_eval(inputs[0].literal)
+        index = ast.literal_eval(inputs[1].literal)
+        assert 0 <= index < len(nums)
+
+
+def test_k_not_clamped_without_index_usage():
+    fn = _function("def f(nums, k):\n    return k")
+    saw_unclamped = False
+    for seed in range(200):
+        inputs, _ = generate_inputs(fn, seed=seed)
+        nums = ast.literal_eval(inputs[0].literal)
+        k = ast.literal_eval(inputs[1].literal)
+        if k >= len(nums):
+            saw_unclamped = True
+            break
+    assert saw_unclamped
 
 
 def test_tree_literal_evaluates_to_tree():

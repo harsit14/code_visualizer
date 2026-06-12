@@ -111,7 +111,7 @@ def generate_input(
 
 def _coordinate(
     inputs: list[GeneratedInput],
-    params: list[Param],
+    function: FunctionInfo,
     rng: random.Random,
     make_solvable: bool = True,
 ) -> None:
@@ -121,19 +121,18 @@ def _coordinate(
       elements (the two-sum family has an answer). Skipped when
       ``make_solvable`` is False — complexity measurement wants the
       no-early-exit path, not a lucky hit.
-    * ``k``/index-like ints are clamped into the bounds of a sibling list
-      or string (always — out-of-range indices just crash).
+    * Int parameters used as collection indexes or slice bounds are clamped
+      into the matching collection's bounds (out-of-range indices just crash).
     """
     by_name = {generated.name: generated for generated in inputs}
     list_values: Optional[list[int]] = None
-    sized_length: Optional[int] = None
+    sized_lengths: dict[str, int] = {}
     for generated in inputs:
         if generated.type == "list[int]":
             list_values = ast.literal_eval(generated.literal)
-            sized_length = len(list_values)
-            break
-        if generated.type == "str" and sized_length is None:
-            sized_length = len(ast.literal_eval(generated.literal))
+            sized_lengths[generated.name] = len(list_values)
+        elif generated.type in ("str", "list[str]"):
+            sized_lengths[generated.name] = len(ast.literal_eval(generated.literal))
 
     target = by_name.get("target")
     if (
@@ -148,11 +147,17 @@ def _coordinate(
     elif not make_solvable and target is not None and target.type == "int" and list_values:
         target.literal = repr(-1)  # unreachable: forces the full scan
 
-    if sized_length:
-        for name in ("k", "idx", "index"):
+    for sequence_name, pointer_names in function.pointer_hints.items():
+        sized_length = sized_lengths.get(sequence_name)
+        if not sized_length:
+            continue
+        for name in pointer_names:
             generated = by_name.get(name)
-            if generated is not None and generated.type == "int":
-                generated.literal = repr(rng.randint(1, max(1, sized_length - 1)))
+            if generated is None or generated.type != "int":
+                continue
+            lower = 1 if name == "k" else 0
+            upper = max(lower, sized_length - 1)
+            generated.literal = repr(rng.randint(lower, upper))
 
 
 def generate_inputs(
@@ -170,7 +175,7 @@ def generate_inputs(
     seed_used = seed if seed is not None else random.SystemRandom().randint(0, 999_999)
     rng = random.Random(seed_used)
     inputs = [generate_input(param, rng, size) for param in function.params]
-    _coordinate(inputs, function.params, rng, make_solvable=make_solvable)
+    _coordinate(inputs, function, rng, make_solvable=make_solvable)
     return inputs, seed_used
 
 

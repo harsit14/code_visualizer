@@ -50,6 +50,7 @@ export type EncodedValue =
 export type FrameSnapshot = {
   id: string;
   func: string;
+  qualname?: string;
   line: number;
   locals: Record<string, EncodedValue>;
   elided?: boolean;
@@ -83,6 +84,7 @@ export type FunctionInfo = {
   isGenerator: boolean;
   docstring: string | null;
   returns: string | null;
+  pointerHints?: Record<string, string[]>;
 };
 
 export type Diagnostic = {
@@ -100,6 +102,7 @@ export type AnalysisInfo = {
   definesListNode: boolean;
   referencesTreeNode: boolean;
   referencesListNode: boolean;
+  modulePointerHints?: Record<string, string[]>;
   diagnostics: Diagnostic[];
 };
 

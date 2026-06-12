@@ -185,6 +185,35 @@ const POINTER_NAMES = new Set([
 ]);
 
 export type ArrayPointer = { name: string; index: number };
+export type ArrayPointerHints = Record<string, string[]>;
+
+function isIndexableSequence(value: EncodedValue): value is Extract<EncodedValue, { k: 'seq' }> {
+  return value.k === 'seq' && (value.t === 'list' || value.t === 'tuple');
+}
+
+function sequenceLength(value: EncodedValue): number | null {
+  if (isIndexableSequence(value)) {
+    return value.len;
+  }
+  if (value.k === 'str') {
+    return [...value.v].length;
+  }
+  return null;
+}
+
+function dedupePointers(pointers: ArrayPointer[]): ArrayPointer[] {
+  const seen = new Set<string>();
+  const result: ArrayPointer[] = [];
+  for (const pointer of pointers) {
+    const key = `${pointer.name}:${pointer.index}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    result.push(pointer);
+  }
+  return result;
+}
 
 /**
  * Map sequence-valued locals to the integer locals that index into them
@@ -192,27 +221,59 @@ export type ArrayPointer = { name: string; index: number };
  */
 export function findArrayPointers(
   locals: Record<string, EncodedValue>,
+  hints?: ArrayPointerHints | null,
 ): Map<string, ArrayPointer[]> {
   const result = new Map<string, ArrayPointer[]>();
-  const intLocals: { name: string; value: number }[] = [];
+  const intLocals = new Map<string, number>();
 
   for (const [name, value] of Object.entries(locals)) {
-    if (value.k === 'num' && value.t === 'int' && POINTER_NAMES.has(name)) {
-      intLocals.push({ name, value: Number(value.v) });
-    }
-  }
-
-  for (const [name, value] of Object.entries(locals)) {
-    if ((value.k === 'seq' || value.k === 'str') && intLocals.length > 0) {
-      const length = value.k === 'seq' ? value.len : value.v.length;
-      const pointers = intLocals
-        .filter((pointer) => pointer.value >= 0 && pointer.value <= length)
-        .map((pointer) => ({ name: pointer.name, index: pointer.value }));
-      if (pointers.length > 0) {
-        result.set(name, pointers);
+    if (value.k === 'num' && value.t === 'int') {
+      const numeric = Number(value.v);
+      if (Number.isFinite(numeric)) {
+        intLocals.set(name, numeric);
       }
     }
   }
+
+  const useHints = hints != null;
+  for (const [name, value] of Object.entries(locals)) {
+    const length = sequenceLength(value);
+    if (length !== null && intLocals.size > 0) {
+      const candidates = useHints
+        ? (hints[name] ?? []).map((pointerName) => ({
+            name: pointerName,
+            value: intLocals.get(pointerName),
+          }))
+        : [...intLocals.entries()]
+            .filter(([pointerName]) => POINTER_NAMES.has(pointerName))
+            .map(([pointerName, pointerValue]) => ({ name: pointerName, value: pointerValue }));
+      const pointers = candidates
+        .filter(
+          (pointer): pointer is { name: string; value: number } =>
+            pointer.value !== undefined && pointer.value >= 0 && pointer.value <= length,
+        )
+        .map((pointer) => ({ name: pointer.name, index: pointer.value }));
+      if (pointers.length > 0) {
+        result.set(name, dedupePointers(pointers));
+      }
+    }
+  }
+
+  const byId = new Map<number, string[]>();
+  for (const [name, value] of Object.entries(locals)) {
+    if (isIndexableSequence(value)) {
+      byId.set(value.id, [...(byId.get(value.id) ?? []), name]);
+    }
+  }
+  for (const names of byId.values()) {
+    const shared = dedupePointers(names.flatMap((name) => result.get(name) ?? []));
+    if (shared.length > 0) {
+      for (const name of names) {
+        result.set(name, shared);
+      }
+    }
+  }
+
   return result;
 }
 
