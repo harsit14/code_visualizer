@@ -149,7 +149,6 @@ export function findMatchingFrame(
 const POINTER_NAMES = new Set([
   'i',
   'j',
-  'k',
   'l',
   'r',
   'p',

@@ -126,6 +126,14 @@ describe('findArrayPointers', () => {
     const pointers = findArrayPointers({ s: str('abc'), lo: num(0), hi: num(3) });
     expect(pointers.get('s')).toHaveLength(2);
   });
+
+  it('does not mark scalar k values as string indexes', () => {
+    const pointers = findArrayPointers({ s: str('dcadabb'), k: num(4), l: num(0), r: num(1) });
+    expect(pointers.get('s')).toEqual([
+      { name: 'l', index: 0 },
+      { name: 'r', index: 1 },
+    ]);
+  });
 });
 
 describe('groupChains', () => {
