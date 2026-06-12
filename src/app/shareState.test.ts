@@ -6,6 +6,7 @@ describe('share state', () => {
     const state = {
       code: 'def f(nums):\n    return nums # ünïcode ✓',
       exampleId: 'two-sum',
+      inputs: ['[2, 7, 11, 15]', '9'],
       seed: 42,
       functionName: 'Solution.twoSum',
     };

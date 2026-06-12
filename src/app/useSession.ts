@@ -18,6 +18,7 @@ export type Session = ReturnType<typeof useSession>;
 
 type InitialSessionOptions = {
   functionName?: string;
+  inputs?: string[];
   seed?: number;
 };
 
@@ -51,6 +52,9 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
     initialOptions.functionName ?? null,
   );
   const [inputDrafts, setInputDrafts] = useState<Record<string, string> | null>(null);
+  const [pendingInitialInputs, setPendingInitialInputs] = useState<string[] | null>(
+    initialOptions.inputs ?? null,
+  );
   const [seed, setSeed] = useState<number | null>(
     Number.isFinite(initialOptions.seed) ? (initialOptions.seed ?? null) : null,
   );
@@ -117,6 +121,7 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
       setSelectedFrameIndex(null);
       setFunctionOverrideState(null);
       setInputDrafts(null);
+      setPendingInitialInputs(null);
       scheduleAnalyze(nextCode);
     },
     [scheduleAnalyze],
@@ -126,6 +131,20 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
     const name = functionOverride ?? analysis?.defaultFunction ?? null;
     return analysis?.functions.find((fn) => fn.qualname === name) ?? null;
   }, [analysis, functionOverride]);
+
+  useEffect(() => {
+    if (!activeFunction || !pendingInitialInputs) {
+      return;
+    }
+    if (pendingInitialInputs.length === activeFunction.params.length) {
+      setInputDrafts(
+        Object.fromEntries(
+          activeFunction.params.map((param, index) => [param.name, pendingInitialInputs[index]]),
+        ),
+      );
+    }
+    setPendingInitialInputs(null);
+  }, [activeFunction, pendingInitialInputs]);
 
   /** Literals to send: drafts override the last run's generated inputs. */
   const inputLiterals = useMemo(() => {
@@ -154,6 +173,7 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
     setPlaying(false);
     setSelectedFrameIndex(null);
     setInputDrafts(null);
+    setPendingInitialInputs(null);
   }, []);
 
   const run = useCallback(
@@ -197,6 +217,7 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
         }
         if (overrides?.freshInputs) {
           setInputDrafts(null);
+          setPendingInitialInputs(null);
         }
 
         const runSteps = data.run?.steps ?? [];
@@ -327,6 +348,7 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
       setStep(Math.max(0, Math.min(importedStep, Math.max(steps - 1, 0))));
       setPlaying(false);
       setInputDrafts(null);
+      setPendingInitialInputs(null);
       setFunctionOverrideState(imported.run?.functionName ?? null);
       setSeed(imported.run?.seed ?? null);
     },
@@ -357,6 +379,7 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
     functionOverride,
     setFunctionOverride,
     inputDrafts,
+    inputLiterals,
     setInputDrafts,
     seed,
     setSeed,

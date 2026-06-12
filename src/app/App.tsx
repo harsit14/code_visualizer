@@ -43,6 +43,7 @@ export function App() {
   const initialCode = shared?.code ?? getExample(DEFAULT_EXAMPLE_ID)?.code ?? '';
   const session = useSession(initialCode, {
     functionName: shared?.functionName,
+    inputs: shared?.inputs,
     seed: shared?.seed,
   });
 
@@ -82,6 +83,7 @@ export function App() {
     url.hash = encodeShareState({
       code: session.code,
       exampleId: exampleId ?? undefined,
+      inputs: session.inputLiterals,
       seed: session.seed ?? undefined,
       functionName: session.functionOverride ?? undefined,
     });
@@ -93,7 +95,7 @@ export function App() {
       setShareLabel('Link set');
     }
     window.setTimeout(() => setShareLabel('Share'), 1800);
-  }, [exampleId, session.code, session.functionOverride, session.seed]);
+  }, [exampleId, session.code, session.functionOverride, session.inputLiterals, session.seed]);
 
   const handleExport = useCallback(() => {
     if (!session.result) {
