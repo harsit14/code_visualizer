@@ -16,6 +16,11 @@ export type PlaybackSpeed = number; // steps per second
 
 export type Session = ReturnType<typeof useSession>;
 
+type InitialSessionOptions = {
+  functionName?: string;
+  seed?: number;
+};
+
 function timeoutResult(message: string): SessionResult {
   return {
     status: 'timeout',
@@ -27,7 +32,7 @@ function timeoutResult(message: string): SessionResult {
   };
 }
 
-export function useSession(initialCode: string) {
+export function useSession(initialCode: string, initialOptions: InitialSessionOptions = {}) {
   const [code, setCodeState] = useState(initialCode);
   const [status, setStatus] = useState<RuntimeStatus>({
     phase: 'idle',
@@ -42,12 +47,18 @@ export function useSession(initialCode: string) {
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState<PlaybackSpeed>(2);
   const [selectedFrameIndex, setSelectedFrameIndex] = useState<number | null>(null);
-  const [functionOverride, setFunctionOverride] = useState<string | null>(null);
+  const [functionOverride, setFunctionOverrideState] = useState<string | null>(
+    initialOptions.functionName ?? null,
+  );
   const [inputDrafts, setInputDrafts] = useState<Record<string, string> | null>(null);
-  const [seed, setSeed] = useState<number | null>(null);
+  const [seed, setSeed] = useState<number | null>(
+    Number.isFinite(initialOptions.seed) ? (initialOptions.seed ?? null) : null,
+  );
 
   const clientRef = useRef<RuntimeClient | null>(null);
   const analyzeTimer = useRef<number | null>(null);
+  const analyzeSerial = useRef(0);
+  const codeRef = useRef(initialCode);
 
   const getClient = useCallback(() => {
     if (!clientRef.current) {
@@ -71,13 +82,19 @@ export function useSession(initialCode: string) {
       if (analyzeTimer.current) {
         window.clearTimeout(analyzeTimer.current);
       }
+      const serial = ++analyzeSerial.current;
       analyzeTimer.current = window.setTimeout(() => {
+        analyzeTimer.current = null;
         const client = getClient();
         client
           .request({ op: 'analyze', source })
           .then((data) => {
             const payload = data as { analysis?: AnalysisInfo };
-            if (payload.analysis) {
+            if (
+              payload.analysis &&
+              serial === analyzeSerial.current &&
+              source === codeRef.current
+            ) {
               setAnalysis(payload.analysis);
             }
           })
@@ -91,13 +108,14 @@ export function useSession(initialCode: string) {
 
   const setCode = useCallback(
     (nextCode: string) => {
+      codeRef.current = nextCode;
       setCodeState(nextCode);
       setResult(null);
       setComplexity(null);
       setStep(0);
       setPlaying(false);
       setSelectedFrameIndex(null);
-      setFunctionOverride(null);
+      setFunctionOverrideState(null);
       setInputDrafts(null);
       scheduleAnalyze(nextCode);
     },
@@ -121,15 +139,31 @@ export function useSession(initialCode: string) {
         return draft;
       }
       const last = lastInputs?.[index];
-      return last && lastInputs?.length === activeFunction.params.length ? last.literal : null;
+      return last && lastInputs?.length === activeFunction.params.length && last.name === param.name
+        ? last.literal
+        : null;
     });
     return literals.every((literal) => literal !== null) ? (literals as string[]) : undefined;
   }, [activeFunction, inputDrafts, result]);
+
+  const setFunctionOverride = useCallback((nextFunction: string | null) => {
+    setFunctionOverrideState(nextFunction);
+    setResult(null);
+    setComplexity(null);
+    setStep(0);
+    setPlaying(false);
+    setSelectedFrameIndex(null);
+    setInputDrafts(null);
+  }, []);
 
   const run = useCallback(
     async (overrides?: { freshInputs?: boolean; seed?: number }) => {
       if (isBusy) {
         return;
+      }
+      if (analyzeTimer.current) {
+        window.clearTimeout(analyzeTimer.current);
+        analyzeTimer.current = null;
       }
       setPlaying(false);
       setResult(null);
@@ -275,25 +309,29 @@ export function useSession(initialCode: string) {
   }, [step, totalSteps]);
 
   /** Restore an exported session (replay without re-running). */
-  const importSession = useCallback((importedCode: string, imported: SessionResult) => {
-    if (analyzeTimer.current) {
-      // A debounced analyze from a recent edit would overwrite the
-      // imported analysis (and e.g. hide the inputs panel) — drop it.
-      window.clearTimeout(analyzeTimer.current);
-      analyzeTimer.current = null;
-    }
-    setCodeState(importedCode);
-    setResult(imported);
-    setAnalysis(imported.analysis ?? null);
-    setComplexity(null);
-    setStep(0);
-    setPlaying(false);
-    setInputDrafts(null);
-    setFunctionOverride(null);
-    if (imported.run?.seed != null) {
-      setSeed(imported.run.seed);
-    }
-  }, []);
+  const importSession = useCallback(
+    (importedCode: string, imported: SessionResult, importedStep = 0) => {
+      if (analyzeTimer.current) {
+        // A debounced analyze from a recent edit would overwrite the
+        // imported analysis (and e.g. hide the inputs panel) — drop it.
+        window.clearTimeout(analyzeTimer.current);
+        analyzeTimer.current = null;
+      }
+      codeRef.current = importedCode;
+      analyzeSerial.current += 1;
+      setCodeState(importedCode);
+      setResult(imported);
+      setAnalysis(imported.analysis ?? null);
+      setComplexity(null);
+      const steps = imported.run?.steps.length ?? 0;
+      setStep(Math.max(0, Math.min(importedStep, Math.max(steps - 1, 0))));
+      setPlaying(false);
+      setInputDrafts(null);
+      setFunctionOverrideState(imported.run?.functionName ?? null);
+      setSeed(imported.run?.seed ?? null);
+    },
+    [],
+  );
 
   return {
     code,

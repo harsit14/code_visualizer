@@ -41,7 +41,10 @@ export function App() {
   const [shareLabel, setShareLabel] = useState('Share');
 
   const initialCode = shared?.code ?? getExample(DEFAULT_EXAMPLE_ID)?.code ?? '';
-  const session = useSession(initialCode);
+  const session = useSession(initialCode, {
+    functionName: shared?.functionName,
+    seed: shared?.seed,
+  });
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -123,11 +126,12 @@ export function App() {
           const payload = JSON.parse(text) as {
             version?: number;
             code?: string;
+            step?: number;
             result?: SessionResult;
           };
           if (typeof payload.code === 'string' && payload.result) {
             setExampleId(null);
-            session.importSession(payload.code, payload.result);
+            session.importSession(payload.code, payload.result, payload.step ?? 0);
           }
         } catch {
           /* invalid file — ignore */
