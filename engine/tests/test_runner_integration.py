@@ -213,3 +213,76 @@ def test_json_api_round_trip():
 
     bad = json.loads(handle_request("{not json"))
     assert bad["error"]["type"] == "JSONDecodeError"
+
+
+def test_pointer_hints_in_analysis_for_two_sum():
+    analysis = json.loads(handle_request(json.dumps({"op": "analyze", "source": TWO_SUM})))
+    fn = analysis["analysis"]["functions"][0]
+    assert fn["qualname"] == "Solution.twoSum"
+    # i and value are enumerate targets; i should be a pointer to nums
+    hints = fn["pointerHints"]
+    assert "nums" in hints
+    assert "i" in hints["nums"]
+
+
+def test_pointer_hints_in_analysis_for_sliding_window():
+    analysis = json.loads(handle_request(json.dumps({"op": "analyze", "source": SLIDING_WINDOW})))
+    fn = analysis["analysis"]["functions"][0]
+    hints = fn["pointerHints"]
+    assert "nums" in hints
+    assert "right" in hints["nums"]
+
+
+def test_pointer_hints_in_module_scope_script():
+    script = "nums = [1, 2, 3]\nfor i in range(len(nums)):\n    print(nums[i])\n"
+    analysis = json.loads(handle_request(json.dumps({"op": "analyze", "source": script})))
+    hints = analysis["analysis"].get("modulePointerHints", {})
+    assert "nums" in hints
+    assert "i" in hints["nums"]
+
+
+def test_pointer_hints_do_not_include_unrelated_vars():
+    code = """
+class Solution:
+    def process(self, nums):
+        cur = 0
+        for i in range(len(nums)):
+            cur += nums[i]
+        return cur
+"""
+    analysis = json.loads(handle_request(json.dumps({"op": "analyze", "source": code})))
+    fn = analysis["analysis"]["functions"][0]
+    hints = fn["pointerHints"]
+    assert "nums" in hints
+    assert "i" in hints["nums"]
+    # 'cur' is NOT used as an index into nums, should not be in hints
+    assert "cur" not in hints.get("nums", [])
+
+
+def test_pointer_hints_for_slice_bounds():
+    code = "def f(arr, left, right):\n    return arr[left:right]\n"
+    analysis = json.loads(handle_request(json.dumps({"op": "analyze", "source": code})))
+    fn = analysis["analysis"]["functions"][0]
+    hints = fn["pointerHints"]
+    assert "arr" in hints
+    assert set(hints["arr"]) == {"left", "right"}
+
+
+def test_pointer_hints_for_double_subscript_ignored():
+    code = "def f(grid, i, j):\n    return grid[i][j]\n"
+    analysis = json.loads(handle_request(json.dumps({"op": "analyze", "source": code})))
+    fn = analysis["analysis"]["functions"][0]
+    hints = fn["pointerHints"]
+    # grid[i][j] only records i as a pointer to 'grid' (j is on the inner list)
+    assert "grid" in hints
+    assert "i" in hints["grid"]
+    assert "j" not in hints.get("grid", [])
+
+
+def test_pointer_hints_for_slice_with_binop_bound():
+    code = "def f(s, left, right):\n    return s[left:right+1]\n"
+    analysis = json.loads(handle_request(json.dumps({"op": "analyze", "source": code})))
+    fn = analysis["analysis"]["functions"][0]
+    hints = fn["pointerHints"]
+    assert "s" in hints
+    assert set(hints["s"]) == {"left", "right"}

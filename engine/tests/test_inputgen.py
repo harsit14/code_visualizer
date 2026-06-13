@@ -32,6 +32,23 @@ def test_list_int_size_bounds():
     assert all(isinstance(v, int) for v in values)
 
 
+def test_list_float_hint_generation():
+    fn = _function("def f(nums: list[float]):\n    pass")
+    inputs, _ = generate_inputs(fn, seed=7)
+    values = ast.literal_eval(inputs[0].literal)
+    assert inputs[0].type == "list[float]"
+    assert 5 <= len(values) <= 8
+    assert all(isinstance(v, float) for v in values)
+
+
+def test_list_float_does_not_generate_decimal_int_target():
+    fn = _function("def f(nums: list[float], target):\n    pass")
+    inputs, _ = generate_inputs(fn, seed=1)
+    by_name = {item.name: item for item in inputs}
+    assert by_name["target"].type == "int"
+    assert isinstance(ast.literal_eval(by_name["target"].literal), int)
+
+
 def test_string_size_bounds():
     fn = _function("def f(s):\n    pass")
     inputs, _ = generate_inputs(fn, seed=7)

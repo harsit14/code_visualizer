@@ -112,13 +112,16 @@ describe('diffLocals', () => {
 });
 
 describe('findArrayPointers', () => {
-  it('attaches pointer-named ints to arrays they can index', () => {
-    const pointers = findArrayPointers({
-      nums: list(1, [4, 5, 6]),
-      i: num(1),
-      left: num(0),
-      total: num(99), // not a pointer name
-    });
+  it('attaches source-hinted ints to their target arrays', () => {
+    const pointers = findArrayPointers(
+      {
+        nums: list(1, [4, 5, 6]),
+        i: num(1),
+        left: num(0),
+        total: num(99),
+      },
+      { nums: ['i', 'left'] },
+    );
     expect(pointers.get('nums')).toEqual([
       { name: 'i', index: 1 },
       { name: 'left', index: 0 },
@@ -126,17 +129,23 @@ describe('findArrayPointers', () => {
   });
 
   it('ignores out-of-range values', () => {
-    const pointers = findArrayPointers({ nums: list(1, [4, 5]), i: num(7) });
+    const pointers = findArrayPointers({ nums: list(1, [4, 5]), i: num(7) }, { nums: ['i'] });
     expect(pointers.has('nums')).toBe(false);
   });
 
-  it('marks pointers on strings too', () => {
-    const pointers = findArrayPointers({ s: str('abc'), lo: num(0), hi: num(3) });
+  it('marks pointers on strings via source hints', () => {
+    const pointers = findArrayPointers(
+      { s: str('abc'), lo: num(0), hi: num(3) },
+      { s: ['lo', 'hi'] },
+    );
     expect(pointers.get('s')).toHaveLength(2);
   });
 
-  it('does not mark scalar k values as string indexes', () => {
-    const pointers = findArrayPointers({ s: str('dcadabb'), k: num(4), l: num(0), r: num(1) });
+  it('marks pointers on strings via source hints, excludes non-hinted ints', () => {
+    const pointers = findArrayPointers(
+      { s: str('dcadabb'), k: num(4), l: num(0), r: num(1) },
+      { s: ['l', 'r'] },
+    );
     expect(pointers.get('s')).toEqual([
       { name: 'l', index: 0 },
       { name: 'r', index: 1 },
@@ -171,6 +180,62 @@ describe('findArrayPointers', () => {
     const pointers = findArrayPointers({ nums: shared, arr: shared, i: num(1) }, { arr: ['i'] });
     expect(pointers.get('nums')).toEqual([{ name: 'i', index: 1 }]);
     expect(pointers.get('arr')).toEqual([{ name: 'i', index: 1 }]);
+  });
+
+  it('does NOT attach generic int locals as pointers when hints is undefined (nested functions, etc.)', () => {
+    // Simulates a nested function where 'cur' is a profit counter, not an index
+    const pointers = findArrayPointers({
+      prices: list(1, [7, 1, 5, 3, 6, 4]),
+      cur: num(0),
+      first: num(0),
+      last: num(5),
+    });
+    // 'cur' should NOT appear as a pointer to 'prices' since we have no hints
+    expect(pointers.get('prices') ?? []).not.toEqual(
+      expect.arrayContaining([{ name: 'cur', index: 0 }]),
+    );
+  });
+
+  it('does NOT attach l/r ints to all in-range sequences when they are not pointers', () => {
+    // l=5 and r=5 are arbitrary counts, not indices into prices.
+    // Without source hints they should not be attached.
+    const pointers = findArrayPointers({
+      prices: list(1, [7, 1, 5, 3, 6, 4]),
+      l: num(5),
+      r: num(5),
+    });
+    expect(pointers.has('prices')).toBe(false);
+  });
+
+  it('does not attach end-value coincidences (k equals length of unrelated array)', () => {
+    const pointers = findArrayPointers({
+      nums: list(1, [1, 2, 3]),
+      result: list(2, [0, 0, 0]),
+      k: num(3), // k is a size param, happens to equal result.length
+    });
+    // k should not be attached to result (it's a count, not an index)
+    expect(pointers.has('result')).toBe(false);
+  });
+
+  it('does not mark cur/curr/current as pointers without explicit source hints', () => {
+    const pointers = findArrayPointers({
+      arr: list(1, [10, 20, 30, 40]),
+      cur: num(15), // out of range anyway
+      curr: num(2), // in range! but is a state variable, not proven index
+      current: num(1), // in range! same issue
+    });
+    expect(pointers.has('arr')).toBe(false);
+  });
+
+  it('does not attach step/position counters to arrays', () => {
+    const pointers = findArrayPointers({
+      data: list(1, [1, 2, 3, 4, 5]),
+      start: num(0),
+      end: num(5),
+      idx: num(2),
+      pos: num(1),
+    });
+    expect(pointers.has('data')).toBe(false);
   });
 });
 

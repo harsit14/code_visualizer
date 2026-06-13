@@ -25,6 +25,7 @@ TYPES = (
     "bool",
     "str",
     "list[int]",
+    "list[float]",
     "list[str]",
     "grid",  # list[list[int]]
     "pairs",  # list of [start, end] pairs (intervals/edges)
@@ -82,7 +83,7 @@ _ANNOTATION_TYPES: dict[str, str] = {
     "bool": "bool",
     "str": "str",
     "list[int]": "list[int]",
-    "list[float]": "list[int]",
+    "list[float]": "list[float]",
     "list[str]": "list[str]",
     "list[list[int]]": "grid",
     "list[list[str]]": "grid",
@@ -344,12 +345,29 @@ class _PointerHintVisitor(ast.NodeVisitor):
             return node.id
         return None
 
+    def _extract_names(self, node: ast.expr | None) -> list[str]:
+        """Recurse into expressions to collect variable name references."""
+        if node is None:
+            return []
+        if isinstance(node, ast.Name):
+            return [node.id]
+        if isinstance(node, ast.BinOp):
+            return self._extract_names(node.left) + self._extract_names(node.right)
+        if isinstance(node, ast.UnaryOp):
+            return self._extract_names(node.operand)
+        return []
+
     def _record_slice(self, sequence_name: str, slice_node: ast.expr) -> None:
         if isinstance(slice_node, ast.Name):
             self._add(sequence_name, slice_node.id)
         elif isinstance(slice_node, ast.Slice):
-            self._add(sequence_name, self._name(slice_node.lower))
-            self._add(sequence_name, self._name(slice_node.upper))
+            for name in self._extract_names(slice_node.lower):
+                self._add(sequence_name, name)
+            for name in self._extract_names(slice_node.upper):
+                self._add(sequence_name, name)
+        elif isinstance(slice_node, (ast.BinOp, ast.UnaryOp)):
+            for name in self._extract_names(slice_node):
+                self._add(sequence_name, name)
 
     def visit_Subscript(self, node: ast.Subscript) -> None:
         sequence_name = self._name(node.value)

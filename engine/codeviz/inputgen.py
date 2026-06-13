@@ -38,6 +38,11 @@ def _gen_list_int(rng: random.Random, size: Optional[int] = None) -> list[int]:
     return [rng.randint(*DEFAULT_INT_RANGE) for _ in range(length)]
 
 
+def _gen_list_float(rng: random.Random, size: Optional[int] = None) -> list[float]:
+    length = size if size is not None else rng.randint(*DEFAULT_LIST_SIZE)
+    return [round(rng.uniform(0.5, 10.0), 2) for _ in range(length)]
+
+
 def _gen_str(rng: random.Random, size: Optional[int] = None) -> str:
     length = size if size is not None else rng.randint(*DEFAULT_STR_SIZE)
     # Small alphabet so duplicate/palindrome patterns actually occur.
@@ -90,6 +95,8 @@ def generate_input(
         literal = repr(_gen_str(rng, size))
     elif kind == "list[int]":
         literal = repr(_gen_list_int(rng, size))
+    elif kind == "list[float]":
+        literal = repr(_gen_list_float(rng, size))
     elif kind == "list[str]":
         count = size if size is not None else rng.randint(3, 5)
         literal = repr([_gen_str(rng, rng.randint(3, 5)) for _ in range(count)])
@@ -131,6 +138,8 @@ def _coordinate(
         if generated.type == "list[int]":
             list_values = ast.literal_eval(generated.literal)
             sized_lengths[generated.name] = len(list_values)
+        elif generated.type == "list[float]":
+            sized_lengths[generated.name] = len(ast.literal_eval(generated.literal))
         elif generated.type in ("str", "list[str]"):
             sized_lengths[generated.name] = len(ast.literal_eval(generated.literal))
 

@@ -168,9 +168,9 @@ def test_pointer_hints_capture_range_with_start_bound():
     assert analysis.functions[0].pointer_hints == {"nums": ["right"]}
 
 
-def test_pointer_hints_ignore_computed_offsets():
+def test_pointer_hints_extract_names_from_computed_expressions():
     analysis = analyze("def f(nums, right, k):\n    return nums[right - k]\n")
-    assert analysis.functions[0].pointer_hints == {}
+    assert analysis.functions[0].pointer_hints == {"nums": ["k", "right"]}
 
 
 def test_module_pointer_hints_capture_script_indexes():

@@ -205,6 +205,7 @@ class Snapshotter:
         cyclic = False
         truncated = False
         walk_seen: set[int] = set()
+        full_seen = seen.copy()
         node = head
         while node is not None:
             if id(node) in walk_seen:
@@ -214,10 +215,11 @@ class Snapshotter:
                 truncated = True
                 break
             walk_seen.add(id(node))
+            full_seen.add(id(node))
             nodes.append(
                 {
                     "id": self.object_id(node),
-                    "val": self.snapshot(node.val, depth + 1, seen | walk_seen),
+                    "val": self.snapshot(node.val, depth + 1, full_seen),
                 }
             )
             node = getattr(node, "next", None)

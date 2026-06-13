@@ -146,44 +146,6 @@ export function findMatchingFrame(
   return step?.stack.find((frame) => frame.id === frameId);
 }
 
-const POINTER_NAMES = new Set([
-  'i',
-  'j',
-  'l',
-  'r',
-  'p',
-  'q',
-  'left',
-  'right',
-  'lo',
-  'hi',
-  'low',
-  'high',
-  'mid',
-  'middle',
-  'start',
-  'end',
-  'begin',
-  'stop',
-  'first',
-  'last',
-  'index',
-  'idx',
-  'pos',
-  'ptr',
-  'cur',
-  'curr',
-  'current',
-  'p1',
-  'p2',
-  'i1',
-  'i2',
-  'fast',
-  'slow',
-  'read',
-  'write',
-]);
-
 export type ArrayPointer = { name: string; index: number };
 export type ArrayPointerHints = Record<string, string[]>;
 
@@ -218,6 +180,9 @@ function dedupePointers(pointers: ArrayPointer[]): ArrayPointer[] {
 /**
  * Map sequence-valued locals to the integer locals that index into them
  * ("i", "left", "hi", ...) so the UI can draw markers on the array boxes.
+ *
+ * Uses only AST-analyzed pointer hints to avoid false positives.
+ * When ``hints`` is ``undefined`` or ``null`` no pointers are attached.
  */
 export function findArrayPointers(
   locals: Record<string, EncodedValue>,
@@ -235,19 +200,19 @@ export function findArrayPointers(
     }
   }
 
-  const useHints = hints != null;
+  if (hints == null) {
+    return result;
+  }
+
   for (const [name, value] of Object.entries(locals)) {
     const length = sequenceLength(value);
     if (length !== null && intLocals.size > 0) {
-      const candidates = useHints
-        ? (hints[name] ?? []).map((pointerName) => ({
-            name: pointerName,
-            value: intLocals.get(pointerName),
-          }))
-        : [...intLocals.entries()]
-            .filter(([pointerName]) => POINTER_NAMES.has(pointerName))
-            .map(([pointerName, pointerValue]) => ({ name: pointerName, value: pointerValue }));
-      const pointers = candidates
+      const pointerNames = hints[name] ?? [];
+      const pointers = pointerNames
+        .map((pointerName) => ({
+          name: pointerName,
+          value: intLocals.get(pointerName),
+        }))
         .filter(
           (pointer): pointer is { name: string; value: number } =>
             pointer.value !== undefined && pointer.value >= 0 && pointer.value <= length,
