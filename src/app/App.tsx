@@ -14,6 +14,8 @@ import { InputsPanel } from '../components/InputsPanel';
 import { TopBar } from '../components/TopBar';
 import { VariablesPanel } from '../components/VariablesPanel';
 import { WatchPanel } from '../components/WatchPanel';
+import { lineExecutionCounts } from '../engine/traceMetrics';
+import { nextBreakpointStep, nextStepOnLine, stepOverStep } from '../engine/traceNavigation';
 import type { SessionResult } from '../engine/types';
 import { DEFAULT_EXAMPLE_ID, getExample } from '../examples/examples';
 import {
@@ -124,6 +126,8 @@ export function App() {
   const [importLabel, setImportLabel] = useState(DEFAULT_IMPORT_LABEL);
   const [importTitle, setImportTitle] = useState(DEFAULT_IMPORT_TITLE);
   const [watchedVariables, setWatchedVariables] = useState<string[]>([]);
+  const [breakpoints, setBreakpoints] = useState<Set<number>>(() => new Set());
+  const [cursorLine, setCursorLine] = useState<number | null>(null);
   const [panelVisibility, setPanelVisibility] = useState<PanelVisibility>(() =>
     readStoredValue(
       PANEL_VISIBILITY_STORAGE_KEY,
@@ -155,6 +159,67 @@ export function App() {
     inputs: shared?.inputs,
     seed: shared?.seed,
   });
+  const { importSession, jumpToStep, selectedFrameIndex, setCode, step, steps } = session;
+
+  const executionCounts = useMemo(() => lineExecutionCounts(steps), [steps]);
+  const breakpointLines = useMemo(() => [...breakpoints].sort((a, b) => a - b), [breakpoints]);
+  const nextBreakpointTarget = useMemo(
+    () => nextBreakpointStep(steps, step, breakpoints),
+    [breakpoints, step, steps],
+  );
+  const cursorTarget = useMemo(
+    () => nextStepOnLine(steps, step, cursorLine),
+    [cursorLine, step, steps],
+  );
+  const stepOverTarget = useMemo(
+    () => stepOverStep(steps, step, selectedFrameIndex),
+    [selectedFrameIndex, step, steps],
+  );
+
+  const clearTraceNavigation = useCallback(() => {
+    setBreakpoints((current) => (current.size > 0 ? new Set() : current));
+    setCursorLine(null);
+  }, []);
+
+  const toggleBreakpoint = useCallback((line: number) => {
+    setBreakpoints((current) => {
+      const next = new Set(current);
+      if (next.has(line)) {
+        next.delete(line);
+      } else {
+        next.add(line);
+      }
+      return next;
+    });
+  }, []);
+
+  const runToLine = useCallback(
+    (line: number) => {
+      const target = nextStepOnLine(steps, step, line);
+      if (target !== null) {
+        jumpToStep(target);
+      }
+    },
+    [jumpToStep, step, steps],
+  );
+
+  const runToBreakpoint = useCallback(() => {
+    if (nextBreakpointTarget !== null) {
+      jumpToStep(nextBreakpointTarget);
+    }
+  }, [jumpToStep, nextBreakpointTarget]);
+
+  const runToCursor = useCallback(() => {
+    if (cursorTarget !== null) {
+      jumpToStep(cursorTarget);
+    }
+  }, [cursorTarget, jumpToStep]);
+
+  const stepOver = useCallback(() => {
+    if (stepOverTarget !== null) {
+      jumpToStep(stepOverTarget);
+    }
+  }, [jumpToStep, stepOverTarget]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -190,7 +255,7 @@ export function App() {
 
   // Keyboard transport: ←/→ step, Space play/pause, Home/End jump. Ignored
   // while typing in the editor, inputs, or any form control.
-  const { stepBack, stepForward, togglePlay, jumpToStep, totalSteps } = session;
+  const { stepBack, stepForward, togglePlay, totalSteps } = session;
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.metaKey || event.ctrlKey || event.altKey) {
@@ -241,9 +306,10 @@ export function App() {
     (code: string) => {
       setExampleId(null);
       setWatchedVariables([]);
-      session.setCode(code);
+      clearTraceNavigation();
+      setCode(code);
     },
-    [session],
+    [clearTraceNavigation, setCode],
   );
 
   const handleExampleChange = useCallback(
@@ -254,9 +320,10 @@ export function App() {
       }
       setExampleId(id);
       setWatchedVariables([]);
-      session.setCode(example.code);
+      clearTraceNavigation();
+      setCode(example.code);
     },
-    [session],
+    [clearTraceNavigation, setCode],
   );
 
   const handleShare = useCallback(async () => {
@@ -330,7 +397,8 @@ export function App() {
             if (typeof payload.code === 'string' && payload.result) {
               setExampleId(null);
               setWatchedVariables([]);
-              session.importSession(payload.code, payload.result, payload.step ?? 0);
+              clearTraceNavigation();
+              importSession(payload.code, payload.result, payload.step ?? 0);
               showImportStatus('Imported', 'Trace imported successfully');
               return;
             }
@@ -341,7 +409,7 @@ export function App() {
         })
         .catch(() => showImportStatus('Import failed', 'Could not read selected file'));
     },
-    [session, showImportStatus],
+    [clearTraceNavigation, importSession, showImportStatus],
   );
 
   const toggleWatchedVariable = useCallback((name: string) => {
@@ -518,10 +586,15 @@ export function App() {
           >
             <EditorPanel
               activeLine={session.currentStep?.line ?? null}
+              breakpoints={breakpointLines}
               code={session.code}
               diagnostics={session.analysis?.diagnostics ?? []}
               errorLine={errorLine}
+              executionCounts={executionCounts}
               onChange={handleCodeChange}
+              onCursorLineChange={setCursorLine}
+              onRunToLine={runToLine}
+              onToggleBreakpoint={toggleBreakpoint}
               theme={theme}
             />
           </ErrorBoundary>,
@@ -738,13 +811,21 @@ export function App() {
       </main>
 
       <ControlsBar
+        breakpointCount={breakpointLines.length}
+        canRunToBreakpoint={nextBreakpointTarget !== null}
+        canRunToCursor={cursorTarget !== null}
+        canStepOver={stepOverTarget !== null}
+        cursorLine={cursorLine}
         currentStep={session.currentStep}
         isBusy={session.isBusy}
         onJump={session.jumpToStep}
         onRun={() => void session.run()}
+        onRunToBreakpoint={runToBreakpoint}
+        onRunToCursor={runToCursor}
         onSpeedChange={session.setSpeed}
         onStepBack={session.stepBack}
         onStepForward={session.stepForward}
+        onStepOver={stepOver}
         onTogglePlay={session.togglePlay}
         playing={session.playing}
         speed={session.speed}

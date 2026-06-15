@@ -5,6 +5,9 @@
 import {
   ChevronLeft,
   ChevronRight,
+  CircleDot,
+  CornerDownRight,
+  Crosshair,
   Gauge,
   Pause,
   Play,
@@ -24,6 +27,14 @@ type ControlsBarProps = {
   onJump: (step: number) => void;
   onStepBack: () => void;
   onStepForward: () => void;
+  onRunToBreakpoint: () => void;
+  onRunToCursor: () => void;
+  onStepOver: () => void;
+  canRunToBreakpoint: boolean;
+  canRunToCursor: boolean;
+  canStepOver: boolean;
+  breakpointCount: number;
+  cursorLine: number | null;
   speed: number;
   onSpeedChange: (speed: number) => void;
   currentStep: TraceStep | undefined;
@@ -47,6 +58,14 @@ export function ControlsBar({
   onJump,
   onStepBack,
   onStepForward,
+  onRunToBreakpoint,
+  onRunToCursor,
+  onStepOver,
+  canRunToBreakpoint,
+  canRunToCursor,
+  canStepOver,
+  breakpointCount,
+  cursorLine,
   speed,
   onSpeedChange,
   currentStep,
@@ -101,6 +120,40 @@ export function ControlsBar({
           type="button"
         >
           <SkipForward size={15} />
+        </button>
+        <button
+          aria-label="Step over"
+          className="debug-nav-button"
+          disabled={!canStepOver}
+          onClick={onStepOver}
+          title="Step over"
+          type="button"
+        >
+          <CornerDownRight size={15} />
+        </button>
+        <button
+          aria-label="Run to next breakpoint"
+          className="debug-nav-button"
+          disabled={!canRunToBreakpoint}
+          onClick={onRunToBreakpoint}
+          title={
+            breakpointCount > 0
+              ? `Run to next breakpoint (${breakpointCount} set)`
+              : 'Run to next breakpoint'
+          }
+          type="button"
+        >
+          <CircleDot size={15} />
+        </button>
+        <button
+          aria-label="Run to cursor"
+          className="debug-nav-button"
+          disabled={!canRunToCursor}
+          onClick={onRunToCursor}
+          title={cursorLine ? `Run to cursor line ${cursorLine}` : 'Run to cursor'}
+          type="button"
+        >
+          <Crosshair size={15} />
         </button>
       </div>
 

@@ -4,15 +4,17 @@
  */
 import { python } from '@codemirror/lang-python';
 import { lintGutter, setDiagnostics, type Diagnostic as CMDiagnostic } from '@codemirror/lint';
-import { StateEffect, StateField } from '@codemirror/state';
-import { Decoration, EditorView, type DecorationSet } from '@codemirror/view';
+import { StateEffect, StateField, type Extension } from '@codemirror/state';
+import { Decoration, EditorView, GutterMarker, gutter, type DecorationSet } from '@codemirror/view';
 import CodeMirror from '@uiw/react-codemirror';
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import type { Diagnostic } from '../engine/types';
 
 type LineMarks = { active: number | null; error: number | null };
 
 const setLineMarks = StateEffect.define<LineMarks>();
+const setBreakpointLines = StateEffect.define<ReadonlySet<number>>();
+const setExecutionCounts = StateEffect.define<ReadonlyMap<number, number>>();
 
 const activeLineDecoration = Decoration.line({ class: 'cv-exec-line' });
 const errorLineDecoration = Decoration.line({ class: 'cv-error-line' });
@@ -41,6 +43,153 @@ const lineMarksField = StateField.define<DecorationSet>({
   provide: (field) => EditorView.decorations.from(field),
 });
 
+const breakpointLinesField = StateField.define<ReadonlySet<number>>({
+  create: () => new Set<number>(),
+  update(value, transaction) {
+    for (const effect of transaction.effects) {
+      if (effect.is(setBreakpointLines)) {
+        return effect.value;
+      }
+    }
+    return value;
+  },
+});
+
+const executionCountsField = StateField.define<ReadonlyMap<number, number>>({
+  create: () => new Map<number, number>(),
+  update(value, transaction) {
+    for (const effect of transaction.effects) {
+      if (effect.is(setExecutionCounts)) {
+        return effect.value;
+      }
+    }
+    return value;
+  },
+});
+
+class BreakpointMarker extends GutterMarker {
+  toDOM() {
+    const marker = document.createElement('span');
+    marker.className = 'cv-breakpoint-marker';
+    marker.title = 'Breakpoint';
+    return marker;
+  }
+}
+
+class BreakpointSpacer extends GutterMarker {
+  toDOM() {
+    const marker = document.createElement('span');
+    marker.className = 'cv-breakpoint-spacer';
+    return marker;
+  }
+}
+
+const breakpointMarker = new BreakpointMarker();
+const breakpointSpacer = new BreakpointSpacer();
+
+class ExecutionCountMarker extends GutterMarker {
+  constructor(readonly count: number) {
+    super();
+  }
+
+  toDOM() {
+    const marker = document.createElement('span');
+    marker.className = 'cv-exec-count-marker';
+    marker.textContent = this.count > 999 ? '999+' : String(this.count);
+    marker.title = `Executed ${this.count} time${this.count === 1 ? '' : 's'} in this run`;
+    return marker;
+  }
+}
+
+class ExecutionCountSpacer extends GutterMarker {
+  toDOM() {
+    const marker = document.createElement('span');
+    marker.className = 'cv-exec-count-spacer';
+    marker.textContent = '999+';
+    return marker;
+  }
+}
+
+const executionCountSpacer = new ExecutionCountSpacer();
+
+function breakpointGutter(onToggleBreakpoint?: (line: number) => void): Extension {
+  return [
+    breakpointLinesField,
+    gutter({
+      class: 'cv-breakpoint-gutter',
+      domEventHandlers: {
+        mousedown(view, line, event) {
+          if (!onToggleBreakpoint) {
+            return false;
+          }
+          event.preventDefault();
+          const lineNumber = view.state.doc.lineAt(line.from).number;
+          onToggleBreakpoint(lineNumber);
+          return true;
+        },
+      },
+      initialSpacer: () => breakpointSpacer,
+      lineMarker(view, line) {
+        const lineNumber = view.state.doc.lineAt(line.from).number;
+        return view.state.field(breakpointLinesField).has(lineNumber) ? breakpointMarker : null;
+      },
+      lineMarkerChange(update) {
+        return (
+          update.docChanged ||
+          update.transactions.some((transaction) =>
+            transaction.effects.some((effect) => effect.is(setBreakpointLines)),
+          )
+        );
+      },
+      renderEmptyElements: true,
+    }),
+  ];
+}
+
+function executionCountGutter(): Extension {
+  return [
+    executionCountsField,
+    gutter({
+      class: 'cv-exec-count-gutter',
+      initialSpacer: () => executionCountSpacer,
+      lineMarker(view, line) {
+        const lineNumber = view.state.doc.lineAt(line.from).number;
+        const count = view.state.field(executionCountsField).get(lineNumber) ?? 0;
+        return count > 0 ? new ExecutionCountMarker(count) : null;
+      },
+      lineMarkerChange(update) {
+        return (
+          update.docChanged ||
+          update.transactions.some((transaction) =>
+            transaction.effects.some((effect) => effect.is(setExecutionCounts)),
+          )
+        );
+      },
+      renderEmptyElements: true,
+    }),
+  ];
+}
+
+function runToLineExtension(onRunToLine?: (line: number) => void): Extension {
+  if (!onRunToLine) {
+    return [];
+  }
+  return EditorView.domEventHandlers({
+    contextmenu(event, view) {
+      if (!(event instanceof MouseEvent)) {
+        return false;
+      }
+      const position = view.posAtCoords({ x: event.clientX, y: event.clientY });
+      if (position === null) {
+        return false;
+      }
+      event.preventDefault();
+      onRunToLine(view.state.doc.lineAt(position).number);
+      return true;
+    },
+  });
+}
+
 const baseExtensions = [python(), lineMarksField, lintGutter(), EditorView.lineWrapping];
 
 /** Map analyzer diagnostics to CodeMirror diagnostics with document offsets. */
@@ -61,8 +210,13 @@ type EditorPanelProps = {
   code: string;
   onChange: (code: string) => void;
   activeLine: number | null;
+  breakpoints: readonly number[];
+  executionCounts: ReadonlyMap<number, number>;
   errorLine: number | null;
   diagnostics: Diagnostic[];
+  onCursorLineChange?: (line: number | null) => void;
+  onRunToLine?: (line: number) => void;
+  onToggleBreakpoint?: (line: number) => void;
   theme: 'light' | 'dark';
 };
 
@@ -70,11 +224,25 @@ export function EditorPanel({
   code,
   onChange,
   activeLine,
+  breakpoints,
+  executionCounts,
   errorLine,
   diagnostics,
+  onCursorLineChange,
+  onRunToLine,
+  onToggleBreakpoint,
   theme,
 }: EditorPanelProps) {
   const viewRef = useRef<EditorView | null>(null);
+  const extensions = useMemo(
+    () => [
+      ...baseExtensions,
+      breakpointGutter(onToggleBreakpoint),
+      executionCountGutter(),
+      runToLineExtension(onRunToLine),
+    ],
+    [onRunToLine, onToggleBreakpoint],
+  );
 
   useEffect(() => {
     const view = viewRef.current;
@@ -98,6 +266,27 @@ export function EditorPanel({
     }
   }, [diagnostics, code]);
 
+  useEffect(() => {
+    const view = viewRef.current;
+    if (view) {
+      view.dispatch({ effects: setBreakpointLines.of(new Set(breakpoints)) });
+    }
+  }, [breakpoints, code]);
+
+  useEffect(() => {
+    const view = viewRef.current;
+    if (view) {
+      view.dispatch({ effects: setExecutionCounts.of(new Map(executionCounts)) });
+    }
+  }, [executionCounts, code]);
+
+  useEffect(
+    () => () => {
+      onCursorLineChange?.(null);
+    },
+    [onCursorLineChange],
+  );
+
   const errors = diagnostics.filter((diagnostic) => diagnostic.severity === 'error');
 
   return (
@@ -111,9 +300,17 @@ export function EditorPanel({
           value={code}
           onChange={onChange}
           theme={theme}
-          extensions={baseExtensions}
+          extensions={extensions}
           onCreateEditor={(view) => {
             viewRef.current = view;
+            onCursorLineChange?.(view.state.doc.lineAt(view.state.selection.main.head).number);
+          }}
+          onUpdate={(update) => {
+            if (update.selectionSet || update.docChanged) {
+              onCursorLineChange?.(
+                update.state.doc.lineAt(update.state.selection.main.head).number,
+              );
+            }
           }}
           basicSetup={{
             foldGutter: false,

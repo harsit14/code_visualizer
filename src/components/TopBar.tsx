@@ -1,8 +1,8 @@
 /**
  * Top bar: branding, example picker, theme toggle, share link,
- * trace export/import, and runtime status.
+ * trace export/import, layout controls, shortcuts, and runtime status.
  */
-import { Columns3, Download, Link2, Moon, Sun, Upload } from 'lucide-react';
+import { Columns3, Download, HelpCircle, Link2, Moon, Sun, Upload } from 'lucide-react';
 import { useRef } from 'react';
 import { examples } from '../examples/examples';
 import type { RuntimeStatus } from '../engine/types';
@@ -32,6 +32,15 @@ type TopBarProps = {
 };
 
 const CUSTOM_ID = '__custom__';
+const SHORTCUTS = [
+  { keys: ['←'], label: 'Step back' },
+  { keys: ['→'], label: 'Step forward' },
+  { keys: ['Space'], label: 'Play or pause' },
+  { keys: ['Home'], label: 'Jump to start' },
+  { keys: ['End'], label: 'Jump to end' },
+  { keys: ['Click gutter'], label: 'Toggle breakpoint' },
+  { keys: ['Right click line'], label: 'Run to line' },
+];
 
 export function TopBar({
   exampleId,
@@ -95,6 +104,24 @@ export function TopBar({
           <Upload size={14} />
           {importLabel}
         </button>
+        <details className="panel-menu shortcuts-menu">
+          <summary title="Show keyboard and editor shortcuts">
+            <HelpCircle size={14} />
+            Shortcuts
+          </summary>
+          <div className="panel-menu-popover shortcuts-popover">
+            {SHORTCUTS.map((shortcut) => (
+              <div className="shortcut-row" key={shortcut.label}>
+                <span className="shortcut-keys">
+                  {shortcut.keys.map((key) => (
+                    <kbd key={key}>{key}</kbd>
+                  ))}
+                </span>
+                <span>{shortcut.label}</span>
+              </div>
+            ))}
+          </div>
+        </details>
         <details className="panel-menu">
           <summary title="Show, hide, and reset panels">
             <Columns3 size={14} />

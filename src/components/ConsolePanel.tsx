@@ -3,6 +3,7 @@
  * stderr, truncation notices, and complexity hints.
  */
 import { AlertTriangle, Terminal, TrendingUp } from 'lucide-react';
+import { explainException } from '../engine/exceptionExplanations';
 import { fitGrowth, formatValue, stdoutAtStep } from '../engine/trace';
 import type { ComplexityResult, SessionResult, TraceStep } from '../engine/types';
 
@@ -29,6 +30,7 @@ export function ConsolePanel({
   const stdout = run ? stdoutAtStep(run.stdout, currentStep) : '';
   const exception = run?.exception ?? run?.setupError ?? null;
   const error = result?.error ?? null;
+  const explanation = explainException(exception ?? error);
   const growth =
     complexity && complexity.samples.length >= 3 ? fitGrowth(complexity.samples) : null;
   const maxOps = complexity ? Math.max(...complexity.samples.map((sample) => sample.ops), 1) : 1;
@@ -76,6 +78,20 @@ export function ConsolePanel({
             <strong>
               {error.type}: {error.msg}
             </strong>
+          </div>
+        ) : null}
+
+        {explanation ? (
+          <div className="console-explanation">
+            <strong>{explanation.title}</strong>
+            <p>{explanation.detail}</p>
+            {explanation.checks.length > 0 ? (
+              <ul>
+                {explanation.checks.map((check) => (
+                  <li key={check}>{check}</li>
+                ))}
+              </ul>
+            ) : null}
           </div>
         ) : null}
 
