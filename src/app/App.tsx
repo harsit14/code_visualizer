@@ -12,6 +12,7 @@ import { EditorPanel } from '../components/EditorPanel';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { ExplainerPanel } from '../components/ExplainerPanel';
 import { InputsPanel } from '../components/InputsPanel';
+import { ProductTour } from '../components/ProductTour';
 import { TopBar } from '../components/TopBar';
 import { VariablesPanel } from '../components/VariablesPanel';
 import { WatchPanel } from '../components/WatchPanel';
@@ -902,90 +903,93 @@ export function App() {
 
   return (
     <div className={`app-shell${embedMode ? ' app-shell-embed' : ''}`}>
-      {embedMode ? (
-        <header className="embed-bar">
-          <strong>Code Visualizer</strong>
-          <span className={`status-pill status-${session.status.phase}`}>
-            {session.status.message}
-          </span>
-        </header>
-      ) : (
-        <TopBar
-          canExport={Boolean(session.result?.run)}
-          embedLabel={embedLabel}
-          exampleId={exampleId}
-          importLabel={importLabel}
-          importTitle={importTitle}
-          language={session.language}
-          onEmbed={() => void handleEmbed()}
-          onExampleChange={handleExampleChange}
-          onExport={handleExport}
-          onExportSvg={handleExportSvg}
-          onImport={handleImport}
-          onLanguageChange={handleLanguageChange}
-          onResetLayout={resetLayout}
-          onShare={() => void handleShare()}
-          onTogglePanel={togglePanelVisibility}
-          onToggleTheme={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))}
-          panelControls={panelControls}
-          shareLabel={shareLabel}
-          status={session.status}
-          theme={theme}
-        />
-      )}
-
-      <p className="viewport-note">Best on desktop or tablet.</p>
-
-      <main className="workbench" style={workbenchStyle}>
-        {visibleColumns.length > 0 ? (
-          visibleColumns.map((columnId, index) => (
-            <Fragment key={columnId}>
-              {renderPanelStack(columnId, columnSlots[columnId])}
-              {index < visibleColumns.length - 1 ? (
-                <div
-                  aria-label={`Resize ${columnId} and ${visibleColumns[index + 1]} columns`}
-                  aria-orientation="vertical"
-                  className="column-resizer"
-                  onPointerDown={(event) =>
-                    startColumnResize(columnId, visibleColumns[index + 1], event)
-                  }
-                  role="separator"
-                />
-              ) : null}
-            </Fragment>
-          ))
+      <section className="dashboard-stage" aria-label="Code Visualizer dashboard">
+        {embedMode ? (
+          <header className="embed-bar">
+            <strong>Code Visualizer</strong>
+            <span className={`status-pill status-${session.status.phase}`}>
+              {session.status.message}
+            </span>
+          </header>
         ) : (
-          <section className="panel layout-empty" aria-label="No panels selected">
-            <p>No panels selected.</p>
-            <button className="ghost-button" onClick={resetLayout} type="button">
-              Reset layout
-            </button>
-          </section>
+          <TopBar
+            canExport={Boolean(session.result?.run)}
+            embedLabel={embedLabel}
+            exampleId={exampleId}
+            importLabel={importLabel}
+            importTitle={importTitle}
+            language={session.language}
+            onEmbed={() => void handleEmbed()}
+            onExampleChange={handleExampleChange}
+            onExport={handleExport}
+            onExportSvg={handleExportSvg}
+            onImport={handleImport}
+            onLanguageChange={handleLanguageChange}
+            onResetLayout={resetLayout}
+            onShare={() => void handleShare()}
+            onTogglePanel={togglePanelVisibility}
+            onToggleTheme={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))}
+            panelControls={panelControls}
+            shareLabel={shareLabel}
+            status={session.status}
+            theme={theme}
+          />
         )}
-      </main>
 
-      <ControlsBar
-        breakpointCount={breakpointLines.length}
-        canRunToBreakpoint={nextBreakpointTarget !== null}
-        canRunToCursor={cursorTarget !== null}
-        canStepOver={stepOverTarget !== null}
-        cursorLine={cursorLine}
-        currentStep={session.currentStep}
-        isBusy={session.isBusy}
-        onJump={session.jumpToStep}
-        onRun={() => void session.run()}
-        onRunToBreakpoint={runToBreakpoint}
-        onRunToCursor={runToCursor}
-        onSpeedChange={session.setSpeed}
-        onStepBack={session.stepBack}
-        onStepForward={session.stepForward}
-        onStepOver={stepOver}
-        onTogglePlay={session.togglePlay}
-        playing={session.playing}
-        speed={session.speed}
-        step={session.step}
-        totalSteps={session.totalSteps}
-      />
+        <p className="viewport-note">Best on desktop or tablet.</p>
+
+        <main className="workbench" style={workbenchStyle}>
+          {visibleColumns.length > 0 ? (
+            visibleColumns.map((columnId, index) => (
+              <Fragment key={columnId}>
+                {renderPanelStack(columnId, columnSlots[columnId])}
+                {index < visibleColumns.length - 1 ? (
+                  <div
+                    aria-label={`Resize ${columnId} and ${visibleColumns[index + 1]} columns`}
+                    aria-orientation="vertical"
+                    className="column-resizer"
+                    onPointerDown={(event) =>
+                      startColumnResize(columnId, visibleColumns[index + 1], event)
+                    }
+                    role="separator"
+                  />
+                ) : null}
+              </Fragment>
+            ))
+          ) : (
+            <section className="panel layout-empty" aria-label="No panels selected">
+              <p>No panels selected.</p>
+              <button className="ghost-button" onClick={resetLayout} type="button">
+                Reset layout
+              </button>
+            </section>
+          )}
+        </main>
+
+        <ControlsBar
+          breakpointCount={breakpointLines.length}
+          canRunToBreakpoint={nextBreakpointTarget !== null}
+          canRunToCursor={cursorTarget !== null}
+          canStepOver={stepOverTarget !== null}
+          cursorLine={cursorLine}
+          currentStep={session.currentStep}
+          isBusy={session.isBusy}
+          onJump={session.jumpToStep}
+          onRun={() => void session.run()}
+          onRunToBreakpoint={runToBreakpoint}
+          onRunToCursor={runToCursor}
+          onSpeedChange={session.setSpeed}
+          onStepBack={session.stepBack}
+          onStepForward={session.stepForward}
+          onStepOver={stepOver}
+          onTogglePlay={session.togglePlay}
+          playing={session.playing}
+          speed={session.speed}
+          step={session.step}
+          totalSteps={session.totalSteps}
+        />
+      </section>
+      {!embedMode ? <ProductTour /> : null}
     </div>
   );
 }
