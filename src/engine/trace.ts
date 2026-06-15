@@ -347,3 +347,48 @@ export function stdoutAtStep(fullStdout: string, step: TraceStep | undefined): s
 export function firstExceptionStep(steps: TraceStep[]): number {
   return steps.findIndex((step) => step.event === 'exception');
 }
+
+export type VariableTimelineEntry = {
+  step: number;
+  line: number;
+  executedLine: number;
+  event: TraceStep['event'];
+  value: string;
+  changedWith: string[];
+};
+
+/** Build the change timeline for one variable inside one frame invocation. */
+export function variableTimeline(
+  steps: TraceStep[],
+  frameId: string,
+  variableName: string,
+): VariableTimelineEntry[] {
+  const entries: VariableTimelineEntry[] = [];
+  for (let index = 0; index < steps.length; index += 1) {
+    const step = steps[index];
+    const frame = findMatchingFrame(step, frameId);
+    if (!frame || !(variableName in frame.locals)) {
+      continue;
+    }
+
+    const previousFrame = findMatchingFrame(steps[index - 1], frameId);
+    const diff = diffLocals(previousFrame?.locals, frame.locals);
+    if (!diff.added.has(variableName) && !diff.changed.has(variableName)) {
+      continue;
+    }
+
+    const changedWith = [...diff.added, ...diff.changed]
+      .filter((name) => name !== variableName)
+      .sort();
+
+    entries.push({
+      step: step.i,
+      line: frame.line,
+      executedLine: previousFrame?.line ?? frame.line,
+      event: step.event,
+      value: formatValue(frame.locals[variableName]),
+      changedWith,
+    });
+  }
+  return entries;
+}

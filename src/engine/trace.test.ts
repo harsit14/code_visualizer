@@ -6,6 +6,7 @@ import {
   formatValue,
   groupChains,
   stdoutAtStep,
+  variableTimeline,
 } from './trace';
 import type { EncodedValue, TraceStep } from './types';
 
@@ -317,5 +318,108 @@ describe('stdoutAtStep', () => {
     const step = { stdoutLen: 3 } as TraceStep;
     expect(stdoutAtStep('ab\ncd\n', step)).toBe('ab\n');
     expect(stdoutAtStep('ab\n', undefined)).toBe('');
+  });
+});
+
+describe('variableTimeline', () => {
+  it('tracks value changes for a variable in one frame', () => {
+    const steps: TraceStep[] = [
+      {
+        i: 0,
+        event: 'call',
+        line: 1,
+        func: 'f',
+        stack: [{ id: 'frame-1', func: 'f', line: 1, locals: { x: num(1), y: num(0) } }],
+        globals: {},
+        stdoutLen: 0,
+      },
+      {
+        i: 1,
+        event: 'line',
+        line: 2,
+        func: 'f',
+        stack: [{ id: 'frame-1', func: 'f', line: 2, locals: { x: num(2), y: num(1) } }],
+        globals: {},
+        stdoutLen: 0,
+      },
+      {
+        i: 2,
+        event: 'line',
+        line: 3,
+        func: 'f',
+        stack: [{ id: 'frame-1', func: 'f', line: 3, locals: { x: num(2), y: num(3) } }],
+        globals: {},
+        stdoutLen: 0,
+      },
+    ];
+
+    expect(variableTimeline(steps, 'frame-1', 'x')).toEqual([
+      { step: 0, line: 1, executedLine: 1, event: 'call', value: '1', changedWith: ['y'] },
+      { step: 1, line: 2, executedLine: 1, event: 'line', value: '2', changedWith: ['y'] },
+    ]);
+  });
+
+  it('attributes a changed value to the line that just executed', () => {
+    const steps: TraceStep[] = [
+      {
+        i: 0,
+        event: 'line',
+        line: 7,
+        func: 'f',
+        stack: [
+          {
+            id: 'frame-1',
+            func: 'f',
+            line: 7,
+            locals: { lookup: { k: 'dict', id: 1, entries: [], len: 0, truncated: false } },
+          },
+        ],
+        globals: {},
+        stdoutLen: 0,
+      },
+      {
+        i: 1,
+        event: 'line',
+        line: 4,
+        func: 'f',
+        stack: [
+          {
+            id: 'frame-1',
+            func: 'f',
+            line: 4,
+            locals: {
+              lookup: {
+                k: 'dict',
+                id: 1,
+                entries: [[num(11), num(0)]],
+                len: 1,
+                truncated: false,
+              },
+            },
+          },
+        ],
+        globals: {},
+        stdoutLen: 0,
+      },
+    ];
+
+    expect(variableTimeline(steps, 'frame-1', 'lookup')).toEqual([
+      {
+        step: 0,
+        line: 7,
+        executedLine: 7,
+        event: 'line',
+        value: '{}',
+        changedWith: [],
+      },
+      {
+        step: 1,
+        line: 4,
+        executedLine: 7,
+        event: 'line',
+        value: '{11: 0}',
+        changedWith: [],
+      },
+    ]);
   });
 });

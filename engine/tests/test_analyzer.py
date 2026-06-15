@@ -176,3 +176,69 @@ def test_pointer_hints_extract_names_from_computed_expressions():
 def test_module_pointer_hints_capture_script_indexes():
     analysis = analyze("nums = [1, 2, 3]\nfor i in range(len(nums)):\n    print(nums[i])\n")
     assert analysis.module_pointer_hints == {"nums": ["i"]}
+
+
+def test_assignment_hints_capture_sliding_window_dependencies():
+    analysis = analyze(
+        "def f(nums, k):\n"
+        "    window = sum(nums[:k])\n"
+        "    for right in range(k, len(nums)):\n"
+        "        window += nums[right] - nums[right - k]\n"
+    )
+    hints = analysis.functions[0].assignment_hints
+    assert {
+        "target": "window",
+        "line": 2,
+        "statement": "window = sum(nums[:k])",
+        "sources": ["k", "nums"],
+    } in hints
+    assert {
+        "target": "right",
+        "line": 3,
+        "statement": "for right in range(k, len(nums))",
+        "sources": ["k", "nums"],
+    } in hints
+    assert {
+        "target": "window",
+        "line": 4,
+        "statement": "window += nums[right] - nums[right - k]",
+        "sources": ["k", "nums", "right"],
+    } in hints
+
+
+def test_assignment_hints_capture_mutated_container_roots():
+    analysis = analyze(
+        "def f(nums, target):\n"
+        "    lookup = {}\n"
+        "    for i, value in enumerate(nums):\n"
+        "        lookup[value] = i\n"
+    )
+    hints = analysis.functions[0].assignment_hints
+    assert {
+        "target": "lookup",
+        "line": 4,
+        "statement": "lookup[value] = i",
+        "sources": ["i", "value"],
+    } in hints
+    assert {
+        "target": "i",
+        "line": 3,
+        "statement": "for i, value in enumerate(nums)",
+        "sources": ["nums"],
+    } in hints
+    assert {
+        "target": "value",
+        "line": 3,
+        "statement": "for i, value in enumerate(nums)",
+        "sources": ["nums"],
+    } in hints
+
+
+def test_module_assignment_hints_capture_script_assignments():
+    analysis = analyze("nums = [1, 2, 3]\ntotal = sum(nums)\n")
+    assert {
+        "target": "total",
+        "line": 2,
+        "statement": "total = sum(nums)",
+        "sources": ["nums"],
+    } in analysis.module_assignment_hints

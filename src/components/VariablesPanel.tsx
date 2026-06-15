@@ -3,6 +3,7 @@
  * function mode), with per-step diff highlighting — what changed, what's
  * new, what disappeared this step.
  */
+import { Pin } from 'lucide-react';
 import { diffLocals, formatValue, typeNameOf } from '../engine/trace';
 import type { EncodedValue, TraceStep } from '../engine/types';
 
@@ -10,18 +11,37 @@ type VariablesPanelProps = {
   currentStep: TraceStep | undefined;
   previousStep: TraceStep | undefined;
   frameIndex: number | null;
+  onToggleWatch: (name: string) => void;
+  watchedVariables: readonly string[];
 };
 
 type RowProps = {
   name: string;
   value: EncodedValue;
   badge: 'new' | 'changed' | null;
+  isWatched: boolean;
+  onToggleWatch: (name: string) => void;
 };
 
-function VariableRow({ name, value, badge }: RowProps) {
+function VariableRow({ name, value, badge, isWatched, onToggleWatch }: RowProps) {
   return (
-    <tr className={badge ? `is-${badge}` : undefined}>
-      <td className="var-name">{name}</td>
+    <tr
+      className={[badge ? `is-${badge}` : '', isWatched ? 'is-watched' : '']
+        .filter(Boolean)
+        .join(' ')}
+    >
+      <td className="var-name">
+        <button
+          aria-pressed={isWatched}
+          className={['var-watch-button', isWatched ? 'is-active' : ''].filter(Boolean).join(' ')}
+          onClick={() => onToggleWatch(name)}
+          title={isWatched ? `Stop watching ${name}` : `Watch ${name}`}
+          type="button"
+        >
+          <Pin size={11} />
+          <span>{name}</span>
+        </button>
+      </td>
       <td className="var-type">{typeNameOf(value)}</td>
       <td className="var-value">
         {formatValue(value)}
@@ -31,7 +51,13 @@ function VariableRow({ name, value, badge }: RowProps) {
   );
 }
 
-export function VariablesPanel({ currentStep, previousStep, frameIndex }: VariablesPanelProps) {
+export function VariablesPanel({
+  currentStep,
+  previousStep,
+  frameIndex,
+  onToggleWatch,
+  watchedVariables,
+}: VariablesPanelProps) {
   const stack = currentStep?.stack ?? [];
   const index = frameIndex !== null && frameIndex < stack.length ? frameIndex : stack.length - 1;
   const frame = index >= 0 ? stack[index] : undefined;
@@ -42,6 +68,7 @@ export function VariablesPanel({ currentStep, previousStep, frameIndex }: Variab
   const globalEntries = Object.entries(globals).filter(([, value]) => value.k !== 'func');
   const previousGlobals = previousStep?.globals ?? {};
   const globalsDiff = diffLocals(previousGlobals, globals);
+  const stepKey = currentStep?.i ?? 'empty';
 
   return (
     <section className="panel variables-panel" aria-label="Variables">
@@ -66,14 +93,16 @@ export function VariablesPanel({ currentStep, previousStep, frameIndex }: Variab
               {Object.entries(frame.locals).map(([name, value]) => (
                 <VariableRow
                   badge={diff?.added.has(name) ? 'new' : diff?.changed.has(name) ? 'changed' : null}
-                  key={name}
+                  isWatched={watchedVariables.includes(name)}
+                  key={`${stepKey}-${name}`}
                   name={name}
+                  onToggleWatch={onToggleWatch}
                   value={value}
                 />
               ))}
               {diff && diff.removed.size > 0
                 ? [...diff.removed].map((name) => (
-                    <tr className="is-removed" key={`removed-${name}`}>
+                    <tr className="is-removed" key={`${stepKey}-removed-${name}`}>
                       <td className="var-name">{name}</td>
                       <td className="var-type" />
                       <td className="var-value">removed</td>
@@ -97,8 +126,10 @@ export function VariablesPanel({ currentStep, previousStep, frameIndex }: Variab
                             ? 'changed'
                             : null
                       }
-                      key={name}
+                      isWatched={watchedVariables.includes(name)}
+                      key={`${stepKey}-global-${name}`}
                       name={name}
+                      onToggleWatch={onToggleWatch}
                       value={value}
                     />
                   ))}

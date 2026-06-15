@@ -75,6 +75,13 @@ export type ParamInfo = {
   source: 'hint' | 'usage' | 'name' | 'default';
 };
 
+export type AssignmentHint = {
+  target: string;
+  line: number;
+  statement: string;
+  sources: string[];
+};
+
 export type FunctionInfo = {
   name: string;
   qualname: string;
@@ -85,6 +92,7 @@ export type FunctionInfo = {
   docstring: string | null;
   returns: string | null;
   pointerHints?: Record<string, string[]>;
+  assignmentHints?: AssignmentHint[];
 };
 
 export type Diagnostic = {
@@ -103,6 +111,7 @@ export type AnalysisInfo = {
   referencesTreeNode: boolean;
   referencesListNode: boolean;
   modulePointerHints?: Record<string, string[]>;
+  moduleAssignmentHints?: AssignmentHint[];
   diagnostics: Diagnostic[];
 };
 

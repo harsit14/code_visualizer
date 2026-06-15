@@ -8,9 +8,11 @@ import { ConsolePanel } from '../components/ConsolePanel';
 import { ControlsBar } from '../components/ControlsBar';
 import { DataPanel } from '../components/DataPanel';
 import { EditorPanel } from '../components/EditorPanel';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 import { InputsPanel } from '../components/InputsPanel';
 import { TopBar } from '../components/TopBar';
 import { VariablesPanel } from '../components/VariablesPanel';
+import { WatchPanel } from '../components/WatchPanel';
 import type { SessionResult } from '../engine/types';
 import { DEFAULT_EXAMPLE_ID, getExample } from '../examples/examples';
 import { decodeShareHash, encodeShareState } from './shareState';
@@ -39,6 +41,7 @@ export function App() {
   );
   const [theme, setTheme] = useState<Theme>(initialTheme);
   const [shareLabel, setShareLabel] = useState('Share');
+  const [watchedVariables, setWatchedVariables] = useState<string[]>([]);
 
   const initialCode = shared?.code ?? getExample(DEFAULT_EXAMPLE_ID)?.code ?? '';
   const session = useSession(initialCode, {
@@ -61,6 +64,7 @@ export function App() {
   const handleCodeChange = useCallback(
     (code: string) => {
       setExampleId(null);
+      setWatchedVariables([]);
       session.setCode(code);
     },
     [session],
@@ -73,6 +77,7 @@ export function App() {
         return;
       }
       setExampleId(id);
+      setWatchedVariables([]);
       session.setCode(example.code);
     },
     [session],
@@ -133,6 +138,7 @@ export function App() {
           };
           if (typeof payload.code === 'string' && payload.result) {
             setExampleId(null);
+            setWatchedVariables([]);
             session.importSession(payload.code, payload.result, payload.step ?? 0);
           }
         } catch {
@@ -142,6 +148,16 @@ export function App() {
     },
     [session],
   );
+
+  const toggleWatchedVariable = useCallback((name: string) => {
+    setWatchedVariables((current) =>
+      current.includes(name) ? current.filter((item) => item !== name) : [...current, name],
+    );
+  }, []);
+
+  const removeWatchedVariable = useCallback((name: string) => {
+    setWatchedVariables((current) => current.filter((item) => item !== name));
+  }, []);
 
   const run = session.result?.run ?? null;
   const errorLine = useMemo(() => {
@@ -175,60 +191,122 @@ export function App() {
 
       <main className="workbench">
         <div className="column column-left">
-          <EditorPanel
-            activeLine={session.currentStep?.line ?? null}
-            code={session.code}
-            diagnostics={session.analysis?.diagnostics ?? []}
-            errorLine={errorLine}
-            onChange={handleCodeChange}
-            theme={theme}
-          />
-          {showInputs ? (
-            <InputsPanel
-              activeFunction={session.activeFunction}
-              analysis={session.analysis}
-              drafts={session.inputDrafts}
-              isBusy={session.isBusy}
-              lastInputs={run?.inputs ?? null}
-              onDraftsChange={session.setInputDrafts}
-              onFunctionChange={session.setFunctionOverride}
-              onRegenerate={session.regenerateInputs}
-              onSeedChange={session.setSeed}
-              seed={session.seed}
+          <ErrorBoundary
+            className="editor-panel"
+            resetKeys={[session.code, session.step]}
+            title="Code"
+          >
+            <EditorPanel
+              activeLine={session.currentStep?.line ?? null}
+              code={session.code}
+              diagnostics={session.analysis?.diagnostics ?? []}
+              errorLine={errorLine}
+              onChange={handleCodeChange}
+              theme={theme}
             />
+          </ErrorBoundary>
+          {showInputs ? (
+            <ErrorBoundary
+              className="inputs-panel"
+              resetKeys={[session.code, session.analysis, run, session.inputDrafts]}
+              title="Test inputs"
+            >
+              <InputsPanel
+                activeFunction={session.activeFunction}
+                analysis={session.analysis}
+                drafts={session.inputDrafts}
+                isBusy={session.isBusy}
+                lastInputs={run?.inputs ?? null}
+                onDraftsChange={session.setInputDrafts}
+                onFunctionChange={session.setFunctionOverride}
+                onRegenerate={session.regenerateInputs}
+                onSeedChange={session.setSeed}
+                seed={session.seed}
+              />
+            </ErrorBoundary>
           ) : null}
         </div>
 
         <div className="column column-center">
-          <DataPanel
-            analysis={session.analysis}
-            atLastStep={atLastStep}
-            currentStep={session.currentStep}
-            frameIndex={session.selectedFrameIndex}
-            returnValue={run?.returnValue ?? null}
-          />
+          <ErrorBoundary
+            className="data-panel"
+            resetKeys={[session.result, session.step, session.selectedFrameIndex]}
+            title="Data"
+          >
+            <DataPanel
+              analysis={session.analysis}
+              atLastStep={atLastStep}
+              currentStep={session.currentStep}
+              frameIndex={session.selectedFrameIndex}
+              returnValue={run?.returnValue ?? null}
+            />
+          </ErrorBoundary>
         </div>
 
         <div className="column column-right">
-          <VariablesPanel
-            currentStep={session.currentStep}
-            frameIndex={session.selectedFrameIndex}
-            previousStep={previousStep}
-          />
-          <CallStackPanel
-            currentStep={session.currentStep}
-            onSelectFrame={session.setSelectedFrameIndex}
-            selectedFrameIndex={session.selectedFrameIndex}
-          />
-          <ConsolePanel
-            atLastStep={atLastStep}
-            canMeasureComplexity={showInputs && !session.isBusy}
-            complexity={session.complexity}
-            complexityBusy={session.complexityBusy}
-            currentStep={session.currentStep}
-            onMeasureComplexity={() => void session.measureComplexity()}
-            result={session.result}
-          />
+          <ErrorBoundary
+            className="variables-panel"
+            resetKeys={[session.result, session.step, session.selectedFrameIndex]}
+            title="Variables"
+          >
+            <VariablesPanel
+              currentStep={session.currentStep}
+              frameIndex={session.selectedFrameIndex}
+              onToggleWatch={toggleWatchedVariable}
+              previousStep={previousStep}
+              watchedVariables={watchedVariables}
+            />
+          </ErrorBoundary>
+          {watchedVariables.length > 0 ? (
+            <ErrorBoundary
+              className="watch-panel"
+              resetKeys={[
+                session.result,
+                session.step,
+                session.selectedFrameIndex,
+                watchedVariables,
+              ]}
+              title="Watch"
+            >
+              <WatchPanel
+                analysis={session.analysis}
+                currentStep={session.currentStep}
+                frameIndex={session.selectedFrameIndex}
+                onClear={() => setWatchedVariables([])}
+                onJump={session.jumpToStep}
+                onRemoveVariable={removeWatchedVariable}
+                step={session.step}
+                steps={session.steps}
+                watchedVariables={watchedVariables}
+              />
+            </ErrorBoundary>
+          ) : null}
+          <ErrorBoundary
+            className="callstack-panel"
+            resetKeys={[session.result, session.step, session.selectedFrameIndex]}
+            title="Call stack"
+          >
+            <CallStackPanel
+              currentStep={session.currentStep}
+              onSelectFrame={session.setSelectedFrameIndex}
+              selectedFrameIndex={session.selectedFrameIndex}
+            />
+          </ErrorBoundary>
+          <ErrorBoundary
+            className="console-panel"
+            resetKeys={[session.result, session.step, session.complexity]}
+            title="Console"
+          >
+            <ConsolePanel
+              atLastStep={atLastStep}
+              canMeasureComplexity={showInputs && !session.isBusy}
+              complexity={session.complexity}
+              complexityBusy={session.complexityBusy}
+              currentStep={session.currentStep}
+              onMeasureComplexity={() => void session.measureComplexity()}
+              result={session.result}
+            />
+          </ErrorBoundary>
         </div>
       </main>
 

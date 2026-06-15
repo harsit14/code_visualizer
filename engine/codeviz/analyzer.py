@@ -129,6 +129,7 @@ class FunctionInfo:
     docstring: Optional[str]
     returns: Optional[str]
     pointer_hints: dict[str, list[str]] = field(default_factory=dict)
+    assignment_hints: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -141,6 +142,7 @@ class FunctionInfo:
             "docstring": self.docstring,
             "returns": self.returns,
             "pointerHints": self.pointer_hints,
+            "assignmentHints": self.assignment_hints,
         }
 
 
@@ -156,6 +158,7 @@ class Analysis:
     references_tree_node: bool = False
     references_list_node: bool = False
     module_pointer_hints: dict[str, list[str]] = field(default_factory=dict)
+    module_assignment_hints: list[dict[str, Any]] = field(default_factory=list)
     diagnostics: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
@@ -168,6 +171,7 @@ class Analysis:
             "referencesTreeNode": self.references_tree_node,
             "referencesListNode": self.references_list_node,
             "modulePointerHints": self.module_pointer_hints,
+            "moduleAssignmentHints": self.module_assignment_hints,
             "diagnostics": self.diagnostics,
         }
 
@@ -414,6 +418,172 @@ def _pointer_hints_for_body(body: list[ast.stmt]) -> dict[str, list[str]]:
     return visitor.result()
 
 
+class _NameLoadVisitor(ast.NodeVisitor):
+    """Collect variable names that an expression reads."""
+
+    def __init__(self) -> None:
+        self.names: set[str] = set()
+
+    def visit_Name(self, node: ast.Name) -> None:
+        if isinstance(node.ctx, ast.Load):
+            self.names.add(node.id)
+
+    def visit_Call(self, node: ast.Call) -> None:
+        if isinstance(node.func, ast.Attribute):
+            self.visit(node.func.value)
+        for arg in node.args:
+            self.visit(arg)
+        for keyword in node.keywords:
+            self.visit(keyword.value)
+
+
+def _unparse(node: ast.AST) -> str:
+    try:
+        return ast.unparse(node).strip()
+    except Exception:
+        return "<expression>"
+
+
+def _target_text(node: ast.AST) -> str:
+    if isinstance(node, (ast.Tuple, ast.List)):
+        return ", ".join(_unparse(item) for item in node.elts)
+    return _unparse(node)
+
+
+def _source_names(*nodes: ast.AST | None) -> set[str]:
+    visitor = _NameLoadVisitor()
+    for node in nodes:
+        if node is not None:
+            visitor.visit(node)
+    return visitor.names
+
+
+def _target_roots(node: ast.AST | None) -> list[str]:
+    if node is None:
+        return []
+    if isinstance(node, ast.Name):
+        return [node.id]
+    if isinstance(node, (ast.Tuple, ast.List)):
+        roots: list[str] = []
+        for item in node.elts:
+            roots.extend(_target_roots(item))
+        return roots
+    if isinstance(node, ast.Starred):
+        return _target_roots(node.value)
+    if isinstance(node, ast.Attribute):
+        return _target_roots(node.value)
+    if isinstance(node, ast.Subscript):
+        return _target_roots(node.value)
+    return []
+
+
+class _AssignmentHintVisitor(ast.NodeVisitor):
+    """Collect target -> source-expression hints for watched variables."""
+
+    def __init__(self) -> None:
+        self.hints: list[dict[str, Any]] = []
+
+    def _add(
+        self,
+        target: str,
+        line: int,
+        statement: str,
+        sources: set[str],
+    ) -> None:
+        filtered = sorted(name for name in sources if name and name != target)
+        self.hints.append(
+            {
+                "target": target,
+                "line": line,
+                "statement": statement,
+                "sources": filtered,
+            }
+        )
+
+    def _record_target(
+        self,
+        target_node: ast.AST,
+        line: int,
+        statement: str,
+        sources: set[str],
+        include_target_root: bool = False,
+    ) -> None:
+        roots = _target_roots(target_node)
+        target_sources = _source_names(target_node)
+        for root in roots:
+            combined = set(sources)
+            if include_target_root:
+                combined.update(target_sources)
+            else:
+                combined.update(name for name in target_sources if name != root)
+            self._add(root, line, statement, combined)
+
+    def _record_assign_target(
+        self,
+        target_node: ast.AST,
+        value_node: ast.AST,
+        line: int,
+        fallback_statement: str,
+    ) -> None:
+        if (
+            isinstance(target_node, (ast.Tuple, ast.List))
+            and isinstance(value_node, (ast.Tuple, ast.List))
+            and len(target_node.elts) == len(value_node.elts)
+        ):
+            for target_item, value_item in zip(target_node.elts, value_node.elts):
+                statement = f"{_unparse(target_item)} = {_unparse(value_item)}"
+                self._record_target(
+                    target_item,
+                    line,
+                    statement,
+                    _source_names(value_item),
+                )
+            return
+        self._record_target(target_node, line, fallback_statement, _source_names(value_node))
+
+    def visit_Assign(self, node: ast.Assign) -> None:
+        statement = _unparse(node)
+        for target in node.targets:
+            self._record_assign_target(target, node.value, node.lineno, statement)
+        self.generic_visit(node)
+
+    def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
+        if node.value is not None:
+            self._record_assign_target(node.target, node.value, node.lineno, _unparse(node))
+        self.generic_visit(node)
+
+    def visit_AugAssign(self, node: ast.AugAssign) -> None:
+        self._record_target(
+            node.target,
+            node.lineno,
+            _unparse(node),
+            _source_names(node.value),
+            include_target_root=True,
+        )
+        self.generic_visit(node)
+
+    def visit_For(self, node: ast.For) -> None:
+        statement = f"for {_target_text(node.target)} in {_unparse(node.iter)}"
+        self._record_target(node.target, node.lineno, statement, _source_names(node.iter))
+        self.generic_visit(node)
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+        return
+
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+        return
+
+    def visit_ClassDef(self, node: ast.ClassDef) -> None:
+        return
+
+
+def _assignment_hints_for_body(body: list[ast.stmt]) -> list[dict[str, Any]]:
+    visitor = _AssignmentHintVisitor()
+    for statement in body:
+        visitor.visit(statement)
+    return visitor.hints
+
+
 def _is_generator(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
     for child in ast.walk(node):
         if isinstance(child, (ast.Yield, ast.YieldFrom)):
@@ -492,6 +662,7 @@ def analyze(source: str) -> Analysis:
                     docstring=ast.get_docstring(node),
                     returns=ast.unparse(node.returns) if node.returns else None,
                     pointer_hints=_pointer_hints_for_body(node.body),
+                    assignment_hints=_assignment_hints_for_body(node.body),
                 )
             )
         elif isinstance(node, ast.ClassDef):
@@ -514,6 +685,7 @@ def analyze(source: str) -> Analysis:
                             docstring=ast.get_docstring(item),
                             returns=ast.unparse(item.returns) if item.returns else None,
                             pointer_hints=_pointer_hints_for_body(item.body),
+                            assignment_hints=_assignment_hints_for_body(item.body),
                         )
                     )
 
@@ -543,6 +715,7 @@ def analyze(source: str) -> Analysis:
         references_tree_node=references_tree,
         references_list_node=references_list,
         module_pointer_hints=_pointer_hints_for_body(tree.body),
+        module_assignment_hints=_assignment_hints_for_body(tree.body),
     )
     if mode == "empty" and not functions:
         analysis.diagnostics.append(

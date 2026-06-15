@@ -233,6 +233,24 @@ def test_pointer_hints_in_analysis_for_sliding_window():
     assert "right" in hints["nums"]
 
 
+def test_assignment_hints_in_analysis_for_sliding_window():
+    analysis = json.loads(handle_request(json.dumps({"op": "analyze", "source": SLIDING_WINDOW})))
+    fn = analysis["analysis"]["functions"][0]
+    hints = fn["assignmentHints"]
+    assert {
+        "target": "window",
+        "line": 3,
+        "statement": "window = sum(nums[:k])",
+        "sources": ["k", "nums"],
+    } in hints
+    assert {
+        "target": "window",
+        "line": 6,
+        "statement": "window += nums[right] - nums[right - k]",
+        "sources": ["k", "nums", "right"],
+    } in hints
+
+
 def test_pointer_hints_in_module_scope_script():
     script = "nums = [1, 2, 3]\nfor i in range(len(nums)):\n    print(nums[i])\n"
     analysis = json.loads(handle_request(json.dumps({"op": "analyze", "source": script})))
