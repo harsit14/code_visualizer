@@ -2,10 +2,16 @@
  * Top bar: branding, example picker, theme toggle, share link,
  * trace export/import, and runtime status.
  */
-import { Download, Link2, Moon, Sun, Upload } from 'lucide-react';
+import { Columns3, Download, Link2, Moon, Sun, Upload } from 'lucide-react';
 import { useRef } from 'react';
 import { examples } from '../examples/examples';
 import type { RuntimeStatus } from '../engine/types';
+
+type PanelControl = {
+  id: string;
+  label: string;
+  visible: boolean;
+};
 
 type TopBarProps = {
   exampleId: string | null;
@@ -14,9 +20,14 @@ type TopBarProps = {
   onToggleTheme: () => void;
   onShare: () => void;
   shareLabel: string;
+  importLabel: string;
+  importTitle: string;
   canExport: boolean;
   onExport: () => void;
   onImport: (file: File) => void;
+  onResetLayout: () => void;
+  onTogglePanel: (id: string, visible: boolean) => void;
+  panelControls: readonly PanelControl[];
   status: RuntimeStatus;
 };
 
@@ -29,9 +40,14 @@ export function TopBar({
   onToggleTheme,
   onShare,
   shareLabel,
+  importLabel,
+  importTitle,
   canExport,
   onExport,
   onImport,
+  onResetLayout,
+  onTogglePanel,
+  panelControls,
   status,
 }: TopBarProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -75,14 +91,31 @@ export function TopBar({
           <Download size={14} />
           Export
         </button>
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          title="Import a previously exported trace"
-          type="button"
-        >
+        <button onClick={() => fileInputRef.current?.click()} title={importTitle} type="button">
           <Upload size={14} />
-          Import
+          {importLabel}
         </button>
+        <details className="panel-menu">
+          <summary title="Show, hide, and reset panels">
+            <Columns3 size={14} />
+            Panels
+          </summary>
+          <div className="panel-menu-popover">
+            {panelControls.map((panel) => (
+              <label className="panel-menu-item" key={panel.id}>
+                <input
+                  checked={panel.visible}
+                  onChange={(event) => onTogglePanel(panel.id, event.target.checked)}
+                  type="checkbox"
+                />
+                <span>{panel.label}</span>
+              </label>
+            ))}
+            <button className="panel-menu-reset" onClick={onResetLayout} type="button">
+              Reset layout
+            </button>
+          </div>
+        </details>
         <input
           accept="application/json"
           hidden

@@ -98,16 +98,12 @@ export function WatchPanel({
           {watchedVariables.map((name) => {
             const value = currentValue(frame, name);
             const entries = variableTimeline(steps, frame.id, name);
-            const visibleEntries = entries
-              .filter((entry) => entry.step <= step)
-              .slice(-MAX_VISIBLE_EVENTS);
-            const hiddenCount = Math.max(
-              0,
-              entries.filter((entry) => entry.step <= step).length - visibleEntries.length,
-            );
+            const activeEntries = entries.filter((entry) => entry.step <= step);
+            const visibleEntries = activeEntries.slice(-MAX_VISIBLE_EVENTS);
+            const hiddenCount = Math.max(0, activeEntries.length - visibleEntries.length);
 
             return (
-              <article className="watch-card" key={name}>
+              <article className="watch-card" key={`${frame.id}-${name}`}>
                 <header className="watch-card-header">
                   <div>
                     <h3>{name}</h3>
