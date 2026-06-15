@@ -31,6 +31,8 @@ const headersPath = join(distDir, '_headers');
 const headers = existsSync(headersPath) ? readFileSync(headersPath, 'utf8') : '';
 const routesPath = join(distDir, '_routes.json');
 const routes = existsSync(routesPath) ? readFileSync(routesPath, 'utf8') : '';
+const wranglerPath = join(root, 'wrangler.jsonc');
+const wranglerConfig = existsSync(wranglerPath) ? readFileSync(wranglerPath, 'utf8') : '';
 const indexPath = join(distDir, 'index.html');
 const indexHtml = existsSync(indexPath) ? readFileSync(indexPath, 'utf8') : '';
 
@@ -46,6 +48,10 @@ if (process.env.GITHUB_PAGES === 'true' && !indexHtml.includes('/code_visualizer
 
 if (!routes.includes('"/api/*"')) {
   failures.push('dist/_routes.json does not include /api/* for the Cloudflare explainer Function');
+}
+
+if (!wranglerConfig.includes('"run_worker_first"') || !wranglerConfig.includes('"/api/*"')) {
+  failures.push('wrangler.jsonc does not run the Worker before static assets for /api/*');
 }
 
 if (existsSync(join(distDir, 'assets/pyodide/node_modules'))) {
