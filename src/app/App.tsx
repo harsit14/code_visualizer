@@ -176,8 +176,8 @@ export function App() {
     [selectedFrameIndex, step, steps],
   );
 
-  const clearTraceNavigation = useCallback(() => {
-    setBreakpoints((current) => (current.size > 0 ? new Set() : current));
+  const resetTraceNavigation = useCallback(() => {
+    setBreakpoints(new Set());
     setCursorLine(null);
   }, []);
 
@@ -306,10 +306,10 @@ export function App() {
     (code: string) => {
       setExampleId(null);
       setWatchedVariables([]);
-      clearTraceNavigation();
+      resetTraceNavigation();
       setCode(code);
     },
-    [clearTraceNavigation, setCode],
+    [resetTraceNavigation, setCode],
   );
 
   const handleExampleChange = useCallback(
@@ -320,10 +320,10 @@ export function App() {
       }
       setExampleId(id);
       setWatchedVariables([]);
-      clearTraceNavigation();
+      resetTraceNavigation();
       setCode(example.code);
     },
-    [clearTraceNavigation, setCode],
+    [resetTraceNavigation, setCode],
   );
 
   const handleShare = useCallback(async () => {
@@ -397,7 +397,7 @@ export function App() {
             if (typeof payload.code === 'string' && payload.result) {
               setExampleId(null);
               setWatchedVariables([]);
-              clearTraceNavigation();
+              resetTraceNavigation();
               importSession(payload.code, payload.result, payload.step ?? 0);
               showImportStatus('Imported', 'Trace imported successfully');
               return;
@@ -409,7 +409,7 @@ export function App() {
         })
         .catch(() => showImportStatus('Import failed', 'Could not read selected file'));
     },
-    [clearTraceNavigation, importSession, showImportStatus],
+    [resetTraceNavigation, importSession, showImportStatus],
   );
 
   const toggleWatchedVariable = useCallback((name: string) => {

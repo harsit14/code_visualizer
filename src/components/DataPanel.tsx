@@ -22,6 +22,7 @@ import {
   type ArrayPointer,
   type ArrayPointerHints,
 } from '../engine/trace';
+import { effectiveFrame } from '../engine/traceNavigation';
 import type {
   AnalysisInfo,
   EncodedValue,
@@ -77,7 +78,9 @@ function ArrayBoxes({ value, pointers }: { value: SeqValue; pointers: ArrayPoint
         {value.truncated ? (
           <div className="array-cell-wrap">
             <span className="array-index" />
-            <span className={`array-cell is-ellipsis${endPointers.length > 0 ? ' has-pointer' : ''}`}>
+            <span
+              className={`array-cell is-ellipsis${endPointers.length > 0 ? ' has-pointer' : ''}`}
+            >
               +{value.len - value.items.length}
             </span>
             {endPointers.length > 0 ? <span className="array-pointer">▲ {endLabel}</span> : null}
@@ -121,7 +124,9 @@ function StringBoxes({ value, pointers }: { value: StringValue; pointers: ArrayP
         {value.truncated ? (
           <div className="array-cell-wrap">
             <span className="array-index" />
-            <span className={`array-cell is-ellipsis${endPointers.length > 0 ? ' has-pointer' : ''}`}>
+            <span
+              className={`array-cell is-ellipsis${endPointers.length > 0 ? ' has-pointer' : ''}`}
+            >
               …
             </span>
             {endPointers.length > 0 ? <span className="array-pointer">▲ {endLabel}</span> : null}
@@ -480,9 +485,7 @@ export function DataPanel({
   returnValue,
   atLastStep,
 }: DataPanelProps) {
-  const stack = currentStep?.stack ?? [];
-  const index = frameIndex !== null && frameIndex < stack.length ? frameIndex : stack.length - 1;
-  const frame = index >= 0 ? stack[index] : undefined;
+  const frame = effectiveFrame(currentStep, frameIndex);
   const functionInfo = findFunctionInfo(analysis, frame);
   const pointerHints = pointerHintsForFrame(analysis, frame);
   const frameLocals = frame ? expandSelf(frame.locals) : {};
@@ -548,7 +551,9 @@ export function DataPanel({
           {sharedRefs.length > 0 ? (
             <article className="data-card data-card-wide data-card-shared">
               <h3>shared references</h3>
-              <p className="shared-ref-note">Same object reached by multiple paths — mutating one changes all.</p>
+              <p className="shared-ref-note">
+                Same object reached by multiple paths — mutating one changes all.
+              </p>
               <ul className="shared-ref-list">
                 {sharedRefs.map((ref) => (
                   <li className="shared-ref" key={ref.id}>

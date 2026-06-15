@@ -5,7 +5,14 @@
 import { python } from '@codemirror/lang-python';
 import { lintGutter, setDiagnostics, type Diagnostic as CMDiagnostic } from '@codemirror/lint';
 import { StateEffect, StateField, type Extension } from '@codemirror/state';
-import { Decoration, EditorView, GutterMarker, gutter, type DecorationSet } from '@codemirror/view';
+import {
+  Decoration,
+  EditorView,
+  GutterMarker,
+  gutter,
+  lineNumbers,
+  type DecorationSet,
+} from '@codemirror/view';
 import CodeMirror from '@uiw/react-codemirror';
 import { useEffect, useMemo, useRef } from 'react';
 import type { Diagnostic } from '../engine/types';
@@ -170,22 +177,17 @@ function executionCountGutter(): Extension {
   ];
 }
 
-function runToLineExtension(onRunToLine?: (line: number) => void): Extension {
-  if (!onRunToLine) {
-    return [];
-  }
-  return EditorView.domEventHandlers({
-    contextmenu(event, view) {
-      if (!(event instanceof MouseEvent)) {
-        return false;
-      }
-      const position = view.posAtCoords({ x: event.clientX, y: event.clientY });
-      if (position === null) {
-        return false;
-      }
-      event.preventDefault();
-      onRunToLine(view.state.doc.lineAt(position).number);
-      return true;
+function lineNumberGutter(onRunToLine?: (line: number) => void): Extension {
+  return lineNumbers({
+    domEventHandlers: {
+      contextmenu(view, line, event) {
+        if (!onRunToLine) {
+          return false;
+        }
+        event.preventDefault();
+        onRunToLine(view.state.doc.lineAt(line.from).number);
+        return true;
+      },
     },
   });
 }
@@ -237,9 +239,9 @@ export function EditorPanel({
   const extensions = useMemo(
     () => [
       ...baseExtensions,
+      lineNumberGutter(onRunToLine),
       breakpointGutter(onToggleBreakpoint),
       executionCountGutter(),
-      runToLineExtension(onRunToLine),
     ],
     [onRunToLine, onToggleBreakpoint],
   );
@@ -314,6 +316,7 @@ export function EditorPanel({
           }}
           basicSetup={{
             foldGutter: false,
+            lineNumbers: false,
             autocompletion: false,
             highlightActiveLine: false,
             highlightActiveLineGutter: false,

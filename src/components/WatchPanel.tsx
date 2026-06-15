@@ -1,5 +1,6 @@
 import { Activity, ChevronDown, ChevronUp, X } from 'lucide-react';
 import { expandSelf, formatValue, variableTimeline } from '../engine/trace';
+import { effectiveFrame } from '../engine/traceNavigation';
 import type {
   AnalysisInfo,
   AssignmentHint,
@@ -22,15 +23,6 @@ type WatchPanelProps = {
 };
 
 const MAX_VISIBLE_EVENTS = 8;
-
-function effectiveFrame(
-  step: TraceStep | undefined,
-  frameIndex: number | null,
-): FrameSnapshot | undefined {
-  const stack = step?.stack ?? [];
-  const index = frameIndex !== null && frameIndex < stack.length ? frameIndex : stack.length - 1;
-  return index >= 0 ? stack[index] : undefined;
-}
 
 function currentValue(frame: FrameSnapshot | undefined, name: string): EncodedValue | undefined {
   return frame ? expandSelf(frame.locals)[name] : undefined;

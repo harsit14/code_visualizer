@@ -5,6 +5,7 @@
  */
 import { Pin } from 'lucide-react';
 import { diffLocals, expandSelf, formatValue, typeNameOf } from '../engine/trace';
+import { effectiveFrame } from '../engine/traceNavigation';
 import type { EncodedValue, TraceStep } from '../engine/types';
 
 type VariablesPanelProps = {
@@ -58,9 +59,7 @@ export function VariablesPanel({
   onToggleWatch,
   watchedVariables,
 }: VariablesPanelProps) {
-  const stack = currentStep?.stack ?? [];
-  const index = frameIndex !== null && frameIndex < stack.length ? frameIndex : stack.length - 1;
-  const frame = index >= 0 ? stack[index] : undefined;
+  const frame = effectiveFrame(currentStep, frameIndex);
   const previousFrame = previousStep?.stack.find((candidate) => candidate.id === frame?.id);
   const locals = frame ? expandSelf(frame.locals) : {};
   const previousLocals = previousFrame ? expandSelf(previousFrame.locals) : undefined;
