@@ -89,4 +89,27 @@ describe('/api/explain-step', () => {
     expect(await response.json()).toEqual({ error: 'AI explainer is not configured.' });
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it('returns JSON when the DeepSeek fetch throws', async () => {
+    const fetchMock = vi.fn(async () => {
+      throw new Error('network unavailable');
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await onRequestPost({
+      env: { DEEPSEEK_API_KEY: 'sk-server-only' },
+      request: new Request('https://example.com/api/explain-step', {
+        body: JSON.stringify({ context }),
+        headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+      }),
+    });
+
+    expect(response.status).toBe(500);
+    expect(response.headers.get('Content-Type')).toContain('application/json');
+    expect(response.headers.get('X-Code-Visualizer-Function')).toBe('explain-step');
+    expect(await response.json()).toEqual({
+      error: 'AI explainer crashed before returning JSON: network unavailable',
+    });
+  });
 });
