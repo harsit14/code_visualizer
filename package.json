@@ -7,14 +7,15 @@
     "dev": "vite --host 0.0.0.0",
     "build": "tsc -b && vite build",
     "ci": "npm run typecheck && npm run lint && npm run test && npm run build && npm run smoke",
-    "preview": "vite preview --host 0.0.0.0",
+    "preview": "npm run build && wrangler dev",
     "smoke": "node scripts/smoke-check.mjs",
     "typecheck": "tsc -b --pretty",
     "lint": "eslint .",
     "format": "prettier --check .",
     "format:write": "prettier --write .",
     "test": "vitest run",
-    "test:engine": "cd engine && .venv/bin/pytest -q"
+    "test:engine": "cd engine && .venv/bin/pytest -q",
+    "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
     "@codemirror/lang-python": "^6.2.1",
@@ -27,6 +28,7 @@
     "vite-plugin-static-copy": "^4.1.0"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.40.2",
     "@eslint/js": "^9.0.0",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^25.9.1",
@@ -42,6 +44,7 @@
     "typescript": "^5.7.0",
     "typescript-eslint": "^8.0.0",
     "vite": "^7.0.0",
-    "vitest": "^3.0.0"
+    "vitest": "^3.0.0",
+    "wrangler": "^4.100.0"
   }
 }
