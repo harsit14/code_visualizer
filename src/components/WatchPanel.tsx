@@ -1,10 +1,11 @@
-import { Activity, X } from 'lucide-react';
-import { formatValue, variableTimeline } from '../engine/trace';
+import { Activity, ChevronDown, ChevronUp, X } from 'lucide-react';
+import { expandSelf, formatValue, variableTimeline } from '../engine/trace';
 import type {
   AnalysisInfo,
   AssignmentHint,
   EncodedValue,
   FrameSnapshot,
+  FunctionInfo,
   TraceStep,
 } from '../engine/types';
 
@@ -32,7 +33,7 @@ function effectiveFrame(
 }
 
 function currentValue(frame: FrameSnapshot | undefined, name: string): EncodedValue | undefined {
-  return frame?.locals[name];
+  return frame ? expandSelf(frame.locals)[name] : undefined;
 }
 
 function eventLabel(event: TraceStep['event']): string {
@@ -66,6 +67,31 @@ function assignmentHintForEntry(
   return hints.find((hint) => hint.target === target && hint.line === line);
 }
 
+function functionInfoForFrame(
+  analysis: AnalysisInfo | null,
+  frame: FrameSnapshot | undefined,
+): FunctionInfo | undefined {
+  if (!analysis || !frame || frame.func === '<module>') {
+    return undefined;
+  }
+  const exact = analysis.functions.find((fn) => fn.qualname === frame.qualname);
+  if (exact) {
+    return exact;
+  }
+  const byName = analysis.functions.filter((fn) => fn.name === frame.func);
+  return byName.length === 1 ? byName[0] : undefined;
+}
+
+function isParameterBinding(
+  functionInfo: FunctionInfo | undefined,
+  variableName: string,
+  event: TraceStep['event'],
+): boolean {
+  return (
+    event === 'call' && (functionInfo?.params.some((param) => param.name === variableName) ?? false)
+  );
+}
+
 export function WatchPanel({
   analysis,
   currentStep,
@@ -79,6 +105,7 @@ export function WatchPanel({
 }: WatchPanelProps) {
   const frame = effectiveFrame(currentStep, frameIndex);
   const assignmentHints = assignmentHintsForFrame(analysis, frame);
+  const functionInfo = functionInfoForFrame(analysis, frame);
 
   return (
     <section className="panel watch-panel" aria-label="Watch variables">
@@ -101,6 +128,10 @@ export function WatchPanel({
             const activeEntries = entries.filter((entry) => entry.step <= step);
             const visibleEntries = activeEntries.slice(-MAX_VISIBLE_EVENTS);
             const hiddenCount = Math.max(0, activeEntries.length - visibleEntries.length);
+            // Run-until-change: jump straight to the next/previous step where
+            // this watched variable changes in the current frame.
+            const nextChange = entries.find((entry) => entry.step > step)?.step;
+            const prevChange = [...entries].reverse().find((entry) => entry.step < step)?.step;
 
             return (
               <article className="watch-card" key={`${frame.id}-${name}`}>
@@ -109,14 +140,34 @@ export function WatchPanel({
                     <h3>{name}</h3>
                     <p>{value ? formatValue(value) : 'not in scope'}</p>
                   </div>
-                  <button
-                    className="icon-button watch-remove"
-                    onClick={() => onRemoveVariable(name)}
-                    title={`Remove ${name} from watch`}
-                    type="button"
-                  >
-                    <X size={13} />
-                  </button>
+                  <div className="watch-card-actions">
+                    <button
+                      className="icon-button"
+                      disabled={prevChange === undefined}
+                      onClick={() => prevChange !== undefined && onJump(prevChange)}
+                      title={`Jump to previous change of ${name}`}
+                      type="button"
+                    >
+                      <ChevronUp size={13} />
+                    </button>
+                    <button
+                      className="icon-button"
+                      disabled={nextChange === undefined}
+                      onClick={() => nextChange !== undefined && onJump(nextChange)}
+                      title={`Jump to next change of ${name}`}
+                      type="button"
+                    >
+                      <ChevronDown size={13} />
+                    </button>
+                    <button
+                      className="icon-button watch-remove"
+                      onClick={() => onRemoveVariable(name)}
+                      title={`Remove ${name} from watch`}
+                      type="button"
+                    >
+                      <X size={13} />
+                    </button>
+                  </div>
                 </header>
 
                 {hiddenCount > 0 ? (
@@ -131,11 +182,14 @@ export function WatchPanel({
                   <ol className="watch-timeline">
                     {visibleEntries.map((entry) =>
                       (() => {
-                        const assignmentHint = assignmentHintForEntry(
-                          assignmentHints,
+                        const parameterBinding = isParameterBinding(
+                          functionInfo,
                           name,
-                          entry.executedLine,
+                          entry.event,
                         );
+                        const assignmentHint = parameterBinding
+                          ? undefined
+                          : assignmentHintForEntry(assignmentHints, name, entry.executedLine);
                         const displayLine = assignmentHint?.line ?? entry.line;
                         return (
                           <li
@@ -151,10 +205,16 @@ export function WatchPanel({
                             </button>
                             <div className="watch-event-body">
                               <div className="watch-event-meta">
-                                line {displayLine} · {eventLabel(entry.event)}
+                                {parameterBinding
+                                  ? 'parameter input · call'
+                                  : `line ${displayLine} · ${eventLabel(entry.event)}`}
                               </div>
                               <div className="watch-value">{entry.value}</div>
-                              {assignmentHint ? (
+                              {parameterBinding ? (
+                                <div className="watch-explain">
+                                  <code>{name} received from the test input</code>
+                                </div>
+                              ) : assignmentHint ? (
                                 <div className="watch-explain">
                                   <code>{assignmentHint.statement}</code>
                                   {assignmentHint.sources.length > 0 ? (

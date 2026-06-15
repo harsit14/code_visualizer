@@ -11,9 +11,14 @@
 import { Boxes } from 'lucide-react';
 import type { JSX } from 'react';
 import {
+  collectStructures,
+  expandSelf,
   findArrayPointers,
+  findSharedReferences,
   formatValue,
   groupChains,
+  largestContainingChain,
+  largestContainingTree,
   type ArrayPointer,
   type ArrayPointerHints,
 } from '../engine/trace';
@@ -34,10 +39,19 @@ type DictValue = Extract<EncodedValue, { k: 'dict' }>;
 // ---------------------------------------------------------------- arrays
 
 function ArrayBoxes({ value, pointers }: { value: SeqValue; pointers: ArrayPointer[] }) {
+  const visibleEnd = value.items.length;
   const labels = new Map<number, string[]>();
   for (const pointer of pointers) {
-    labels.set(pointer.index, [...(labels.get(pointer.index) ?? []), pointer.name]);
+    // Pointers landing on a hidden (truncated) cell are surfaced on the
+    // overflow cell below rather than dropped silently.
+    if (pointer.index < visibleEnd) {
+      labels.set(pointer.index, [...(labels.get(pointer.index) ?? []), pointer.name]);
+    }
   }
+  // Pointers at or past the last shown cell (e.g. `hi` resting on len(nums),
+  // or any pointer inside the truncated tail).
+  const endPointers = pointers.filter((pointer) => pointer.index >= visibleEnd);
+  const endLabel = endPointers.map((pointer) => pointer.name).join(', ');
   const cells = value.items.map((item, index) => ({
     index,
     text: formatValue(item),
@@ -63,20 +77,16 @@ function ArrayBoxes({ value, pointers }: { value: SeqValue; pointers: ArrayPoint
         {value.truncated ? (
           <div className="array-cell-wrap">
             <span className="array-index" />
-            <span className="array-cell is-ellipsis">+{value.len - value.items.length}</span>
-          </div>
-        ) : null}
-        {pointers.some((pointer) => pointer.index === value.items.length) && !value.truncated ? (
-          <div className="array-cell-wrap">
-            <span className="array-index">{value.items.length}</span>
-            <span className="array-cell is-ellipsis">end</span>
-            <span className="array-pointer">
-              ▲{' '}
-              {pointers
-                .filter((pointer) => pointer.index === value.items.length)
-                .map((pointer) => pointer.name)
-                .join(', ')}
+            <span className={`array-cell is-ellipsis${endPointers.length > 0 ? ' has-pointer' : ''}`}>
+              +{value.len - value.items.length}
             </span>
+            {endPointers.length > 0 ? <span className="array-pointer">▲ {endLabel}</span> : null}
+          </div>
+        ) : endPointers.length > 0 ? (
+          <div className="array-cell-wrap">
+            <span className="array-index">{visibleEnd}</span>
+            <span className="array-cell is-ellipsis">end</span>
+            <span className="array-pointer">▲ {endLabel}</span>
           </div>
         ) : null}
       </div>
@@ -85,12 +95,16 @@ function ArrayBoxes({ value, pointers }: { value: SeqValue; pointers: ArrayPoint
 }
 
 function StringBoxes({ value, pointers }: { value: StringValue; pointers: ArrayPointer[] }) {
+  const chars = [...value.v];
+  const visibleEnd = chars.length;
   const labels = new Map<number, string[]>();
   for (const pointer of pointers) {
-    labels.set(pointer.index, [...(labels.get(pointer.index) ?? []), pointer.name]);
+    if (pointer.index < visibleEnd) {
+      labels.set(pointer.index, [...(labels.get(pointer.index) ?? []), pointer.name]);
+    }
   }
-  const chars = [...value.v];
-  const endPointers = pointers.filter((pointer) => pointer.index === chars.length);
+  const endPointers = pointers.filter((pointer) => pointer.index >= visibleEnd);
+  const endLabel = endPointers.map((pointer) => pointer.name).join(', ');
 
   return (
     <div className="array-render">
@@ -104,13 +118,19 @@ function StringBoxes({ value, pointers }: { value: StringValue; pointers: ArrayP
             ) : null}
           </div>
         ))}
-        {endPointers.length > 0 && !value.truncated ? (
+        {value.truncated ? (
           <div className="array-cell-wrap">
-            <span className="array-index">{chars.length}</span>
-            <span className="array-cell is-ellipsis">end</span>
-            <span className="array-pointer">
-              ▲ {endPointers.map((pointer) => pointer.name).join(', ')}
+            <span className="array-index" />
+            <span className={`array-cell is-ellipsis${endPointers.length > 0 ? ' has-pointer' : ''}`}>
+              …
             </span>
+            {endPointers.length > 0 ? <span className="array-pointer">▲ {endLabel}</span> : null}
+          </div>
+        ) : endPointers.length > 0 ? (
+          <div className="array-cell-wrap">
+            <span className="array-index">{visibleEnd}</span>
+            <span className="array-cell is-ellipsis">end</span>
+            <span className="array-pointer">▲ {endLabel}</span>
           </div>
         ) : null}
       </div>
@@ -217,7 +237,7 @@ const TREE_X = 52;
 const TREE_Y = 58;
 const TREE_R = 17;
 
-function TreeDiagram({ value }: { value: TreeValue }) {
+function TreeDiagram({ value, highlightId }: { value: TreeValue; highlightId?: number }) {
   const { nodes, edges } = layoutTree(value);
   const width = (Math.max(...nodes.map((node) => node.x)) + 1) * TREE_X;
   const height = (Math.max(...nodes.map((node) => node.y)) + 1) * TREE_Y;
@@ -243,14 +263,26 @@ function TreeDiagram({ value }: { value: TreeValue }) {
           y2={cy(edge.to)}
         />
       ))}
-      {nodes.map((node, index) => (
-        <g key={index}>
-          <circle className="tree-node" cx={cx(node)} cy={cy(node)} r={TREE_R} />
-          <text className="tree-label" x={cx(node)} y={cy(node) + 4}>
-            {node.label}
-          </text>
-        </g>
-      ))}
+      {nodes.map((node, index) => {
+        const isCurrent = highlightId !== undefined && node.id === highlightId;
+        return (
+          <g key={index}>
+            <circle
+              className={`tree-node${isCurrent ? ' is-current' : ''}`}
+              cx={cx(node)}
+              cy={cy(node)}
+              r={TREE_R}
+            />
+            <text
+              className={`tree-label${isCurrent ? ' is-current' : ''}`}
+              x={cx(node)}
+              y={cy(node) + 4}
+            >
+              {node.label}
+            </text>
+          </g>
+        );
+      })}
     </svg>
   );
 }
@@ -260,9 +292,11 @@ function TreeDiagram({ value }: { value: TreeValue }) {
 function ChainDiagram({
   value,
   pointerLabels,
+  highlightId,
 }: {
   value: ChainValue;
   pointerLabels: Map<number, string[]>;
+  highlightId?: number;
 }) {
   return (
     <div className="chain-render">
@@ -273,7 +307,7 @@ function ChainDiagram({
           ) : (
             <span className="chain-pointer chain-pointer-empty" />
           )}
-          <div className="chain-node">
+          <div className={`chain-node${node.id === highlightId ? ' is-current' : ''}`}>
             <span className="chain-val">{formatValue(node.val)}</span>
             <span className="chain-next">next</span>
           </div>
@@ -300,7 +334,7 @@ type DataPanelProps = {
   atLastStep: boolean;
 };
 
-type Card = { names: string[]; value: EncodedValue; render: JSX.Element };
+type Card = { names: string[]; value: EncodedValue; render: JSX.Element; wide?: boolean };
 
 function pointerHintsForFrame(
   analysis: AnalysisInfo | null,
@@ -339,6 +373,7 @@ function findFunctionInfo(
 function buildCards(
   locals: Record<string, EncodedValue>,
   pointerHints: ArrayPointerHints | null | undefined,
+  structures: { trees: TreeValue[]; chains: ChainValue[] },
 ): Card[] {
   const arrayPointers = findArrayPointers(locals, pointerHints);
 
@@ -346,15 +381,25 @@ function buildCards(
   const cards: Card[] = [];
 
   // Linked lists are grouped so aliases and mid-chain pointers become
-  // markers on one card instead of duplicate (or missing) cards.
+  // markers on one card instead of duplicate (or missing) cards. In recursive
+  // code the frame holds a tail; resolve to the whole chain and highlight the
+  // current head node so context isn't lost.
   for (const group of groupChains(locals)) {
     if (group.names[0] === 'self') {
       continue;
     }
+    const whole = largestContainingChain(group.value, structures.chains);
     cards.push({
       names: group.names,
-      value: group.value,
-      render: <ChainDiagram pointerLabels={group.labels} value={group.value} />,
+      value: whole.value,
+      render: (
+        <ChainDiagram
+          highlightId={whole.highlightId}
+          pointerLabels={group.labels}
+          value={whole.value}
+        />
+      ),
+      wide: true,
     });
   }
 
@@ -364,10 +409,14 @@ function buildCards(
     }
     let render: JSX.Element | null = null;
     let identity: string | null = null;
+    // Structurally wide cards (grids, trees, chains, long sequences) span the
+    // full row; compact ones pack side-by-side to fill the column.
+    let wide = false;
 
     if (value.k === 'seq') {
       identity = `seq-${value.id}`;
       const isGrid = value.items.length > 0 && value.items.every((item) => item.k === 'seq');
+      wide = isGrid || value.items.length > 8;
       render = isGrid ? (
         <GridBoxes value={value} />
       ) : (
@@ -377,12 +426,17 @@ function buildCards(
       identity = `dict-${value.id}`;
       render = <DictTable value={value} />;
     } else if (value.k === 'tree') {
-      identity = `tree-${value.id}`;
-      render = <TreeDiagram value={value} />;
+      // In recursive traversals the frame's local is one subtree; show the
+      // whole tree with this node highlighted ("you are here").
+      const whole = largestContainingTree(value, structures.trees);
+      identity = `tree-${whole.value.id}-${whole.highlightId}`;
+      wide = true;
+      render = <TreeDiagram highlightId={whole.highlightId} value={whole.value} />;
     } else if (value.k === 'listnode') {
       continue; // handled by groupChains above
     } else if (value.k === 'str' && (arrayPointers.get(name)?.length ?? 0) > 0) {
       identity = `str-${name}`;
+      wide = [...value.v].length > 8;
       render = <StringBoxes pointers={arrayPointers.get(name) ?? []} value={value} />;
     } else if (value.k === 'obj') {
       identity = `obj-${value.id}`;
@@ -412,7 +466,7 @@ function buildCards(
       existing.names.push(name); // alias of an already-rendered object
       continue;
     }
-    const card: Card = { names: [name], value, render };
+    const card: Card = { names: [name], value, render, wide };
     byId.set(identity, card);
     cards.push(card);
   }
@@ -431,8 +485,11 @@ export function DataPanel({
   const frame = index >= 0 ? stack[index] : undefined;
   const functionInfo = findFunctionInfo(analysis, frame);
   const pointerHints = pointerHintsForFrame(analysis, frame);
-  const locals = { ...(currentStep?.globals ?? {}), ...(frame?.locals ?? {}) };
-  const cards = frame ? buildCards(locals, pointerHints) : [];
+  const frameLocals = frame ? expandSelf(frame.locals) : {};
+  const locals = { ...(currentStep?.globals ?? {}), ...frameLocals };
+  const structures = collectStructures(currentStep);
+  const cards = frame ? buildCards(locals, pointerHints, structures) : [];
+  const sharedRefs = frame ? findSharedReferences(locals) : [];
 
   return (
     <section className="panel data-panel" aria-label="Data structures">
@@ -451,14 +508,17 @@ export function DataPanel({
 
       {!frame ? (
         <p className="panel-empty">Structures appear here while code runs.</p>
-      ) : cards.length === 0 && !(atLastStep && returnValue) ? (
+      ) : cards.length === 0 && sharedRefs.length === 0 && !(atLastStep && returnValue) ? (
         <p className="panel-empty">
           No lists, dicts, trees, or linked lists in scope at this step.
         </p>
       ) : (
         <div className="panel-scroll data-cards">
           {cards.map((card) => (
-            <article className="data-card" key={card.names[0]}>
+            <article
+              className={`data-card${card.wide ? ' data-card-wide' : ''}`}
+              key={card.names[0]}
+            >
               <h3>
                 {card.names.join(' = ')}
                 {card.names.length > 1 ? <span className="alias-badge">alias</span> : null}
@@ -467,7 +527,7 @@ export function DataPanel({
             </article>
           ))}
           {atLastStep && returnValue ? (
-            <article className="data-card data-card-return">
+            <article className="data-card data-card-wide data-card-return">
               <h3>return value</h3>
               {returnValue.k === 'tree' ? (
                 <TreeDiagram value={returnValue} />
@@ -483,6 +543,26 @@ export function DataPanel({
               ) : (
                 <p className="return-preview">{formatValue(returnValue)}</p>
               )}
+            </article>
+          ) : null}
+          {sharedRefs.length > 0 ? (
+            <article className="data-card data-card-wide data-card-shared">
+              <h3>shared references</h3>
+              <p className="shared-ref-note">Same object reached by multiple paths — mutating one changes all.</p>
+              <ul className="shared-ref-list">
+                {sharedRefs.map((ref) => (
+                  <li className="shared-ref" key={ref.id}>
+                    <div className="shared-ref-paths">
+                      {ref.paths.map((path) => (
+                        <code key={path}>{path}</code>
+                      ))}
+                    </div>
+                    <span className="shared-ref-value">
+                      <span className="shared-ref-kind">{ref.kind}</span> {ref.preview}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </article>
           ) : null}
         </div>

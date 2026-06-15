@@ -3,6 +3,7 @@
  * "current execution line" indicator, and an error-line marker.
  */
 import { python } from '@codemirror/lang-python';
+import { lintGutter, setDiagnostics, type Diagnostic as CMDiagnostic } from '@codemirror/lint';
 import { StateEffect, StateField } from '@codemirror/state';
 import { Decoration, EditorView, type DecorationSet } from '@codemirror/view';
 import CodeMirror from '@uiw/react-codemirror';
@@ -40,7 +41,21 @@ const lineMarksField = StateField.define<DecorationSet>({
   provide: (field) => EditorView.decorations.from(field),
 });
 
-const baseExtensions = [python(), lineMarksField, EditorView.lineWrapping];
+const baseExtensions = [python(), lineMarksField, lintGutter(), EditorView.lineWrapping];
+
+/** Map analyzer diagnostics to CodeMirror diagnostics with document offsets. */
+function toCmDiagnostics(view: EditorView, diagnostics: Diagnostic[]): CMDiagnostic[] {
+  const doc = view.state.doc;
+  return diagnostics.map((diagnostic) => {
+    const lineNumber = Math.min(Math.max(diagnostic.line ?? 1, 1), doc.lines);
+    const line = doc.line(lineNumber);
+    const column = Math.min(Math.max(diagnostic.column ?? 0, 0), line.length);
+    // Underline from the reported column to end of line (whole line when col 0).
+    const from = line.from + column;
+    const to = Math.max(from + 1, line.to);
+    return { from, to, severity: diagnostic.severity, message: diagnostic.message };
+  });
+}
 
 type EditorPanelProps = {
   code: string;
@@ -74,6 +89,14 @@ export function EditorPanel({
       }
     }
   }, [activeLine, errorLine, code]);
+
+  // Surface analyzer diagnostics inline (underlines + gutter markers + hover).
+  useEffect(() => {
+    const view = viewRef.current;
+    if (view) {
+      view.dispatch(setDiagnostics(view.state, toCmDiagnostics(view, diagnostics)));
+    }
+  }, [diagnostics, code]);
 
   const errors = diagnostics.filter((diagnostic) => diagnostic.severity === 'error');
 

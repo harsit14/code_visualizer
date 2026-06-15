@@ -141,6 +141,29 @@ export function diffLocals(
   return { added, changed, removed };
 }
 
+/**
+ * Replace a `self` instance with its public attributes as `self.<attr>`
+ * entries, so instance state (memoization caches, accumulators, result
+ * lists, …) is inspectable. An attribute-less instance is dropped entirely —
+ * an empty `Solution()` is plumbing, not data.
+ */
+export function expandSelf(locals: Record<string, EncodedValue>): Record<string, EncodedValue> {
+  const self = locals.self;
+  if (!self || self.k !== 'obj') {
+    return locals;
+  }
+  const expanded: Record<string, EncodedValue> = {};
+  for (const [name, value] of Object.entries(locals)) {
+    if (name !== 'self') {
+      expanded[name] = value;
+    }
+  }
+  for (const [attr, value] of Object.entries(self.attrs)) {
+    expanded[`self.${attr}`] = value;
+  }
+  return expanded;
+}
+
 /** Find the frame in `step` matching `frame.id`, or undefined. */
 export function findMatchingFrame(
   step: TraceStep | undefined,
@@ -161,7 +184,9 @@ function sequenceLength(value: EncodedValue): number | null {
     return value.len;
   }
   if (value.k === 'str') {
-    return [...value.v].length;
+    // Use the original length so pointers into a truncated tail aren't filtered
+    // out; fall back to the preview length for older traces without `len`.
+    return value.len ?? [...value.v].length;
   }
   return null;
 }
@@ -245,7 +270,186 @@ export function findArrayPointers(
   return result;
 }
 
+export type TreeValue = Extract<EncodedValue, { k: 'tree' }>;
 export type ChainValue = Extract<EncodedValue, { k: 'listnode' }>;
+
+/** Object ids of every node reachable in a tree encoding (incl. ref/repr boundaries). */
+export function treeNodeIds(value: TreeValue): Set<number> {
+  const ids = new Set<number>();
+  const walk = (node: EncodedValue | null) => {
+    if (!node) {
+      return;
+    }
+    if (node.k === 'tree') {
+      ids.add(node.id);
+      walk(node.left);
+      walk(node.right);
+    } else if (node.k === 'ref' || (node.k === 'repr' && node.id !== undefined)) {
+      ids.add(node.id!);
+    }
+  };
+  walk(value);
+  return ids;
+}
+
+/** Object ids of every node in a linked-list chain encoding. */
+export function chainNodeIds(value: ChainValue): Set<number> {
+  return new Set(value.nodes.map((node) => node.id));
+}
+
+/**
+ * Recursion binds a *sub*-structure in each frame (e.g. `node` is one subtree
+ * of the whole `root`). Given the current frame's structure and every
+ * structure live in the step, return the largest one that still contains the
+ * current root node — so the UI can draw the whole shape with a "you are here"
+ * highlight instead of a context-free fragment. Falls back to `current`.
+ */
+export function largestContainingTree(
+  current: TreeValue,
+  candidates: TreeValue[],
+): { value: TreeValue; highlightId: number } {
+  let best = current;
+  let bestCount = countTreeNodes(current);
+  for (const candidate of candidates) {
+    if (candidate.id === current.id) {
+      continue;
+    }
+    const count = countTreeNodes(candidate);
+    if (count > bestCount && treeNodeIds(candidate).has(current.id)) {
+      best = candidate;
+      bestCount = count;
+    }
+  }
+  return { value: best, highlightId: current.id };
+}
+
+export function largestContainingChain(
+  current: ChainValue,
+  candidates: ChainValue[],
+): { value: ChainValue; highlightId: number } {
+  const headId = current.nodes[0]?.id ?? -1;
+  let best = current;
+  for (const candidate of candidates) {
+    if (candidate.id === current.id || candidate.nodes.length <= best.nodes.length) {
+      continue;
+    }
+    if (headId >= 0 && chainNodeIds(candidate).has(headId)) {
+      best = candidate;
+    }
+  }
+  return { value: best, highlightId: headId };
+}
+
+export type SharedReference = { id: number; kind: string; preview: string; paths: string[] };
+
+/** Object id of any reference-typed encoded value (containers, refs), else null. */
+function refIdOf(value: EncodedValue): number | null {
+  switch (value.k) {
+    case 'seq':
+    case 'dict':
+    case 'obj':
+    case 'tree':
+    case 'listnode':
+    case 'ref':
+      return value.id;
+    case 'repr':
+      return value.id ?? null;
+    default:
+      return null;
+  }
+}
+
+/**
+ * Find objects reachable under more than one path in the current scope —
+ * i.e. aliasing. Catches what the per-card alias merge can't: the same list
+ * held by a name *and* nested inside another container (`row` and `grid[0]`),
+ * or one list shared by two structures. Mutating any path mutates them all.
+ */
+export function findSharedReferences(locals: Record<string, EncodedValue>): SharedReference[] {
+  const collected = new Map<number, { value: EncodedValue; paths: string[]; seen: Set<string> }>();
+
+  const note = (value: EncodedValue, path: string) => {
+    const id = refIdOf(value);
+    if (id === null) {
+      return;
+    }
+    let entry = collected.get(id);
+    if (!entry) {
+      entry = { value, paths: [], seen: new Set() };
+      collected.set(id, entry);
+    }
+    if (!entry.seen.has(path)) {
+      entry.seen.add(path);
+      entry.paths.push(path);
+    }
+    // Prefer a concrete value over a back-reference for the preview.
+    if (entry.value.k === 'ref' && value.k !== 'ref') {
+      entry.value = value;
+    }
+  };
+
+  const walk = (value: EncodedValue, path: string, depth: number) => {
+    note(value, path);
+    if (depth >= 4) {
+      return;
+    }
+    if (value.k === 'seq') {
+      value.items.forEach((item, index) => walk(item, `${path}[${index}]`, depth + 1));
+    } else if (value.k === 'dict') {
+      value.entries.forEach(([key, val]) => walk(val, `${path}[${formatValue(key)}]`, depth + 1));
+    } else if (value.k === 'obj') {
+      Object.entries(value.attrs).forEach(([attr, val]) => walk(val, `${path}.${attr}`, depth + 1));
+    }
+  };
+
+  for (const [name, value] of Object.entries(locals)) {
+    if (name === 'self') {
+      continue;
+    }
+    walk(value, name, 0);
+  }
+
+  const shared: SharedReference[] = [];
+  for (const [id, entry] of collected) {
+    // 2+ paths, at least one of them nested (bare-name aliases are already
+    // surfaced by the data card's "alias" badge).
+    if (entry.paths.length >= 2 && entry.paths.some((p) => p.includes('[') || p.includes('.'))) {
+      shared.push({
+        id,
+        kind: typeNameOf(entry.value),
+        preview: formatValue(entry.value),
+        paths: entry.paths,
+      });
+    }
+  }
+  return shared.sort((a, b) => b.paths.length - a.paths.length);
+}
+
+/** Collect every distinct tree/chain value live across a step (all frames + globals). */
+export function collectStructures(step: TraceStep | undefined): {
+  trees: TreeValue[];
+  chains: ChainValue[];
+} {
+  const trees: TreeValue[] = [];
+  const chains: ChainValue[] = [];
+  if (!step) {
+    return { trees, chains };
+  }
+  const seen = new Set<number>();
+  const scopes = [step.globals, ...step.stack.map((frame) => frame.locals)];
+  for (const scope of scopes) {
+    for (const value of Object.values(expandSelf(scope))) {
+      if (value.k === 'tree' && !seen.has(value.id)) {
+        seen.add(value.id);
+        trees.push(value);
+      } else if (value.k === 'listnode' && !seen.has(value.id)) {
+        seen.add(value.id);
+        chains.push(value);
+      }
+    }
+  }
+  return { trees, chains };
+}
 
 export type ChainGroup = {
   /** Variables whose head IS this card's head node (aliases). */
@@ -370,12 +574,17 @@ export function variableTimeline(
   for (let index = 0; index < steps.length; index += 1) {
     const step = steps[index];
     const frame = findMatchingFrame(step, frameId);
-    if (!frame || !(variableName in frame.locals)) {
+    if (!frame) {
+      continue;
+    }
+    // Expand so `self.memo`-style instance state is trackable too.
+    const locals = expandSelf(frame.locals);
+    if (!(variableName in locals)) {
       continue;
     }
 
     const previousFrame = findMatchingFrame(steps[index - 1], frameId);
-    const diff = diffLocals(previousFrame?.locals, frame.locals);
+    const diff = diffLocals(previousFrame ? expandSelf(previousFrame.locals) : undefined, locals);
     if (!diff.added.has(variableName) && !diff.changed.has(variableName)) {
       continue;
     }
@@ -389,7 +598,7 @@ export function variableTimeline(
       line: frame.line,
       executedLine: previousFrame?.line ?? frame.line,
       event: step.event,
-      value: formatValue(frame.locals[variableName]),
+      value: formatValue(locals[variableName]),
       changedWith,
     });
   }

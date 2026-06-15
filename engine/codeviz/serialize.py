@@ -26,6 +26,7 @@ UI can detect aliasing and diff by identity.
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sized
+import re
 import types
 from typing import Any
 
@@ -37,6 +38,16 @@ MAX_STR = 120
 MAX_REPR = 120
 
 JsonValue = Any  # JSON-serializable dict/list/str/int/float/bool/None
+
+#: Matches the volatile address in CPython's default object repr,
+#: e.g. ``<__main__.Solution object at 0x10721e8>``. Stripping it keeps
+#: previews stable across runs so exported/shared traces don't churn.
+_DEFAULT_REPR_ADDRESS = re.compile(r"(<.*? object) at 0x[0-9A-Fa-f]+>")
+
+
+def _strip_default_repr_address(text: str) -> str:
+    """Drop ``at 0x…`` from a default object repr; other reprs pass through."""
+    return _DEFAULT_REPR_ADDRESS.sub(r"\1>", text)
 
 
 def _safe_repr(value: Any, limit: int = MAX_REPR) -> str:
@@ -114,6 +125,7 @@ class Snapshotter:
             return {
                 "k": "str",
                 "v": value[:MAX_STR],
+                "len": len(value),
                 "truncated": truncated,
             }
         if isinstance(value, (bytes, bytearray)):
@@ -275,5 +287,5 @@ class Snapshotter:
             "id": obj_id,
             "t": type_name,
             "attrs": attrs,
-            "preview": _safe_repr(value),
+            "preview": _strip_default_repr_address(_safe_repr(value)),
         }

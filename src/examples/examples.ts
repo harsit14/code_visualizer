@@ -119,6 +119,17 @@ copy.append(5)
 print(nums, copy)
 `,
   },
+  {
+    id: 'shared-references',
+    title: 'Shared nested references',
+    category: 'Scripts',
+    code: `shared = [1, 2, 3]
+matrix = [shared, shared]
+matrix[0].append(99)
+row = matrix[1]
+print(matrix, row)
+`,
+  },
 ];
 
 export const DEFAULT_EXAMPLE_ID = 'two-sum';

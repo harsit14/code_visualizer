@@ -18,7 +18,7 @@ const analysis: AnalysisInfo = {
       isGenerator: false,
       docstring: null,
       returns: null,
-      pointerHints: { s: ['hi'] },
+      pointerHints: { s: ['hi'], nums: ['hi'] },
     },
   ],
   defaultFunction: 'f',
@@ -61,6 +61,86 @@ describe('DataPanel', () => {
     );
 
     expect(html).toContain('end');
+    expect(html).toContain('▲ hi');
+  });
+
+  it('surfaces a pointer that lands in a truncated string tail', () => {
+    const currentStep: TraceStep = {
+      i: 0,
+      event: 'line',
+      line: 1,
+      func: 'f',
+      stack: [
+        {
+          id: 'frame-1',
+          func: 'f',
+          qualname: 'f',
+          line: 1,
+          locals: {
+            s: { k: 'str', v: 'abcde', len: 200, truncated: true },
+            hi: num(150),
+          },
+        },
+      ],
+      globals: {},
+      stdoutLen: 0,
+    };
+
+    const html = renderToStaticMarkup(
+      <DataPanel
+        analysis={analysis}
+        atLastStep={false}
+        currentStep={currentStep}
+        frameIndex={null}
+        returnValue={null}
+      />,
+    );
+
+    // The pointer at index 150 (past the 5 shown chars) rides the overflow cell.
+    expect(html).toContain('▲ hi');
+  });
+
+  it('surfaces a pointer that lands in a truncated array tail', () => {
+    const currentStep: TraceStep = {
+      i: 0,
+      event: 'line',
+      line: 1,
+      func: 'f',
+      stack: [
+        {
+          id: 'frame-1',
+          func: 'f',
+          qualname: 'f',
+          line: 1,
+          locals: {
+            nums: {
+              k: 'seq',
+              t: 'list',
+              id: 1,
+              items: [num(1), num(2)],
+              len: 100,
+              truncated: true,
+            },
+            hi: num(100),
+          },
+        },
+      ],
+      globals: {},
+      stdoutLen: 0,
+    };
+
+    const html = renderToStaticMarkup(
+      <DataPanel
+        analysis={analysis}
+        atLastStep={false}
+        currentStep={currentStep}
+        frameIndex={null}
+        returnValue={null}
+      />,
+    );
+
+    // The overflow cell carries the pointer instead of dropping it.
+    expect(html).toContain('+98');
     expect(html).toContain('▲ hi');
   });
 
@@ -145,5 +225,55 @@ describe('DataPanel', () => {
     );
 
     expect(html).toContain('&lt;Queue size=2&gt;');
+  });
+
+  it('renders useful self attributes as data cards', () => {
+    const currentStep: TraceStep = {
+      i: 0,
+      event: 'line',
+      line: 1,
+      func: 'f',
+      stack: [
+        {
+          id: 'frame-1',
+          func: 'f',
+          qualname: 'f',
+          line: 1,
+          locals: {
+            self: {
+              k: 'obj',
+              id: 1,
+              t: 'Solution',
+              attrs: {
+                memo: {
+                  k: 'dict',
+                  id: 2,
+                  entries: [[num(1), num(2)]],
+                  len: 1,
+                  truncated: false,
+                },
+              },
+              preview: '<Solution object>',
+            },
+          },
+        },
+      ],
+      globals: {},
+      stdoutLen: 0,
+    };
+
+    const html = renderToStaticMarkup(
+      <DataPanel
+        analysis={analysis}
+        atLastStep={false}
+        currentStep={currentStep}
+        frameIndex={null}
+        returnValue={null}
+      />,
+    );
+
+    expect(html).toContain('<h3>self.memo</h3>');
+    expect(html).toContain('<td>1</td><td>2</td>');
+    expect(html).not.toContain('&lt;Solution object&gt;');
   });
 });

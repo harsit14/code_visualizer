@@ -1,22 +1,36 @@
 import { describe, expect, it } from 'vitest';
 import {
+  collectStructures,
   diffLocals,
   findArrayPointers,
+  findSharedReferences,
   fitGrowth,
   formatValue,
   groupChains,
+  largestContainingChain,
+  largestContainingTree,
   stdoutAtStep,
   variableTimeline,
 } from './trace';
 import type { EncodedValue, TraceStep } from './types';
 
-const chain = (id: number, nodeIds: number[], values: number[]): EncodedValue => ({
+type TreeValue = Extract<EncodedValue, { k: 'tree' }>;
+type ChainValue = Extract<EncodedValue, { k: 'listnode' }>;
+
+const chain = (id: number, nodeIds: number[], values: number[]): ChainValue => ({
   k: 'listnode',
   id,
   nodes: nodeIds.map((nodeId, index) => ({ id: nodeId, val: num(values[index]) })),
   cyclic: false,
   truncated: false,
 });
+
+const tree = (
+  id: number,
+  val: number,
+  left: EncodedValue | null = null,
+  right: EncodedValue | null = null,
+): TreeValue => ({ k: 'tree', id, val: num(val), left, right });
 
 const num = (v: number): EncodedValue => ({ k: 'num', t: 'int', v: String(v) });
 const str = (v: string): EncodedValue => ({ k: 'str', v, truncated: false });
@@ -421,5 +435,112 @@ describe('variableTimeline', () => {
         changedWith: [],
       },
     ]);
+  });
+});
+
+describe('whole-structure resolution', () => {
+  // root: 1(val 6) -> left 2(val 15) -> left 4(val 10); right 3(val 4)
+  const leaf = tree(4, 10);
+  const leftSub = tree(2, 15, leaf);
+  const root = tree(1, 6, leftSub, tree(3, 4));
+
+  it('resolves a subtree to the largest containing tree and highlights it', () => {
+    const result = largestContainingTree(leftSub, [root, leftSub, leaf]);
+    expect(result.value.id).toBe(root.id);
+    expect(result.highlightId).toBe(leftSub.id);
+  });
+
+  it('keeps a tree that nothing else contains', () => {
+    const lone = tree(99, 1);
+    const result = largestContainingTree(lone, [root, lone]);
+    expect(result.value.id).toBe(lone.id);
+    expect(result.highlightId).toBe(lone.id);
+  });
+
+  it('resolves a chain tail to the full chain and highlights the head', () => {
+    const full = chain(10, [101, 102, 103], [1, 2, 3]);
+    const tail = chain(11, [102, 103], [2, 3]);
+    const result = largestContainingChain(tail, [full, tail]);
+    expect(result.value.id).toBe(full.id);
+    expect(result.highlightId).toBe(102);
+  });
+
+  it('collects distinct trees and chains across all frames and globals', () => {
+    const step: TraceStep = {
+      i: 0,
+      event: 'line',
+      line: 1,
+      func: 'visit',
+      stack: [
+        { id: 'frame-0', func: 'inorder', line: 1, locals: { root } },
+        { id: 'frame-1', func: 'visit', line: 2, locals: { node: leftSub } },
+      ],
+      globals: { head: chain(10, [101], [1]) },
+      stdoutLen: 0,
+    };
+    const { trees, chains } = collectStructures(step);
+    expect(trees.map((t) => t.id).sort()).toEqual([1, 2]);
+    expect(chains.map((c) => c.id)).toEqual([10]);
+  });
+
+  it('collects trees and chains stored on self attributes', () => {
+    const fullChain = chain(20, [201, 202], [1, 2]);
+    const step: TraceStep = {
+      i: 0,
+      event: 'line',
+      line: 1,
+      func: 'visit',
+      stack: [
+        {
+          id: 'frame-0',
+          func: 'visit',
+          line: 1,
+          locals: {
+            self: {
+              k: 'obj',
+              id: 50,
+              t: 'Solution',
+              attrs: { root, head: fullChain },
+              preview: '<Solution object>',
+            },
+          },
+        },
+      ],
+      globals: {},
+      stdoutLen: 0,
+    };
+
+    const { trees, chains } = collectStructures(step);
+    expect(trees.map((t) => t.id)).toContain(root.id);
+    expect(chains.map((c) => c.id)).toContain(fullChain.id);
+  });
+});
+
+describe('findSharedReferences', () => {
+  const ref = (id: number): EncodedValue => ({ k: 'ref', id });
+
+  it('reports an object reached by a name and a nested path', () => {
+    const sharedList = list(5, [1, 2, 3]);
+    const matrix: EncodedValue = {
+      k: 'seq',
+      t: 'list',
+      id: 9,
+      items: [sharedList, ref(5)],
+      len: 2,
+      truncated: false,
+    };
+    const refs = findSharedReferences({ shared: sharedList, matrix, row: ref(5) });
+    expect(refs).toHaveLength(1);
+    expect(refs[0].id).toBe(5);
+    expect([...refs[0].paths].sort()).toEqual(['matrix[0]', 'matrix[1]', 'row', 'shared']);
+  });
+
+  it('ignores bare-name-only aliases (already shown as a card alias badge)', () => {
+    const shared = list(7, [1]);
+    expect(findSharedReferences({ x: shared, y: ref(7) })).toEqual([]);
+  });
+
+  it('ignores objects that appear only once', () => {
+    expect(findSharedReferences({ a: list(1, [1]), b: list(2, [2]) })).toEqual([]);
   });
 });

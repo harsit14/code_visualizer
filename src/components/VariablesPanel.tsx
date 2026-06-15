@@ -4,7 +4,7 @@
  * new, what disappeared this step.
  */
 import { Pin } from 'lucide-react';
-import { diffLocals, formatValue, typeNameOf } from '../engine/trace';
+import { diffLocals, expandSelf, formatValue, typeNameOf } from '../engine/trace';
 import type { EncodedValue, TraceStep } from '../engine/types';
 
 type VariablesPanelProps = {
@@ -62,7 +62,10 @@ export function VariablesPanel({
   const index = frameIndex !== null && frameIndex < stack.length ? frameIndex : stack.length - 1;
   const frame = index >= 0 ? stack[index] : undefined;
   const previousFrame = previousStep?.stack.find((candidate) => candidate.id === frame?.id);
-  const diff = frame ? diffLocals(previousFrame?.locals, frame.locals) : null;
+  const locals = frame ? expandSelf(frame.locals) : {};
+  const previousLocals = previousFrame ? expandSelf(previousFrame.locals) : undefined;
+  const diff = frame ? diffLocals(previousLocals, locals) : null;
+  const localEntries = Object.entries(locals);
 
   const globals = currentStep?.globals ?? {};
   const globalEntries = Object.entries(globals).filter(([, value]) => value.k !== 'func');
@@ -90,7 +93,7 @@ export function VariablesPanel({
           ) : null}
           <table className="var-table">
             <tbody>
-              {Object.entries(frame.locals).map(([name, value]) => (
+              {localEntries.map(([name, value]) => (
                 <VariableRow
                   badge={diff?.added.has(name) ? 'new' : diff?.changed.has(name) ? 'changed' : null}
                   isWatched={watchedVariables.includes(name)}

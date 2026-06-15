@@ -10,7 +10,7 @@ def test_primitives():
     assert snap.snapshot(5) == {"k": "num", "t": "int", "v": "5"}
     assert snap.snapshot(True) == {"k": "num", "t": "bool", "v": "True"}
     assert snap.snapshot(None) == {"k": "none"}
-    assert snap.snapshot("hi") == {"k": "str", "v": "hi", "truncated": False}
+    assert snap.snapshot("hi") == {"k": "str", "v": "hi", "len": 2, "truncated": False}
 
 
 def test_long_string_truncated():
@@ -18,6 +18,7 @@ def test_long_string_truncated():
     encoded = snap.snapshot("x" * 500)
     assert encoded["truncated"] is True
     assert len(encoded["v"]) == MAX_STR
+    assert encoded["len"] == 500  # original length retained for tail pointers
 
 
 def test_list_encoding_with_stable_ids():
@@ -139,6 +140,28 @@ def test_custom_object():
     assert encoded["k"] == "obj"
     assert encoded["t"] == "Point"
     assert encoded["attrs"]["x"]["v"] == "1"
+
+
+def test_default_object_preview_strips_volatile_address():
+    class Solution:
+        pass
+
+    snap = Snapshotter()
+    encoded = snap.snapshot(Solution())
+    # The volatile ``at 0x…`` address is dropped so previews are stable.
+    assert "0x" not in encoded["preview"]
+    assert encoded["preview"].endswith("object>")
+
+
+def test_custom_repr_preview_is_preserved():
+    class Tagged:
+        def __repr__(self):
+            return "Tagged(at 0x100)"
+
+    snap = Snapshotter()
+    encoded = snap.snapshot(Tagged())
+    # A user-defined repr isn't the default-object form, so it's left intact.
+    assert encoded["preview"] == "Tagged(at 0x100)"
 
 
 def test_function_encoding():

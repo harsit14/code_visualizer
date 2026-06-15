@@ -230,11 +230,11 @@ class _UsageVisitor(ast.NodeVisitor):
             name = self._param_of(node.value.value)
             self._set_strong(name, "grid")
         else:
+            # A bare index or a slice both signal a sequence, but neither
+            # distinguishes list from str — keep it weak so name hints
+            # (e.g. ``s`` -> str) and explicit annotations still win.
             name = self._param_of(node.value)
-            if isinstance(node.slice, ast.Slice):
-                self._set_weak(name, "list[int]")
-            else:
-                self._set_weak(name, "list[int]")
+            self._set_weak(name, "list[int]")
         self.generic_visit(node)
 
     def visit_For(self, node: ast.For) -> None:

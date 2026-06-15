@@ -105,6 +105,23 @@ def test_usage_double_subscript_means_grid():
     assert analysis.functions[0].params[0].inferred == "grid"
 
 
+def test_usage_index_or_slice_infers_list_weakly():
+    # A bare index and a slice both infer a sequence (weak list[int])...
+    indexed = analyze("def f(data):\n    return data[0]")
+    sliced = analyze("def f(data):\n    return data[1:3]")
+    assert indexed.functions[0].params[0].inferred == "list[int]"
+    assert indexed.functions[0].params[0].source == "usage"
+    assert sliced.functions[0].params[0].inferred == "list[int]"
+
+
+def test_slicing_does_not_override_str_name_hint():
+    # ...but the weak signal must not beat a name hint: a sliced ``s`` is str.
+    analysis = analyze("def f(s):\n    return s[1:3]")
+    param = analysis.functions[0].params[0]
+    assert param.inferred == "str"
+    assert param.source == "name"
+
+
 def test_usage_string_method():
     analysis = analyze("def f(thing):\n    return thing.lower()")
     assert analysis.functions[0].params[0].inferred == "str"

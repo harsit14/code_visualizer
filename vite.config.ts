@@ -38,6 +38,11 @@ export default defineConfig({
   base: appBase,
   optimizeDeps: {
     exclude: ['pyodide'],
+    // Force the CodeMirror core into a single pre-bundle so addons (lint,
+    // lang-python, …) share one @codemirror/state instance in dev. Without
+    // this, a separately-optimized addon inlines its own copy and breaks
+    // instanceof checks ("Unrecognized extension value in extension set").
+    include: ['@codemirror/state', '@codemirror/view'],
   },
   plugins: [react(), copyPyodideAssets()],
   server: {
@@ -50,6 +55,31 @@ export default defineConfig({
   },
   build: {
     sourcemap: true,
+    rollupOptions: {
+      output: {
+        // Split the big vendors out of the app chunk so the editor and
+        // framework code cache independently and the size warning clears.
+        manualChunks(id) {
+          if (!id.includes('node_modules')) {
+            return undefined;
+          }
+          if (id.includes('@codemirror') || id.includes('@lezer') || id.includes('@uiw')) {
+            return 'codemirror';
+          }
+          if (
+            id.includes('/react-dom/') ||
+            id.includes('/react/') ||
+            id.includes('/scheduler/')
+          ) {
+            return 'react';
+          }
+          if (id.includes('lucide-react')) {
+            return 'icons';
+          }
+          return undefined;
+        },
+      },
+    },
   },
   worker: {
     format: 'es',

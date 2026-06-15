@@ -181,6 +181,38 @@ input[type='text'] {
   }
 }
 
+@media (max-width: 720px) {
+  /* Stack the top bar so the title and status pill each get room instead of
+     the pill collapsing to an unreadable sliver. */
+  .top-bar {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .brand {
+    justify-content: flex-start;
+  }
+
+  .status-pill {
+    flex-shrink: 0;
+    max-width: none;
+  }
+
+  .top-actions {
+    justify-content: flex-start;
+  }
+
+  /* Keep the transport (Run + scrubber) reachable instead of buried at the
+     bottom of a long single-column scroll. */
+  .controls-bar {
+    bottom: 0;
+    box-shadow: 0 -6px 16px var(--bg);
+    position: sticky;
+    z-index: 5;
+  }
+}
+
 /* ------------------------------------------------------------ panels */
 
 .panel {
@@ -694,6 +726,16 @@ input[type='text'] {
   justify-content: space-between;
 }
 
+.watch-card-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 2px;
+}
+
+.watch-card-actions .icon-button {
+  padding: 4px 5px;
+}
+
 .watch-card-header h3 {
   color: var(--accent);
   font-family: var(--mono);
@@ -869,8 +911,9 @@ input[type='text'] {
 /* -------------------------------------------------------------- data */
 
 .data-cards {
+  align-content: flex-start;
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: 12px;
 }
 
@@ -878,7 +921,19 @@ input[type='text'] {
   background: var(--bg-inset);
   border: 1px solid var(--border);
   border-radius: 9px;
+  /* Compact cards hug their content (e.g. a short array card is exactly as
+     wide as its cells) and pack side-by-side, wrapping when the row fills —
+     so a lone small structure never balloons into one oversized empty card. */
+  flex: 0 1 auto;
+  max-width: 100%;
+  min-width: 160px;
   padding: 10px 12px;
+}
+
+.data-card-wide {
+  /* Trees, grids, chains, long sequences, and the return value get the row. */
+  flex: 1 1 100%;
+  max-width: 100%;
 }
 
 .data-card h3 {
@@ -895,6 +950,63 @@ input[type='text'] {
 
 .data-card-return h3 {
   color: var(--green);
+}
+
+.data-card-shared {
+  border-color: var(--purple);
+}
+
+.data-card-shared h3 {
+  color: var(--purple);
+}
+
+.shared-ref-note {
+  color: var(--text-faint);
+  font-size: 11.5px;
+  margin: 0 0 8px;
+}
+
+.shared-ref-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.shared-ref {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  justify-content: space-between;
+}
+
+.shared-ref-paths {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.shared-ref-paths code {
+  background: var(--purple);
+  border-radius: 4px;
+  color: var(--bg);
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 1px 6px;
+}
+
+.shared-ref-value {
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.shared-ref-kind {
+  color: var(--text-faint);
 }
 
 .alias-badge {
@@ -1043,11 +1155,22 @@ input[type='text'] {
   stroke-width: 1.5;
 }
 
+.tree-node.is-current {
+  fill: var(--accent);
+  stroke: var(--accent);
+  stroke-width: 2.5;
+}
+
 .tree-label {
   fill: var(--text);
   font-family: var(--mono);
   font-size: 12px;
   text-anchor: middle;
+}
+
+.tree-label.is-current {
+  fill: #fff;
+  font-weight: 600;
 }
 
 /* linked lists */
@@ -1096,6 +1219,11 @@ input[type='text'] {
   border-radius: 7px;
   display: flex;
   overflow: hidden;
+}
+
+.chain-node.is-current {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
 }
 
 .chain-val {

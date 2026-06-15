@@ -6,7 +6,7 @@
 export type EncodedValue =
   | { k: 'none' }
   | { k: 'num'; t: string; v: string }
-  | { k: 'str'; v: string; truncated: boolean }
+  | { k: 'str'; v: string; len?: number; truncated: boolean }
   | {
       k: 'seq';
       t: string;

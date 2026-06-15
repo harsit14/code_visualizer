@@ -64,7 +64,7 @@ export function ControlsBar({
         <button
           disabled={!hasTrace || step === 0}
           onClick={() => onJump(0)}
-          title="Jump to start"
+          title="Jump to start (Home)"
           type="button"
         >
           <SkipBack size={15} />
@@ -72,7 +72,7 @@ export function ControlsBar({
         <button
           disabled={!hasTrace || step === 0}
           onClick={onStepBack}
-          title="Step back"
+          title="Step back (←)"
           type="button"
         >
           <ChevronLeft size={16} />
@@ -81,7 +81,7 @@ export function ControlsBar({
           className="play-toggle"
           disabled={totalSteps <= 1}
           onClick={onTogglePlay}
-          title={playing ? 'Pause' : 'Play'}
+          title={playing ? 'Pause (Space)' : 'Play (Space)'}
           type="button"
         >
           {playing ? <Pause size={16} /> : <Play size={16} />}
@@ -89,7 +89,7 @@ export function ControlsBar({
         <button
           disabled={!hasTrace || step >= totalSteps - 1}
           onClick={onStepForward}
-          title="Step forward"
+          title="Step forward (→)"
           type="button"
         >
           <ChevronRight size={16} />
@@ -97,7 +97,7 @@ export function ControlsBar({
         <button
           disabled={!hasTrace || step >= totalSteps - 1}
           onClick={() => onJump(totalSteps - 1)}
-          title="Jump to end"
+          title="Jump to end (End)"
           type="button"
         >
           <SkipForward size={15} />

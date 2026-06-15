@@ -188,6 +188,55 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Keyboard transport: ←/→ step, Space play/pause, Home/End jump. Ignored
+  // while typing in the editor, inputs, or any form control.
+  const { stepBack, stepForward, togglePlay, jumpToStep, totalSteps } = session;
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) {
+        return;
+      }
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable ||
+          target.closest('.cm-editor'))
+      ) {
+        return;
+      }
+      switch (event.key) {
+        case 'ArrowLeft':
+          event.preventDefault();
+          stepBack();
+          break;
+        case 'ArrowRight':
+          event.preventDefault();
+          stepForward();
+          break;
+        case ' ':
+        case 'Spacebar':
+          event.preventDefault();
+          togglePlay();
+          break;
+        case 'Home':
+          event.preventDefault();
+          jumpToStep(0);
+          break;
+        case 'End':
+          event.preventDefault();
+          jumpToStep(totalSteps - 1);
+          break;
+        default:
+          break;
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [stepBack, stepForward, togglePlay, jumpToStep, totalSteps]);
+
   const handleCodeChange = useCallback(
     (code: string) => {
       setExampleId(null);
