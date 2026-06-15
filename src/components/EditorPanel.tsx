@@ -15,7 +15,7 @@ import {
 } from '@codemirror/view';
 import CodeMirror from '@uiw/react-codemirror';
 import { useEffect, useMemo, useRef } from 'react';
-import type { Diagnostic } from '../engine/types';
+import type { Diagnostic, Language } from '../engine/types';
 
 type LineMarks = { active: number | null; error: number | null };
 
@@ -219,6 +219,8 @@ type EditorPanelProps = {
   onCursorLineChange?: (line: number | null) => void;
   onRunToLine?: (line: number) => void;
   onToggleBreakpoint?: (line: number) => void;
+  readOnly?: boolean;
+  language: Language;
   theme: 'light' | 'dark';
 };
 
@@ -233,17 +235,20 @@ export function EditorPanel({
   onCursorLineChange,
   onRunToLine,
   onToggleBreakpoint,
+  readOnly = false,
+  language,
   theme,
 }: EditorPanelProps) {
   const viewRef = useRef<EditorView | null>(null);
   const extensions = useMemo(
     () => [
-      ...baseExtensions,
+      ...(language === 'python' ? baseExtensions : [lineMarksField, EditorView.lineWrapping]),
       lineNumberGutter(onRunToLine),
       breakpointGutter(onToggleBreakpoint),
       executionCountGutter(),
+      ...(readOnly ? [EditorView.editable.of(false)] : []),
     ],
-    [onRunToLine, onToggleBreakpoint],
+    [language, onRunToLine, onToggleBreakpoint, readOnly],
   );
 
   useEffect(() => {
@@ -263,10 +268,10 @@ export function EditorPanel({
   // Surface analyzer diagnostics inline (underlines + gutter markers + hover).
   useEffect(() => {
     const view = viewRef.current;
-    if (view) {
+    if (view && language === 'python') {
       view.dispatch(setDiagnostics(view.state, toCmDiagnostics(view, diagnostics)));
     }
-  }, [diagnostics, code]);
+  }, [diagnostics, code, language]);
 
   useEffect(() => {
     const view = viewRef.current;
@@ -292,7 +297,7 @@ export function EditorPanel({
   const errors = diagnostics.filter((diagnostic) => diagnostic.severity === 'error');
 
   return (
-    <section className="panel editor-panel" aria-label="Python source editor">
+    <section className="panel editor-panel" aria-label={`${language} source editor`}>
       <header className="panel-header">
         <h2>Code</h2>
         <span className="panel-hint">{code.split('\n').length} lines</span>

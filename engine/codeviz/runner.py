@@ -283,7 +283,8 @@ def measure_complexity(
 
     Uses a counting-only tracer (no snapshots) so larger sizes stay cheap.
     Returns ``{"functionName", "seed", "samples": [{"n", "ops"} ...],
-    "error"}`` — the UI fits a growth label to the samples.
+    "error", "truncated", "truncationReason"}`` — the UI fits a growth
+    label to the samples and warns when slow growth stopped sampling early.
     """
     analysis = analyze(source)
     target_name = function or analysis.default_function
@@ -293,6 +294,8 @@ def measure_complexity(
         "seed": seed,
         "samples": [],
         "error": None,
+        "truncated": False,
+        "truncationReason": None,
     }
     if info is None:
         payload["error"] = {"type": "AnalysisError", "msg": "No function to measure."}
@@ -327,8 +330,12 @@ def measure_complexity(
                     value = target(*arguments)
                     if info.is_generator and hasattr(value, "__iter__"):
                         list(value)
-        except TraceLimitError:
-            break  # too slow already; keep earlier samples
+        except TraceLimitError as exc:
+            payload["truncated"] = True
+            payload["truncationReason"] = (
+                f"Stopped at n={size}: {exc.reason} Earlier samples were kept."
+            )
+            break
         except BaseException:
             continue  # this size failed (e.g. int param scaled oddly); skip it
         payload["samples"].append({"n": size, "ops": tracer.op_count})

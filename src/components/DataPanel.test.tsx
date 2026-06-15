@@ -276,4 +276,60 @@ describe('DataPanel', () => {
     expect(html).toContain('<td>1</td><td>2</td>');
     expect(html).not.toContain('&lt;Solution object&gt;');
   });
+
+  it('renders a heap memory map for referenced objects', () => {
+    const shared: EncodedValue = {
+      k: 'seq',
+      t: 'list',
+      id: 5,
+      items: [num(1)],
+      len: 1,
+      truncated: false,
+    };
+    const currentStep: TraceStep = {
+      i: 0,
+      event: 'line',
+      line: 1,
+      func: 'f',
+      stack: [
+        {
+          id: 'frame-1',
+          func: 'f',
+          qualname: 'f',
+          line: 1,
+          locals: {
+            shared,
+            matrix: {
+              k: 'seq',
+              t: 'list',
+              id: 6,
+              items: [shared, { k: 'ref', id: 5 }],
+              len: 2,
+              truncated: false,
+            },
+            row: { k: 'ref', id: 5 },
+          },
+        },
+      ],
+      globals: {},
+      stdoutLen: 0,
+    };
+
+    const html = renderToStaticMarkup(
+      <DataPanel
+        analysis={analysis}
+        atLastStep={false}
+        currentStep={currentStep}
+        frameIndex={null}
+        returnValue={null}
+      />,
+    );
+
+    expect(html).toContain('memory map');
+    expect(html).toContain('shared');
+    expect(html).toContain('matrix');
+    expect(html).toContain('row');
+    expect(html).toContain('→ #5');
+    expect(html).toContain('[0]');
+  });
 });

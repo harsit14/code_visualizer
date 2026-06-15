@@ -1,3 +1,5 @@
+import type { Language } from '../engine/types';
+
 /**
  * Shareable session state encoded into the URL hash as `#cv=<base64url>`.
  */
@@ -5,6 +7,7 @@
 export type SharedState = {
   code: string;
   exampleId?: string;
+  language?: Language;
   seed?: number;
   functionName?: string;
   inputs?: string[];
@@ -30,6 +33,15 @@ function fromBase64Url(encoded: string): string {
 
 export function encodeShareState(state: SharedState): string {
   return HASH_PREFIX + toBase64Url(JSON.stringify(state));
+}
+
+function escapeAttribute(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+}
+
+export function buildIframeEmbedCode(src: string): string {
+  const safeSrc = escapeAttribute(src);
+  return `<iframe src="${safeSrc}" title="Code Visualizer" width="100%" height="640" loading="lazy" style="border:0;max-width:100%;"></iframe>`;
 }
 
 export function decodeShareHash(hash: string): SharedState | null {

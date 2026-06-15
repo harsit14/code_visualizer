@@ -9,7 +9,7 @@
  * - aliases (two names, same object id) are rendered once, labels joined
  */
 import { Boxes } from 'lucide-react';
-import type { JSX } from 'react';
+import { useState, type JSX } from 'react';
 import {
   collectStructures,
   expandSelf,
@@ -19,6 +19,7 @@ import {
   groupChains,
   largestContainingChain,
   largestContainingTree,
+  typeNameOf,
   type ArrayPointer,
   type ArrayPointerHints,
 } from '../engine/trace';
@@ -36,6 +37,20 @@ type ChainValue = Extract<EncodedValue, { k: 'listnode' }>;
 type SeqValue = Extract<EncodedValue, { k: 'seq' }>;
 type StringValue = Extract<EncodedValue, { k: 'str' }>;
 type DictValue = Extract<EncodedValue, { k: 'dict' }>;
+type HeapNode = {
+  id: number;
+  kind: string;
+  preview: string;
+  roots: string[];
+  edges: { label: string; targetId: number }[];
+};
+type HeapGraph = {
+  nodes: HeapNode[];
+  rootEdges: { name: string; targetId: number }[];
+  truncated: boolean;
+};
+
+const HEAP_NODE_LIMIT = 24;
 
 // ---------------------------------------------------------------- arrays
 
@@ -329,6 +344,245 @@ function ChainDiagram({
   );
 }
 
+// ------------------------------------------------------------- heap map
+
+function objectIdOf(value: EncodedValue): number | null {
+  switch (value.k) {
+    case 'seq':
+    case 'dict':
+    case 'obj':
+    case 'tree':
+    case 'listnode':
+    case 'ref':
+      return value.id;
+    case 'repr':
+      return value.id ?? null;
+    default:
+      return null;
+  }
+}
+
+function shorten(text: string, max = 44): string {
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+}
+
+function heapPreview(value: EncodedValue): { kind: string; preview: string } {
+  if (value.k === 'tree') {
+    return { kind: 'TreeNode', preview: `val=${formatValue(value.val)}` };
+  }
+  if (value.k === 'listnode') {
+    const head = value.nodes[0];
+    return {
+      kind: 'ListNode',
+      preview: head ? `val=${formatValue(head.val)}` : formatValue(value),
+    };
+  }
+  if (value.k === 'ref') {
+    return { kind: 'ref', preview: `#${value.id}` };
+  }
+  return { kind: typeNameOf(value), preview: shorten(formatValue(value)) };
+}
+
+function buildHeapGraph(locals: Record<string, EncodedValue>): HeapGraph | null {
+  const nodes = new Map<number, HeapNode>();
+  const rootEdges: { name: string; targetId: number }[] = [];
+  const expanded = Object.entries(locals).filter(([name]) => name !== 'self');
+
+  const ensureNode = (id: number, value: EncodedValue) => {
+    const existing = nodes.get(id);
+    const preview = heapPreview(value);
+    if (existing) {
+      if (existing.kind === 'ref' && value.k !== 'ref') {
+        existing.kind = preview.kind;
+        existing.preview = preview.preview;
+      }
+      return existing;
+    }
+    const node: HeapNode = {
+      id,
+      kind: preview.kind,
+      preview: preview.preview,
+      roots: [],
+      edges: [],
+    };
+    nodes.set(id, node);
+    return node;
+  };
+
+  const ensureRawNode = (id: number, kind: string, preview: string) => {
+    const existing = nodes.get(id);
+    if (existing) {
+      if (existing.kind === 'ref') {
+        existing.kind = kind;
+        existing.preview = preview;
+      }
+      return existing;
+    }
+    const node: HeapNode = { id, kind, preview, roots: [], edges: [] };
+    nodes.set(id, node);
+    return node;
+  };
+
+  const addEdge = (source: HeapNode, label: string, targetId: number) => {
+    if (!source.edges.some((edge) => edge.label === label && edge.targetId === targetId)) {
+      source.edges.push({ label, targetId });
+    }
+  };
+
+  const visited = new Set<number>();
+  const walk = (value: EncodedValue, depth: number) => {
+    const id = objectIdOf(value);
+    if (id === null) {
+      return;
+    }
+    const node = ensureNode(id, value);
+    if (visited.has(id) || depth >= 4) {
+      return;
+    }
+    visited.add(id);
+
+    if (value.k === 'seq') {
+      value.items.forEach((item, index) => {
+        const targetId = objectIdOf(item);
+        if (targetId !== null) {
+          addEdge(node, `[${index}]`, targetId);
+          walk(item, depth + 1);
+        }
+      });
+    } else if (value.k === 'dict') {
+      value.entries.forEach(([key, item]) => {
+        const targetId = objectIdOf(item);
+        if (targetId !== null) {
+          addEdge(node, `[${formatValue(key)}]`, targetId);
+          walk(item, depth + 1);
+        }
+      });
+    } else if (value.k === 'obj') {
+      Object.entries(value.attrs).forEach(([attr, item]) => {
+        const targetId = objectIdOf(item);
+        if (targetId !== null) {
+          addEdge(node, `.${attr}`, targetId);
+          walk(item, depth + 1);
+        }
+      });
+    } else if (value.k === 'tree') {
+      for (const [label, child] of [
+        ['left', value.left],
+        ['right', value.right],
+      ] as const) {
+        if (!child) {
+          continue;
+        }
+        const targetId = objectIdOf(child);
+        if (targetId !== null) {
+          addEdge(node, label, targetId);
+          walk(child, depth + 1);
+        }
+      }
+    } else if (value.k === 'listnode') {
+      value.nodes.forEach((listNode, index) => {
+        const raw = ensureRawNode(listNode.id, 'ListNode', `val=${formatValue(listNode.val)}`);
+        if (index < value.nodes.length - 1) {
+          addEdge(raw, 'next', value.nodes[index + 1].id);
+        }
+      });
+    }
+  };
+
+  for (const [name, value] of expanded) {
+    const targetId = objectIdOf(value);
+    if (targetId === null) {
+      continue;
+    }
+    rootEdges.push({ name, targetId });
+    const node = ensureNode(targetId, value);
+    if (!node.roots.includes(name)) {
+      node.roots.push(name);
+    }
+    walk(value, 0);
+  }
+
+  if (nodes.size === 0) {
+    return null;
+  }
+
+  const visibleNodes = [...nodes.values()].slice(0, HEAP_NODE_LIMIT);
+  const visibleIds = new Set(visibleNodes.map((node) => node.id));
+  return {
+    nodes: visibleNodes.map((node) => ({
+      ...node,
+      edges: node.edges.filter((edge) => visibleIds.has(edge.targetId)),
+    })),
+    rootEdges: rootEdges.filter((edge) => visibleIds.has(edge.targetId)),
+    truncated: nodes.size > HEAP_NODE_LIMIT,
+  };
+}
+
+function HeapGraphView({
+  graph,
+  selectedId,
+  onSelect,
+}: {
+  graph: HeapGraph;
+  selectedId: number | null;
+  onSelect: (id: number) => void;
+}) {
+  return (
+    <div className="heap-map">
+      <div className="heap-roots" aria-label="Heap roots">
+        {graph.rootEdges.map((edge) => (
+          <button
+            className={edge.targetId === selectedId ? 'is-selected' : ''}
+            key={`${edge.name}-${edge.targetId}`}
+            onClick={() => onSelect(edge.targetId)}
+            type="button"
+          >
+            <span>{edge.name}</span>
+            <span>→ #{edge.targetId}</span>
+          </button>
+        ))}
+      </div>
+      <div className="heap-nodes">
+        {graph.nodes.map((node) => (
+          <div className={`heap-node${node.id === selectedId ? ' is-selected' : ''}`} key={node.id}>
+            <button className="heap-node-main" onClick={() => onSelect(node.id)} type="button">
+              <span className="heap-node-id">#{node.id}</span>
+              <span className="heap-node-kind">{node.kind}</span>
+              <span className="heap-node-preview">{node.preview}</span>
+            </button>
+            {node.roots.length > 0 ? (
+              <div className="heap-node-roots">
+                {node.roots.map((root) => (
+                  <span key={root}>{root}</span>
+                ))}
+              </div>
+            ) : null}
+            {node.edges.length > 0 ? (
+              <ul className="heap-links">
+                {node.edges.map((edge) => (
+                  <li key={`${edge.label}-${edge.targetId}`}>
+                    <button
+                      className={edge.targetId === selectedId ? 'is-selected' : ''}
+                      onClick={() => onSelect(edge.targetId)}
+                      type="button"
+                    >
+                      <span>{edge.label}</span>
+                      <span>→ #{edge.targetId}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ))}
+      </div>
+      {graph.truncated ? (
+        <p className="heap-note">Showing the first {HEAP_NODE_LIMIT} objects.</p>
+      ) : null}
+    </div>
+  );
+}
+
 // ------------------------------------------------------------- the panel
 
 type DataPanelProps = {
@@ -485,6 +739,7 @@ export function DataPanel({
   returnValue,
   atLastStep,
 }: DataPanelProps) {
+  const [selectedHeapId, setSelectedHeapId] = useState<number | null>(null);
   const frame = effectiveFrame(currentStep, frameIndex);
   const functionInfo = findFunctionInfo(analysis, frame);
   const pointerHints = pointerHintsForFrame(analysis, frame);
@@ -493,6 +748,7 @@ export function DataPanel({
   const structures = collectStructures(currentStep);
   const cards = frame ? buildCards(locals, pointerHints, structures) : [];
   const sharedRefs = frame ? findSharedReferences(locals) : [];
+  const heapGraph = frame ? buildHeapGraph(locals) : null;
 
   return (
     <section className="panel data-panel" aria-label="Data structures">
@@ -511,7 +767,10 @@ export function DataPanel({
 
       {!frame ? (
         <p className="panel-empty">Structures appear here while code runs.</p>
-      ) : cards.length === 0 && sharedRefs.length === 0 && !(atLastStep && returnValue) ? (
+      ) : cards.length === 0 &&
+        sharedRefs.length === 0 &&
+        !heapGraph &&
+        !(atLastStep && returnValue) ? (
         <p className="panel-empty">
           No lists, dicts, trees, or linked lists in scope at this step.
         </p>
@@ -529,6 +788,16 @@ export function DataPanel({
               {card.render}
             </article>
           ))}
+          {heapGraph ? (
+            <article className="data-card data-card-wide heap-card">
+              <h3>memory map</h3>
+              <HeapGraphView
+                graph={heapGraph}
+                onSelect={setSelectedHeapId}
+                selectedId={selectedHeapId}
+              />
+            </article>
+          ) : null}
           {atLastStep && returnValue ? (
             <article className="data-card data-card-wide data-card-return">
               <h3>return value</h3>

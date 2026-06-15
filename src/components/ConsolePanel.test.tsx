@@ -54,4 +54,31 @@ describe('ConsolePanel', () => {
     expect(html).toContain('An index went outside the sequence.');
     expect(html).toContain('Compare the index with the sequence length.');
   });
+
+  it('warns when complexity measurement stops early', () => {
+    const html = renderToStaticMarkup(
+      <ConsolePanel
+        atLastStep={false}
+        canMeasureComplexity={true}
+        complexity={{
+          functionName: 'fib',
+          seed: 1,
+          samples: [
+            { n: 4, ops: 25 },
+            { n: 8, ops: 120 },
+          ],
+          error: null,
+          truncated: true,
+          truncationReason: 'Stopped at n=16: Execution exceeded 4s and was stopped.',
+        }}
+        complexityBusy={false}
+        currentStep={undefined}
+        onMeasureComplexity={() => {}}
+        result={null}
+      />,
+    );
+
+    expect(html).toContain('Stopped at n=16');
+    expect(html).toContain('Growth estimate may be biased toward smaller inputs.');
+  });
 });

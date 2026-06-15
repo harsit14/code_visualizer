@@ -116,6 +116,14 @@ export function ConsolePanel({
             </p>
           ) : null}
 
+          {complexity?.truncated ? (
+            <p className="console-note">
+              {complexity.truncationReason
+                ? `${complexity.truncationReason} Growth estimate may be biased toward smaller inputs.`
+                : 'Complexity measurement stopped early; growth estimate may be biased toward smaller inputs.'}
+            </p>
+          ) : null}
+
           {complexity && complexity.samples.length > 0 ? (
             <div className="complexity-result">
               {growth ? (

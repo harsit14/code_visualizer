@@ -2,10 +2,20 @@
  * Top bar: branding, example picker, theme toggle, share link,
  * trace export/import, layout controls, shortcuts, and runtime status.
  */
-import { Columns3, Download, HelpCircle, Link2, Moon, Sun, Upload } from 'lucide-react';
+import {
+  Code2,
+  Columns3,
+  Download,
+  FileImage,
+  HelpCircle,
+  Link2,
+  Moon,
+  Sun,
+  Upload,
+} from 'lucide-react';
 import { useRef } from 'react';
 import { examples } from '../examples/examples';
-import type { RuntimeStatus } from '../engine/types';
+import type { Language, RuntimeStatus } from '../engine/types';
 
 type PanelControl = {
   id: string;
@@ -16,14 +26,19 @@ type PanelControl = {
 type TopBarProps = {
   exampleId: string | null;
   onExampleChange: (id: string) => void;
+  language: Language;
+  onLanguageChange: (language: Language) => void;
   theme: 'light' | 'dark';
   onToggleTheme: () => void;
   onShare: () => void;
   shareLabel: string;
+  onEmbed: () => void;
+  embedLabel: string;
   importLabel: string;
   importTitle: string;
   canExport: boolean;
   onExport: () => void;
+  onExportSvg: () => void;
   onImport: (file: File) => void;
   onResetLayout: () => void;
   onTogglePanel: (id: string, visible: boolean) => void;
@@ -45,14 +60,19 @@ const SHORTCUTS = [
 export function TopBar({
   exampleId,
   onExampleChange,
+  language,
+  onLanguageChange,
   theme,
   onToggleTheme,
   onShare,
   shareLabel,
+  onEmbed,
+  embedLabel,
   importLabel,
   importTitle,
   canExport,
   onExport,
+  onExportSvg,
   onImport,
   onResetLayout,
   onTogglePanel,
@@ -92,13 +112,36 @@ export function TopBar({
           ))}
         </select>
 
+        <select
+          aria-label="Language"
+          onChange={(event) => onLanguageChange(event.target.value as Language)}
+          value={language}
+        >
+          <option value="python">Python</option>
+          <option value="javascript">JavaScript</option>
+          <option value="typescript">TypeScript</option>
+        </select>
+
         <button onClick={onShare} title="Copy a shareable link" type="button">
           <Link2 size={14} />
           {shareLabel}
         </button>
+        <button onClick={onEmbed} title="Copy iframe embed code" type="button">
+          <Code2 size={14} />
+          {embedLabel}
+        </button>
         <button disabled={!canExport} onClick={onExport} title="Export trace JSON" type="button">
           <Download size={14} />
           Export
+        </button>
+        <button
+          disabled={!canExport}
+          onClick={onExportSvg}
+          title="Export animated trace SVG"
+          type="button"
+        >
+          <FileImage size={14} />
+          SVG
         </button>
         <button onClick={() => fileInputRef.current?.click()} title={importTitle} type="button">
           <Upload size={14} />

@@ -18,4 +18,10 @@ describe('examples', () => {
   it('uses unique ids', () => {
     expect(new Set(examples.map((example) => example.id)).size).toBe(examples.length);
   });
+
+  it('includes JavaScript and TypeScript examples', () => {
+    expect(getExample('js-loop-accumulator')?.language).toBe('javascript');
+    expect(getExample('ts-running-sum')?.language).toBe('typescript');
+    expect(examples.every((example) => example.language)).toBe(true);
+  });
 });

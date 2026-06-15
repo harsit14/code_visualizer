@@ -1,4 +1,12 @@
-export type PanelId = 'code' | 'inputs' | 'data' | 'variables' | 'watch' | 'callStack' | 'console';
+export type PanelId =
+  | 'code'
+  | 'inputs'
+  | 'data'
+  | 'variables'
+  | 'watch'
+  | 'callStack'
+  | 'explainer'
+  | 'console';
 export type ColumnId = 'left' | 'center' | 'right';
 
 export type PanelVisibility = Record<PanelId, boolean>;
@@ -17,6 +25,7 @@ export const PANEL_DEFINITIONS: PanelDefinition[] = [
   { id: 'variables', label: 'Variables' },
   { id: 'watch', label: 'Watch' },
   { id: 'callStack', label: 'Call stack' },
+  { id: 'explainer', label: 'Explainer' },
   { id: 'console', label: 'Console' },
 ];
 
@@ -27,6 +36,7 @@ export const DEFAULT_PANEL_VISIBILITY: PanelVisibility = {
   variables: true,
   watch: true,
   callStack: true,
+  explainer: true,
   console: true,
 };
 
@@ -43,6 +53,7 @@ export const DEFAULT_PANEL_WEIGHTS: PanelWeights = {
   variables: 1.2,
   watch: 1,
   callStack: 0.9,
+  explainer: 1,
   console: 1.1,
 };
 

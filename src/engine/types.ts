@@ -3,6 +3,8 @@
  * (see engine/codeviz/serialize.py and runner.py).
  */
 
+export type Language = 'python' | 'javascript' | 'typescript';
+
 export type EncodedValue =
   | { k: 'none' }
   | { k: 'num'; t: string; v: string }
@@ -161,6 +163,8 @@ export type ComplexityResult = {
   seed: number | null;
   samples: ComplexitySample[];
   error: EngineError | null;
+  truncated?: boolean;
+  truncationReason?: string | null;
 };
 
 export type RunOptions = {

@@ -5,9 +5,16 @@
  * overrides, complexity samples, and all calls into the Pyodide worker.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { runJavaScriptInWorker } from '../engine/jsRuntimeClient';
 import { RuntimeClient, TimeoutError } from '../engine/runtimeClient';
 import { firstExceptionStep } from '../engine/trace';
-import type { AnalysisInfo, ComplexityResult, RuntimeStatus, SessionResult } from '../engine/types';
+import type {
+  AnalysisInfo,
+  ComplexityResult,
+  Language,
+  RuntimeStatus,
+  SessionResult,
+} from '../engine/types';
 
 const RUN_TIMEOUT_MS = 15000;
 const ANALYZE_DEBOUNCE_MS = 700;
@@ -17,10 +24,35 @@ export type PlaybackSpeed = number; // steps per second
 export type Session = ReturnType<typeof useSession>;
 
 type InitialSessionOptions = {
+  language?: Language;
   functionName?: string;
   inputs?: string[];
   seed?: number;
 };
+
+function scriptAnalysis(): AnalysisInfo {
+  return {
+    mode: 'script',
+    functions: [],
+    defaultFunction: null,
+    definesTreeNode: false,
+    definesListNode: false,
+    referencesTreeNode: false,
+    referencesListNode: false,
+    diagnostics: [],
+  };
+}
+
+function idleStatus(language: Language): RuntimeStatus {
+  return {
+    phase: 'idle',
+    message:
+      language === 'python'
+        ? 'Python loads on first run'
+        : `${language === 'typescript' ? 'TypeScript' : 'JavaScript'} runs in a browser worker`,
+    interruptSupported: false,
+  };
+}
 
 function timeoutResult(message: string): SessionResult {
   return {
@@ -35,12 +67,13 @@ function timeoutResult(message: string): SessionResult {
 
 export function useSession(initialCode: string, initialOptions: InitialSessionOptions = {}) {
   const [code, setCodeState] = useState(initialCode);
-  const [status, setStatus] = useState<RuntimeStatus>({
-    phase: 'idle',
-    message: 'Python loads on first run',
-    interruptSupported: false,
-  });
-  const [analysis, setAnalysis] = useState<AnalysisInfo | null>(null);
+  const [language, setLanguageState] = useState<Language>(initialOptions.language ?? 'python');
+  const [status, setStatus] = useState<RuntimeStatus>(
+    idleStatus(initialOptions.language ?? 'python'),
+  );
+  const [analysis, setAnalysis] = useState<AnalysisInfo | null>(
+    initialOptions.language && initialOptions.language !== 'python' ? scriptAnalysis() : null,
+  );
   const [result, setResult] = useState<SessionResult | null>(null);
   const [complexity, setComplexity] = useState<ComplexityResult | null>(null);
   const [complexityBusy, setComplexityBusy] = useState(false);
@@ -63,6 +96,7 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
   const analyzeTimer = useRef<number | null>(null);
   const analyzeSerial = useRef(0);
   const codeRef = useRef(initialCode);
+  const languageRef = useRef<Language>(initialOptions.language ?? 'python');
 
   const getClient = useCallback(() => {
     if (!clientRef.current) {
@@ -82,9 +116,14 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
 
   /** Re-analyze (debounced) so the inputs panel reflects edits before a run. */
   const scheduleAnalyze = useCallback(
-    (source: string) => {
+    (source: string, nextLanguage = languageRef.current) => {
       if (analyzeTimer.current) {
         window.clearTimeout(analyzeTimer.current);
+      }
+      if (nextLanguage !== 'python') {
+        analyzeSerial.current += 1;
+        setAnalysis(scriptAnalysis());
+        return;
       }
       const serial = ++analyzeSerial.current;
       analyzeTimer.current = window.setTimeout(() => {
@@ -97,7 +136,8 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
             if (
               payload.analysis &&
               serial === analyzeSerial.current &&
-              source === codeRef.current
+              source === codeRef.current &&
+              languageRef.current === 'python'
             ) {
               setAnalysis(payload.analysis);
             }
@@ -123,6 +163,24 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
       setInputDrafts(null);
       setPendingInitialInputs(null);
       scheduleAnalyze(nextCode);
+    },
+    [scheduleAnalyze],
+  );
+
+  const setLanguage = useCallback(
+    (nextLanguage: Language) => {
+      languageRef.current = nextLanguage;
+      setLanguageState(nextLanguage);
+      setStatus(idleStatus(nextLanguage));
+      setResult(null);
+      setComplexity(null);
+      setStep(0);
+      setPlaying(false);
+      setSelectedFrameIndex(null);
+      setFunctionOverrideState(null);
+      setInputDrafts(null);
+      setPendingInitialInputs(null);
+      scheduleAnalyze(codeRef.current, nextLanguage);
     },
     [scheduleAnalyze],
   );
@@ -195,24 +253,39 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
       const useInputs = overrides?.freshInputs ? undefined : inputLiterals;
 
       try {
-        const data = (await getClient().request(
-          {
-            op: 'run',
-            source: code,
-            options: {
-              function: functionOverride ?? undefined,
-              inputs: useInputs,
-              seed: useSeed,
+        let data: SessionResult;
+        if (languageRef.current === 'python') {
+          data = (await getClient().request(
+            {
+              op: 'run',
+              source: code,
+              options: {
+                function: functionOverride ?? undefined,
+                inputs: useInputs,
+                seed: useSeed,
+              },
             },
-          },
-          { timeoutMs: RUN_TIMEOUT_MS },
-        )) as SessionResult;
+            { timeoutMs: RUN_TIMEOUT_MS },
+          )) as SessionResult;
+        } else {
+          setStatus({
+            phase: 'running',
+            message: `Running ${languageRef.current === 'typescript' ? 'TypeScript' : 'JavaScript'} code`,
+            interruptSupported: false,
+          });
+          data = await runJavaScriptInWorker(code, languageRef.current, RUN_TIMEOUT_MS);
+          setStatus({
+            phase: 'ready',
+            message: `${languageRef.current === 'typescript' ? 'TypeScript' : 'JavaScript'} ready`,
+            interruptSupported: false,
+          });
+        }
 
         setResult(data);
         if (data.analysis) {
           setAnalysis(data.analysis);
         }
-        if (data.run?.seed != null) {
+        if (languageRef.current === 'python' && data.run?.seed != null) {
           setSeed(data.run.seed);
         }
         if (overrides?.freshInputs) {
@@ -229,6 +302,9 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
           setPlaying(runSteps.length > 1);
         }
       } catch (error) {
+        if (languageRef.current !== 'python') {
+          setStatus(idleStatus(languageRef.current));
+        }
         if (error instanceof TimeoutError) {
           setResult(timeoutResult(error.message));
         } else {
@@ -257,7 +333,7 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
   }, [run]);
 
   const measureComplexity = useCallback(async () => {
-    if (isBusy || complexityBusy) {
+    if (languageRef.current !== 'python' || isBusy || complexityBusy) {
       return;
     }
     setComplexityBusy(true);
@@ -331,7 +407,12 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
 
   /** Restore an exported session (replay without re-running). */
   const importSession = useCallback(
-    (importedCode: string, imported: SessionResult, importedStep = 0) => {
+    (
+      importedCode: string,
+      imported: SessionResult,
+      importedStep = 0,
+      importedLanguage: Language = 'python',
+    ) => {
       if (analyzeTimer.current) {
         // A debounced analyze from a recent edit would overwrite the
         // imported analysis (and e.g. hide the inputs panel) — drop it.
@@ -339,8 +420,11 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
         analyzeTimer.current = null;
       }
       codeRef.current = importedCode;
+      languageRef.current = importedLanguage;
       analyzeSerial.current += 1;
       setCodeState(importedCode);
+      setLanguageState(importedLanguage);
+      setStatus(idleStatus(importedLanguage));
       setResult(imported);
       setAnalysis(imported.analysis ?? null);
       setComplexity(null);
@@ -349,13 +433,17 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
       setPlaying(false);
       setInputDrafts(null);
       setPendingInitialInputs(null);
-      setFunctionOverrideState(imported.run?.functionName ?? null);
-      setSeed(imported.run?.seed ?? null);
+      setFunctionOverrideState(
+        importedLanguage === 'python' ? (imported.run?.functionName ?? null) : null,
+      );
+      setSeed(importedLanguage === 'python' ? (imported.run?.seed ?? null) : null);
     },
     [],
   );
 
   return {
+    language,
+    setLanguage,
     code,
     setCode,
     status,

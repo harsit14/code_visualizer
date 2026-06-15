@@ -10,13 +10,14 @@ import { ControlsBar } from '../components/ControlsBar';
 import { DataPanel } from '../components/DataPanel';
 import { EditorPanel } from '../components/EditorPanel';
 import { ErrorBoundary } from '../components/ErrorBoundary';
+import { ExplainerPanel } from '../components/ExplainerPanel';
 import { InputsPanel } from '../components/InputsPanel';
 import { TopBar } from '../components/TopBar';
 import { VariablesPanel } from '../components/VariablesPanel';
 import { WatchPanel } from '../components/WatchPanel';
 import { lineExecutionCounts } from '../engine/traceMetrics';
 import { nextBreakpointStep, nextStepOnLine, stepOverStep } from '../engine/traceNavigation';
-import type { SessionResult } from '../engine/types';
+import type { Language, SessionResult } from '../engine/types';
 import { DEFAULT_EXAMPLE_ID, getExample } from '../examples/examples';
 import {
   DEFAULT_COLUMN_WEIGHTS,
@@ -31,7 +32,8 @@ import {
   type PanelVisibility,
   type PanelWeights,
 } from './layoutState';
-import { decodeShareHash, encodeShareState } from './shareState';
+import { buildIframeEmbedCode, decodeShareHash, encodeShareState } from './shareState';
+import { buildTraceSvgExport } from './traceSvgExport';
 import { useSession } from './useSession';
 
 type Theme = 'light' | 'dark';
@@ -50,6 +52,18 @@ const COLUMN_MIN_WIDTHS: Record<ColumnId, number> = {
 };
 
 const PANEL_MIN_HEIGHT = 92;
+const EMBED_SEARCH_PARAM = 'embed';
+
+const DEFAULT_EMBED_PANEL_VISIBILITY: PanelVisibility = {
+  code: true,
+  inputs: true,
+  data: true,
+  variables: false,
+  watch: false,
+  callStack: true,
+  explainer: false,
+  console: true,
+};
 
 type PanelSlotConfig = {
   content: ReactNode;
@@ -74,6 +88,14 @@ function initialTheme(): Theme {
 
 function initialShare() {
   return decodeShareHash(window.location.hash);
+}
+
+function initialEmbedMode() {
+  return new URLSearchParams(window.location.search).get(EMBED_SEARCH_PARAM) === '1';
+}
+
+function initialLanguage(exampleId: string | null, sharedLanguage: Language | undefined): Language {
+  return sharedLanguage ?? (exampleId ? (getExample(exampleId)?.language ?? 'python') : 'python');
 }
 
 function readStoredValue<T>(key: string, fallback: T, normalize: (value: unknown) => T): T {
@@ -121,29 +143,39 @@ export function App() {
   const [exampleId, setExampleId] = useState<string | null>(
     shared ? (shared.exampleId ?? null) : DEFAULT_EXAMPLE_ID,
   );
+  const initialCode = shared?.code ?? getExample(exampleId ?? DEFAULT_EXAMPLE_ID)?.code ?? '';
+  const initialSessionLanguage = initialLanguage(exampleId, shared?.language);
   const [theme, setTheme] = useState<Theme>(initialTheme);
   const [shareLabel, setShareLabel] = useState('Share');
+  const [embedLabel, setEmbedLabel] = useState('Embed');
+  const [embedMode] = useState(initialEmbedMode);
   const [importLabel, setImportLabel] = useState(DEFAULT_IMPORT_LABEL);
   const [importTitle, setImportTitle] = useState(DEFAULT_IMPORT_TITLE);
   const [watchedVariables, setWatchedVariables] = useState<string[]>([]);
   const [breakpoints, setBreakpoints] = useState<Set<number>>(() => new Set());
   const [cursorLine, setCursorLine] = useState<number | null>(null);
   const [panelVisibility, setPanelVisibility] = useState<PanelVisibility>(() =>
-    readStoredValue(
-      PANEL_VISIBILITY_STORAGE_KEY,
-      DEFAULT_PANEL_VISIBILITY,
-      normalizePanelVisibility,
-    ),
+    embedMode
+      ? { ...DEFAULT_EMBED_PANEL_VISIBILITY }
+      : readStoredValue(
+          PANEL_VISIBILITY_STORAGE_KEY,
+          DEFAULT_PANEL_VISIBILITY,
+          normalizePanelVisibility,
+        ),
   );
   const [columnWeights, setColumnWeights] = useState<ColumnWeights>(() =>
-    readStoredValue(COLUMN_WEIGHTS_STORAGE_KEY, DEFAULT_COLUMN_WEIGHTS, (value) =>
-      normalizeWeights(value, DEFAULT_COLUMN_WEIGHTS),
-    ),
+    embedMode
+      ? { ...DEFAULT_COLUMN_WEIGHTS }
+      : readStoredValue(COLUMN_WEIGHTS_STORAGE_KEY, DEFAULT_COLUMN_WEIGHTS, (value) =>
+          normalizeWeights(value, DEFAULT_COLUMN_WEIGHTS),
+        ),
   );
   const [panelWeights, setPanelWeights] = useState<PanelWeights>(() =>
-    readStoredValue(PANEL_WEIGHTS_STORAGE_KEY, DEFAULT_PANEL_WEIGHTS, (value) =>
-      normalizeWeights(value, DEFAULT_PANEL_WEIGHTS),
-    ),
+    embedMode
+      ? { ...DEFAULT_PANEL_WEIGHTS }
+      : readStoredValue(PANEL_WEIGHTS_STORAGE_KEY, DEFAULT_PANEL_WEIGHTS, (value) =>
+          normalizeWeights(value, DEFAULT_PANEL_WEIGHTS),
+        ),
   );
   const columnRefs = useRef<Record<ColumnId, HTMLDivElement | null>>({
     left: null,
@@ -153,13 +185,14 @@ export function App() {
   const panelSlotRefs = useRef<Partial<Record<PanelId, HTMLDivElement | null>>>({});
   const importStatusTimeoutRef = useRef<number | null>(null);
 
-  const initialCode = shared?.code ?? getExample(DEFAULT_EXAMPLE_ID)?.code ?? '';
   const session = useSession(initialCode, {
+    language: initialSessionLanguage,
     functionName: shared?.functionName,
     inputs: shared?.inputs,
     seed: shared?.seed,
   });
-  const { importSession, jumpToStep, selectedFrameIndex, setCode, step, steps } = session;
+  const { importSession, jumpToStep, selectedFrameIndex, setCode, setLanguage, step, steps } =
+    session;
 
   const executionCounts = useMemo(() => lineExecutionCounts(steps), [steps]);
   const breakpointLines = useMemo(() => [...breakpoints].sort((a, b) => a - b), [breakpoints]);
@@ -227,16 +260,22 @@ export function App() {
   }, [theme]);
 
   useEffect(() => {
-    saveStoredValue(PANEL_VISIBILITY_STORAGE_KEY, panelVisibility);
-  }, [panelVisibility]);
+    if (!embedMode) {
+      saveStoredValue(PANEL_VISIBILITY_STORAGE_KEY, panelVisibility);
+    }
+  }, [embedMode, panelVisibility]);
 
   useEffect(() => {
-    saveStoredValue(COLUMN_WEIGHTS_STORAGE_KEY, columnWeights);
-  }, [columnWeights]);
+    if (!embedMode) {
+      saveStoredValue(COLUMN_WEIGHTS_STORAGE_KEY, columnWeights);
+    }
+  }, [columnWeights, embedMode]);
 
   useEffect(() => {
-    saveStoredValue(PANEL_WEIGHTS_STORAGE_KEY, panelWeights);
-  }, [panelWeights]);
+    if (!embedMode) {
+      saveStoredValue(PANEL_WEIGHTS_STORAGE_KEY, panelWeights);
+    }
+  }, [embedMode, panelWeights]);
 
   useEffect(
     () => () => {
@@ -321,29 +360,79 @@ export function App() {
       setExampleId(id);
       setWatchedVariables([]);
       resetTraceNavigation();
+      setLanguage(example.language);
       setCode(example.code);
     },
-    [resetTraceNavigation, setCode],
+    [resetTraceNavigation, setCode, setLanguage],
+  );
+
+  const handleLanguageChange = useCallback(
+    (nextLanguage: Language) => {
+      setExampleId(null);
+      setWatchedVariables([]);
+      resetTraceNavigation();
+      setLanguage(nextLanguage);
+    },
+    [resetTraceNavigation, setLanguage],
+  );
+
+  const buildShareUrl = useCallback(
+    (embed: boolean) => {
+      const url = new URL(window.location.href);
+      url.hash = encodeShareState({
+        code: session.code,
+        exampleId: exampleId ?? undefined,
+        inputs: session.inputLiterals,
+        language: session.language,
+        seed: session.seed ?? undefined,
+        functionName: session.functionOverride ?? undefined,
+      });
+      if (embed) {
+        url.searchParams.set(EMBED_SEARCH_PARAM, '1');
+      } else {
+        url.searchParams.delete(EMBED_SEARCH_PARAM);
+      }
+      return url;
+    },
+    [
+      exampleId,
+      session.code,
+      session.functionOverride,
+      session.inputLiterals,
+      session.language,
+      session.seed,
+    ],
   );
 
   const handleShare = useCallback(async () => {
-    const url = new URL(window.location.href);
-    url.hash = encodeShareState({
-      code: session.code,
-      exampleId: exampleId ?? undefined,
-      inputs: session.inputLiterals,
-      seed: session.seed ?? undefined,
-      functionName: session.functionOverride ?? undefined,
-    });
+    const url = buildShareUrl(false);
     window.history.replaceState(null, '', url);
     try {
-      await navigator.clipboard?.writeText(url.toString());
+      if (!navigator.clipboard) {
+        throw new Error('Clipboard unavailable');
+      }
+      await navigator.clipboard.writeText(url.toString());
       setShareLabel('Copied!');
     } catch {
       setShareLabel('Link set');
     }
     window.setTimeout(() => setShareLabel('Share'), 1800);
-  }, [exampleId, session.code, session.functionOverride, session.inputLiterals, session.seed]);
+  }, [buildShareUrl]);
+
+  const handleEmbed = useCallback(async () => {
+    const url = buildShareUrl(true);
+    const code = buildIframeEmbedCode(url.toString());
+    try {
+      if (!navigator.clipboard) {
+        throw new Error('Clipboard unavailable');
+      }
+      await navigator.clipboard.writeText(code);
+      setEmbedLabel('Copied!');
+    } catch {
+      setEmbedLabel('Copy failed');
+    }
+    window.setTimeout(() => setEmbedLabel('Embed'), 1800);
+  }, [buildShareUrl]);
 
   const handleExport = useCallback(() => {
     if (!session.result) {
@@ -355,6 +444,7 @@ export function App() {
       code: session.code,
       step: session.step,
       result: session.result,
+      language: session.language,
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], {
       type: 'application/json;charset=utf-8',
@@ -367,7 +457,25 @@ export function App() {
     link.click();
     link.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-  }, [session.code, session.result, session.step]);
+  }, [session.code, session.language, session.result, session.step]);
+
+  const handleExportSvg = useCallback(() => {
+    const exportData = buildTraceSvgExport(session.code, session.result);
+    if (!exportData) {
+      return;
+    }
+    const blob = new Blob([exportData.svg], {
+      type: 'image/svg+xml;charset=utf-8',
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = exportData.filename;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }, [session.code, session.result]);
 
   const showImportStatus = useCallback((label: string, title: string) => {
     if (importStatusTimeoutRef.current !== null) {
@@ -391,14 +499,19 @@ export function App() {
             const payload = JSON.parse(text) as {
               version?: number;
               code?: string;
+              language?: Language;
               step?: number;
               result?: SessionResult;
             };
             if (typeof payload.code === 'string' && payload.result) {
+              const importedLanguage: Language =
+                payload.language === 'javascript' || payload.language === 'typescript'
+                  ? payload.language
+                  : 'python';
               setExampleId(null);
               setWatchedVariables([]);
               resetTraceNavigation();
-              importSession(payload.code, payload.result, payload.step ?? 0);
+              importSession(payload.code, payload.result, payload.step ?? 0, importedLanguage);
               showImportStatus('Imported', 'Trace imported successfully');
               return;
             }
@@ -438,10 +551,12 @@ export function App() {
   }, []);
 
   const resetLayout = useCallback(() => {
-    setPanelVisibility({ ...DEFAULT_PANEL_VISIBILITY });
+    setPanelVisibility(
+      embedMode ? { ...DEFAULT_EMBED_PANEL_VISIBILITY } : { ...DEFAULT_PANEL_VISIBILITY },
+    );
     setColumnWeights({ ...DEFAULT_COLUMN_WEIGHTS });
     setPanelWeights({ ...DEFAULT_PANEL_WEIGHTS });
-  }, []);
+  }, [embedMode]);
 
   const startColumnResize = useCallback(
     (beforeColumn: ColumnId, afterColumn: ColumnId, event: ReactPointerEvent) => {
@@ -565,7 +680,7 @@ export function App() {
 
   const atLastStep = session.totalSteps > 0 && session.step === session.totalSteps - 1;
   const previousStep = session.step > 0 ? session.steps[session.step - 1] : undefined;
-  const showInputs = session.analysis?.mode === 'function';
+  const showInputs = session.language === 'python' && session.analysis?.mode === 'function';
   const panelControls = useMemo(
     () =>
       PANEL_DEFINITIONS.map((panel) => ({
@@ -591,10 +706,12 @@ export function App() {
               diagnostics={session.analysis?.diagnostics ?? []}
               errorLine={errorLine}
               executionCounts={executionCounts}
-              onChange={handleCodeChange}
+              language={session.language}
+              onChange={embedMode ? () => {} : handleCodeChange}
               onCursorLineChange={setCursorLine}
-              onRunToLine={runToLine}
-              onToggleBreakpoint={toggleBreakpoint}
+              onRunToLine={embedMode ? undefined : runToLine}
+              onToggleBreakpoint={embedMode ? undefined : toggleBreakpoint}
+              readOnly={embedMode}
               theme={theme}
             />
           </ErrorBoundary>,
@@ -699,6 +816,27 @@ export function App() {
               currentStep={session.currentStep}
               onSelectFrame={session.setSelectedFrameIndex}
               selectedFrameIndex={session.selectedFrameIndex}
+              step={session.step}
+              steps={session.steps}
+            />
+          </ErrorBoundary>,
+        )
+      : null,
+    panelVisibility.explainer
+      ? panelSlot(
+          'explainer',
+          <ErrorBoundary
+            className="explainer-panel"
+            resetKeys={[session.code, session.result, session.step, session.selectedFrameIndex]}
+            title="Explainer"
+          >
+            <ExplainerPanel
+              code={session.code}
+              currentStep={session.currentStep}
+              frameIndex={session.selectedFrameIndex}
+              language={session.language}
+              previousStep={previousStep}
+              result={session.result}
             />
           </ErrorBoundary>,
         )
@@ -713,7 +851,7 @@ export function App() {
           >
             <ConsolePanel
               atLastStep={atLastStep}
-              canMeasureComplexity={showInputs && !session.isBusy}
+              canMeasureComplexity={session.language === 'python' && showInputs && !session.isBusy}
               complexity={session.complexity}
               complexityBusy={session.complexityBusy}
               currentStep={session.currentStep}
@@ -763,24 +901,40 @@ export function App() {
   );
 
   return (
-    <div className="app-shell">
-      <TopBar
-        canExport={Boolean(session.result?.run)}
-        exampleId={exampleId}
-        onExampleChange={handleExampleChange}
-        onExport={handleExport}
-        onImport={handleImport}
-        importLabel={importLabel}
-        importTitle={importTitle}
-        onResetLayout={resetLayout}
-        onShare={() => void handleShare()}
-        onToggleTheme={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))}
-        onTogglePanel={togglePanelVisibility}
-        panelControls={panelControls}
-        shareLabel={shareLabel}
-        status={session.status}
-        theme={theme}
-      />
+    <div className={`app-shell${embedMode ? ' app-shell-embed' : ''}`}>
+      {embedMode ? (
+        <header className="embed-bar">
+          <strong>Code Visualizer</strong>
+          <span className={`status-pill status-${session.status.phase}`}>
+            {session.status.message}
+          </span>
+        </header>
+      ) : (
+        <TopBar
+          canExport={Boolean(session.result?.run)}
+          embedLabel={embedLabel}
+          exampleId={exampleId}
+          importLabel={importLabel}
+          importTitle={importTitle}
+          language={session.language}
+          onEmbed={() => void handleEmbed()}
+          onExampleChange={handleExampleChange}
+          onExport={handleExport}
+          onExportSvg={handleExportSvg}
+          onImport={handleImport}
+          onLanguageChange={handleLanguageChange}
+          onResetLayout={resetLayout}
+          onShare={() => void handleShare()}
+          onTogglePanel={togglePanelVisibility}
+          onToggleTheme={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))}
+          panelControls={panelControls}
+          shareLabel={shareLabel}
+          status={session.status}
+          theme={theme}
+        />
+      )}
+
+      <p className="viewport-note">Best on desktop or tablet.</p>
 
       <main className="workbench" style={workbenchStyle}>
         {visibleColumns.length > 0 ? (

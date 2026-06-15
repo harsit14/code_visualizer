@@ -201,6 +201,19 @@ def test_complexity_measurement_linear_vs_quadratic():
     assert quadratic_growth > ratio**1.5
 
 
+def test_complexity_reports_when_sampling_stops_early():
+    result = measure_complexity(
+        "def f(nums):\n"
+        "    total = 0\n"
+        "    while True:\n"
+        "        total += 1\n",
+        seed=1,
+        max_seconds=0.0,
+    )
+    assert result["truncated"] is True
+    assert result["truncationReason"].startswith("Stopped at n=4:")
+
+
 def test_json_api_round_trip():
     response = json.loads(
         handle_request(json.dumps({"op": "run", "source": TWO_SUM, "options": {"seed": 5}}))

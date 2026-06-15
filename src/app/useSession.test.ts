@@ -3,7 +3,10 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SessionResult, TraceStep } from '../engine/types';
 
-const { requestMock } = vi.hoisted(() => ({ requestMock: vi.fn() }));
+const { requestMock, runJavaScriptMock } = vi.hoisted(() => ({
+  requestMock: vi.fn(),
+  runJavaScriptMock: vi.fn(),
+}));
 
 // Replace the Pyodide worker client with a controllable stub so the hook's
 // state machine can be tested without a real Worker.
@@ -20,6 +23,10 @@ vi.mock('../engine/runtimeClient', () => {
   }
   return { RuntimeClient, TimeoutError };
 });
+
+vi.mock('../engine/jsRuntimeClient', () => ({
+  runJavaScriptInWorker: runJavaScriptMock,
+}));
 
 import { TimeoutError } from '../engine/runtimeClient';
 import { useSession } from './useSession';
@@ -72,6 +79,7 @@ function scriptResult(
 beforeEach(() => {
   vi.useFakeTimers();
   requestMock.mockReset();
+  runJavaScriptMock.mockReset();
 });
 
 afterEach(() => {
@@ -159,6 +167,21 @@ describe('useSession', () => {
     act(() => result.current.setCode('print(2)'));
     expect(result.current.result).toBeNull();
     expect(result.current.code).toBe('print(2)');
+    unmount();
+  });
+
+  it('runs JavaScript sessions through the JavaScript worker path', async () => {
+    runJavaScriptMock.mockResolvedValueOnce(scriptResult(2));
+    const { result, unmount } = renderHook(() =>
+      useSession('console.log(1)', { language: 'javascript' }),
+    );
+    await act(async () => {
+      await result.current.run();
+    });
+    expect(runJavaScriptMock).toHaveBeenCalledWith('console.log(1)', 'javascript', 15000);
+    expect(requestMock).not.toHaveBeenCalled();
+    expect(result.current.language).toBe('javascript');
+    expect(result.current.totalSteps).toBe(2);
     unmount();
   });
 });

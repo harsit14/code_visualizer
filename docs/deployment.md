@@ -1,6 +1,7 @@
 # Deployment
 
-This app is designed for Cloudflare Pages as a static Vite site.
+This app is designed for Cloudflare Pages as a Vite site with one Pages
+Function for the AI explainer.
 
 ## GitHub
 
@@ -31,6 +32,46 @@ Use these settings:
 - Node.js version: `22`
 
 Cloudflare should deploy every push to `main` and create preview deployments for pull requests.
+
+### AI Explainer Secret
+
+The Explainer panel calls `/api/explain-step`, a Cloudflare Pages Function. That
+Function reads your DeepSeek key from `context.env.DEEPSEEK_API_KEY`; the key is
+never sent to the browser.
+
+In Cloudflare:
+
+1. Open Workers & Pages.
+2. Select this Pages project.
+3. Go to Settings -> Variables and Secrets -> Add.
+4. Set the variable name to `DEEPSEEK_API_KEY`.
+5. Paste your DeepSeek API key as the value.
+6. Select Encrypt, then Save.
+7. Redeploy the project so the Function can read the new secret.
+
+Optional: add `DEEPSEEK_MODEL` if you want to override the default
+`deepseek-v4-flash`.
+
+For local testing through Cloudflare's runtime:
+
+```bash
+npm run build
+printf 'DEEPSEEK_API_KEY="your_key_here"\n' > .dev.vars
+npx wrangler pages dev dist
+```
+
+Do not commit `.dev.vars`; it is ignored by git.
+
+Before charging subscriptions publicly, add account/session verification in
+`functions/api/explain-step.ts` before the DeepSeek request. A typical
+Cloudflare setup is:
+
+- Auth/session provider: Clerk, Auth.js, Supabase Auth, or Cloudflare Access for
+  private beta.
+- Billing: Stripe Checkout or Lemon Squeezy.
+- Entitlements/rate limits: D1 or KV keyed by user ID.
+- Function gate: verify the user token and subscription status before calling
+  DeepSeek.
 
 ## Required Headers
 
