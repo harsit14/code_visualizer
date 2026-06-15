@@ -386,18 +386,22 @@ function buildCards(
       render = <StringBoxes pointers={arrayPointers.get(name) ?? []} value={value} />;
     } else if (value.k === 'obj') {
       identity = `obj-${value.id}`;
-      render = (
-        <table className="dict-render">
-          <tbody>
-            {Object.entries(value.attrs).map(([attr, attrValue]) => (
-              <tr key={attr}>
-                <td>.{attr}</td>
-                <td>{formatValue(attrValue)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      );
+      const attrs = Object.entries(value.attrs);
+      render =
+        attrs.length > 0 ? (
+          <table className="dict-render">
+            <tbody>
+              {attrs.map(([attr, attrValue]) => (
+                <tr key={attr}>
+                  <td>.{attr}</td>
+                  <td>{formatValue(attrValue)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <p className="object-preview">{value.preview}</p>
+        );
     }
 
     if (!render || !identity) {

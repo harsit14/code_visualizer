@@ -33,6 +33,9 @@ export function formatValue(value: EncodedValue | null | undefined, depth = 0): 
       if (value.t === 'set' || value.t === 'frozenset') {
         return value.len === 0 ? 'set()' : `{${body}}`;
       }
+      if (value.t === 'deque') {
+        return `deque([${body}])`;
+      }
       return `[${body}]`;
     }
     case 'dict': {
@@ -89,7 +92,7 @@ export function typeNameOf(value: EncodedValue): string {
     case 'seq':
       return value.t;
     case 'dict':
-      return 'dict';
+      return value.t ?? 'dict';
     case 'tree':
       return 'TreeNode';
     case 'listnode':

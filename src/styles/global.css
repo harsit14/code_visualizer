@@ -908,7 +908,8 @@ input[type='text'] {
   text-transform: uppercase;
 }
 
-.return-preview {
+.return-preview,
+.object-preview {
   color: var(--text);
   font-family: var(--mono);
   font-size: 13px;

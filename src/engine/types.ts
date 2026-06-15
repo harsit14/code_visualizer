@@ -9,7 +9,7 @@ export type EncodedValue =
   | { k: 'str'; v: string; truncated: boolean }
   | {
       k: 'seq';
-      t: 'list' | 'tuple' | 'set' | 'frozenset';
+      t: string;
       id: number;
       items: EncodedValue[];
       len: number;
@@ -18,6 +18,7 @@ export type EncodedValue =
   | {
       k: 'dict';
       id: number;
+      t?: string;
       entries: [EncodedValue, EncodedValue][];
       len: number;
       truncated: boolean;

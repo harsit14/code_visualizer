@@ -304,3 +304,28 @@ def test_pointer_hints_for_slice_with_binop_bound():
     hints = fn["pointerHints"]
     assert "s" in hints
     assert set(hints["s"]) == {"left", "right"}
+
+
+def test_deque_locals_are_structured_for_data_panel():
+    code = """
+from collections import deque
+
+class Solution:
+    def maxSlidingWindow(self, nums, k):
+        q = deque()
+        for r in range(len(nums)):
+            q.append(r)
+            if r >= k:
+                q.popleft()
+        return list(q)
+"""
+    result = run_session(code, inputs=["[1, 3, 1, 18, 9, 13, 5, 7]", "3"])
+    deque_values = [
+        frame["locals"]["q"]
+        for step in result["run"]["steps"]
+        for frame in step["stack"]
+        if "q" in frame["locals"] and frame["locals"]["q"].get("len", 0) > 0
+    ]
+    assert deque_values
+    assert deque_values[-1]["k"] == "seq"
+    assert deque_values[-1]["t"] == "deque"

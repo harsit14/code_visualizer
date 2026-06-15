@@ -7,10 +7,10 @@ renders structure-aware:
 * ``{"k": "num", "t": "int", "v": "5"}`` — numbers / bools
 * ``{"k": "str", "v": "abc", "truncated": false}``
 * ``{"k": "none"}``
-* ``{"k": "seq", "t": "list"|"tuple"|"set"|"frozenset", "id": 3,
-  "items": [...], "len": 4, "truncated": false}``
-* ``{"k": "dict", "id": 4, "entries": [[keyEnc, valEnc], ...], "len": 2,
-  "truncated": false}``
+* ``{"k": "seq", "t": "list"|"tuple"|"deque"|..., "id": 3,
+  "items": [...], "len": 4, "truncated": false}`` — sized iterables
+* ``{"k": "dict", "t": "dict"|"defaultdict"|..., "id": 4,
+  "entries": [[keyEnc, valEnc], ...], "len": 2, "truncated": false}``
 * ``{"k": "tree", "id": 5, "val": enc, "left": enc|None, "right": enc|None}``
 * ``{"k": "listnode", "id": 6, "nodes": [{"id": 7, "val": enc}, ...],
   "cyclic": false, "truncated": false}`` — the chain starting at a node
@@ -25,6 +25,7 @@ UI can detect aliasing and diff by identity.
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping, Sized
 import types
 from typing import Any
 
@@ -46,6 +47,17 @@ def _safe_repr(value: Any, limit: int = MAX_REPR) -> str:
     if len(text) > limit:
         return text[: limit - 3] + "..."
     return text
+
+
+def _safe_len(value: Any) -> int | None:
+    try:
+        return len(value)
+    except BaseException:
+        return None
+
+
+def _is_sized_iterable(value: Any) -> bool:
+    return isinstance(value, Sized) and isinstance(value, Iterable) and _safe_len(value) is not None
 
 
 def looks_like_tree(value: Any) -> bool:
@@ -110,10 +122,6 @@ class Snapshotter:
         if id(value) in seen:
             return {"k": "ref", "id": self.object_id(value)}
 
-        if isinstance(value, (list, tuple, set, frozenset)):
-            return self._snapshot_sequence(value, depth, seen)
-        if isinstance(value, dict):
-            return self._snapshot_dict(value, depth, seen)
         if isinstance(
             value,
             (types.FunctionType, types.BuiltinFunctionType, types.MethodType, type),
@@ -128,6 +136,11 @@ class Snapshotter:
         if looks_like_listnode(value):
             return self._snapshot_chain(value, depth, seen)
 
+        if isinstance(value, Mapping):
+            return self._snapshot_mapping(value, depth, seen)
+        if _is_sized_iterable(value):
+            return self._snapshot_sequence(value, depth, seen)
+
         return self._snapshot_object(value, depth, seen)
 
     def _snapshot_sequence(
@@ -141,40 +154,48 @@ class Snapshotter:
         seen = seen | {id(value)}
         items = []
         truncated = False
-        for index, item in enumerate(value):
-            if index >= MAX_ITEMS:
-                truncated = True
-                break
-            items.append(self.snapshot(item, depth + 1, seen))
+        try:
+            for index, item in enumerate(value):
+                if index >= MAX_ITEMS:
+                    truncated = True
+                    break
+                items.append(self.snapshot(item, depth + 1, seen))
+        except BaseException:
+            return {"k": "repr", "t": type_name, "v": _safe_repr(value), "id": obj_id}
         return {
             "k": "seq",
             "t": type_name,
             "id": obj_id,
             "items": items,
-            "len": len(value),
+            "len": _safe_len(value) or len(items),
             "truncated": truncated,
         }
 
-    def _snapshot_dict(self, value: dict, depth: int, seen: set[int]) -> JsonValue:
+    def _snapshot_mapping(self, value: Mapping[Any, Any], depth: int, seen: set[int]) -> JsonValue:
         obj_id = self.object_id(value)
+        type_name = type(value).__name__
         if depth >= MAX_DEPTH:
-            return {"k": "repr", "t": "dict", "v": _safe_repr(value), "id": obj_id}
+            return {"k": "repr", "t": type_name, "v": _safe_repr(value), "id": obj_id}
 
         seen = seen | {id(value)}
         entries = []
         truncated = False
-        for index, (key, item) in enumerate(value.items()):
-            if index >= MAX_ITEMS:
-                truncated = True
-                break
-            entries.append(
-                [self.snapshot(key, depth + 1, seen), self.snapshot(item, depth + 1, seen)]
-            )
+        try:
+            for index, (key, item) in enumerate(value.items()):
+                if index >= MAX_ITEMS:
+                    truncated = True
+                    break
+                entries.append(
+                    [self.snapshot(key, depth + 1, seen), self.snapshot(item, depth + 1, seen)]
+                )
+        except BaseException:
+            return {"k": "repr", "t": type_name, "v": _safe_repr(value), "id": obj_id}
         return {
             "k": "dict",
+            "t": type_name,
             "id": obj_id,
             "entries": entries,
-            "len": len(value),
+            "len": _safe_len(value) or len(entries),
             "truncated": truncated,
         }
 

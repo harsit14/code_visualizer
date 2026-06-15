@@ -1,3 +1,6 @@
+from array import array
+from collections import Counter, defaultdict, deque
+
 from codeviz.serialize import MAX_ITEMS, MAX_STR, Snapshotter
 from codeviz.structures import build_linked_list, build_tree
 
@@ -50,8 +53,43 @@ def test_dict_encoding():
     snap = Snapshotter()
     encoded = snap.snapshot({"a": 1})
     assert encoded["k"] == "dict"
+    assert encoded["t"] == "dict"
     assert encoded["entries"][0][0]["v"] == "a"
     assert encoded["entries"][0][1]["v"] == "1"
+
+
+def test_deque_encoding_as_sequence():
+    snap = Snapshotter()
+    encoded = snap.snapshot(deque([5, 6]))
+    assert encoded["k"] == "seq"
+    assert encoded["t"] == "deque"
+    assert encoded["len"] == 2
+    assert [item["v"] for item in encoded["items"]] == ["5", "6"]
+
+
+def test_stdlib_sized_iterables_encode_as_sequences():
+    snap = Snapshotter()
+    encoded_range = snap.snapshot(range(3))
+    encoded_array = snap.snapshot(array("i", [7, 8]))
+    assert encoded_range["k"] == "seq"
+    assert encoded_range["t"] == "range"
+    assert [item["v"] for item in encoded_range["items"]] == ["0", "1", "2"]
+    assert encoded_array["k"] == "seq"
+    assert encoded_array["t"] == "array"
+    assert [item["v"] for item in encoded_array["items"]] == ["7", "8"]
+
+
+def test_mapping_subclasses_encode_as_dicts():
+    snap = Snapshotter()
+    counter = snap.snapshot(Counter(["a", "a", "b"]))
+    defaults = defaultdict(int, {"seen": 3})
+    encoded_defaultdict = snap.snapshot(defaults)
+    assert counter["k"] == "dict"
+    assert counter["t"] == "Counter"
+    assert counter["len"] == 2
+    assert encoded_defaultdict["k"] == "dict"
+    assert encoded_defaultdict["t"] == "defaultdict"
+    assert encoded_defaultdict["entries"][0][0]["v"] == "seen"
 
 
 def test_cyclic_list_uses_ref():
