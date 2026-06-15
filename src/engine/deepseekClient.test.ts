@@ -96,7 +96,7 @@ describe('explainStepWithDeepSeek', () => {
           text: 'x increases from 1 to 2.',
           usage: { completionTokens: 8, promptTokens: 40, totalTokens: 48 },
         }),
-        { status: 200 },
+        { headers: { 'Content-Type': 'application/json' }, status: 200 },
       );
     });
 
@@ -134,6 +134,7 @@ describe('explainStepWithDeepSeek', () => {
     const currentStep = step(1, { x: num(2) });
     const fetchMock = vi.fn(async () => {
       return new Response(JSON.stringify({ error: 'AI explainer is not configured.' }), {
+        headers: { 'Content-Type': 'application/json' },
         status: 503,
         statusText: 'Service Unavailable',
       });
@@ -150,5 +151,29 @@ describe('explainStepWithDeepSeek', () => {
         result: result(currentStep),
       }),
     ).rejects.toThrow('AI explainer request failed (503): AI explainer is not configured.');
+  });
+
+  it('explains when Cloudflare serves the app shell instead of the Function', async () => {
+    const currentStep = step(1, { x: num(2) });
+    const fetchMock = vi.fn(async () => {
+      return new Response('<!doctype html><div id="root"></div>', {
+        headers: { 'Content-Type': 'text/html' },
+        status: 200,
+      });
+    });
+
+    await expect(
+      explainStepWithDeepSeek({
+        code: 'x = 1\nx += 1',
+        currentStep,
+        fetchImpl: fetchMock as unknown as typeof fetch,
+        frameIndex: null,
+        language: 'python',
+        previousStep: step(0, { x: num(1) }),
+        result: result(currentStep),
+      }),
+    ).rejects.toThrow(
+      'AI explainer route is serving the app shell instead of the Cloudflare Function',
+    );
   });
 });

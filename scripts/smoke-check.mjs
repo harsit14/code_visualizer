@@ -6,6 +6,7 @@ const distDir = join(root, 'dist');
 const requiredFiles = [
   'index.html',
   '_headers',
+  '_routes.json',
   'assets/pyodide/pyodide.asm.js',
   'assets/pyodide/pyodide.asm.wasm',
   'assets/pyodide/pyodide-lock.json',
@@ -28,6 +29,8 @@ for (const file of requiredFiles) {
 
 const headersPath = join(distDir, '_headers');
 const headers = existsSync(headersPath) ? readFileSync(headersPath, 'utf8') : '';
+const routesPath = join(distDir, '_routes.json');
+const routes = existsSync(routesPath) ? readFileSync(routesPath, 'utf8') : '';
 const indexPath = join(distDir, 'index.html');
 const indexHtml = existsSync(indexPath) ? readFileSync(indexPath, 'utf8') : '';
 
@@ -39,6 +42,10 @@ for (const header of requiredHeaders) {
 
 if (process.env.GITHUB_PAGES === 'true' && !indexHtml.includes('/code_visualizer/assets/')) {
   failures.push('GitHub Pages build does not use /code_visualizer/ as the Vite asset base');
+}
+
+if (!routes.includes('"/api/*"')) {
+  failures.push('dist/_routes.json does not include /api/* for the Cloudflare explainer Function');
 }
 
 if (existsSync(join(distDir, 'assets/pyodide/node_modules'))) {

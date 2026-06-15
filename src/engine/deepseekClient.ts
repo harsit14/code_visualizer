@@ -29,6 +29,12 @@ type ExplainerErrorPayload = {
   error?: string;
 };
 
+type ParsedResponse = {
+  contentType: string;
+  payload: unknown;
+  text: string;
+};
+
 export type { DeepSeekStepExplanation, StepExplanationContext };
 export { DEFAULT_DEEPSEEK_MODEL, DEEPSEEK_EXPLAINER_ENDPOINT };
 
@@ -103,32 +109,61 @@ export async function explainStepWithDeepSeek({
     signal,
   });
 
-  let payload: unknown = null;
-  try {
-    payload = await response.json();
-  } catch {
-    payload = null;
-  }
+  const parsed = await parseResponse(response);
 
   if (!response.ok) {
-    throw new Error(explainerErrorMessage(response, payload));
+    throw new Error(explainerErrorMessage(response, parsed));
   }
 
-  const explanation = parseDeepSeekExplanationPayload(payload);
+  if (!parsed.contentType.includes('application/json')) {
+    throw new Error(nonJsonResponseMessage(parsed));
+  }
+
+  const explanation = parseDeepSeekExplanationPayload(parsed.payload);
   if (!explanation) {
     throw new Error('The explainer service returned an invalid response.');
   }
   return explanation;
 }
 
-function explainerErrorMessage(response: Response, payload: unknown): string {
-  const detail = isExplainerErrorPayload(payload) ? payload.error : response.statusText;
+async function parseResponse(response: Response): Promise<ParsedResponse> {
+  const contentType = response.headers.get('Content-Type')?.toLowerCase() ?? '';
+  const text = await response.text();
+  if (!contentType.includes('application/json')) {
+    return { contentType, payload: null, text };
+  }
+  try {
+    return { contentType, payload: JSON.parse(text) as unknown, text };
+  } catch {
+    return { contentType, payload: null, text };
+  }
+}
+
+function explainerErrorMessage(response: Response, parsed: ParsedResponse): string {
+  const detail = isExplainerErrorPayload(parsed.payload)
+    ? parsed.payload.error
+    : response.statusText;
   if (response.status === 404) {
     return 'AI explainer service is not available on this host. Deploy with Cloudflare Pages Functions or run locally with wrangler pages dev.';
+  }
+  if (!parsed.contentType.includes('application/json')) {
+    return nonJsonResponseMessage(parsed);
   }
   return detail
     ? `AI explainer request failed (${response.status}): ${detail}`
     : `AI explainer request failed (${response.status}).`;
+}
+
+function nonJsonResponseMessage(parsed: ParsedResponse): string {
+  if (looksLikeAppShell(parsed.text)) {
+    return 'AI explainer route is serving the app shell instead of the Cloudflare Function. Check that the latest GitHub commit deployed, the project root is the repo root, and /api/* is included in _routes.json.';
+  }
+  return 'AI explainer route returned a non-JSON response. Check the Cloudflare Pages Function logs for /api/explain-step.';
+}
+
+function looksLikeAppShell(text: string): boolean {
+  const normalized = text.trim().toLowerCase();
+  return normalized.startsWith('<!doctype html') || normalized.includes('<div id="root">');
 }
 
 function isExplainerErrorPayload(value: unknown): value is ExplainerErrorPayload {

@@ -62,6 +62,18 @@ npx wrangler pages dev dist
 
 Do not commit `.dev.vars`; it is ignored by git.
 
+To verify the Function route after deployment, open:
+
+```text
+https://your-site.pages.dev/api/explain-step
+```
+
+If the route is active, it returns JSON such as `{"error":"Method not allowed."}`.
+If it loads the Code Visualizer app instead, Cloudflare is serving the static
+SPA fallback and the Function is not active for `/api/*`. Check that the latest
+commit deployed, the Cloudflare Pages root directory is the repository root, and
+`dist/_routes.json` includes `/api/*`.
+
 Before charging subscriptions publicly, add account/session verification in
 `functions/api/explain-step.ts` before the DeepSeek request. A typical
 Cloudflare setup is:
