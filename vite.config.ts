@@ -4,6 +4,8 @@ import { viteStaticCopy } from 'vite-plugin-static-copy';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { cloudflare } from "@cloudflare/vite-plugin";
+
 const PYODIDE_ASSETS = [
   'pyodide.asm.js',
   'pyodide.asm.wasm',
@@ -44,7 +46,7 @@ export default defineConfig({
     // instanceof checks ("Unrecognized extension value in extension set").
     include: ['@codemirror/state', '@codemirror/view'],
   },
-  plugins: [react(), copyPyodideAssets()],
+  plugins: [react(), copyPyodideAssets(), cloudflare()],
   server: {
     headers: crossOriginIsolationHeaders,
     port: 5173,
