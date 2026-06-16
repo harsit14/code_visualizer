@@ -1632,11 +1632,22 @@ input[type='password'] {
   text-transform: uppercase;
 }
 
+.dict-render th:first-child {
+  text-align: center;
+}
+
+.dict-render th:last-child {
+  text-align: center;
+}
+
 .dict-render td {
   border-bottom: 1px solid var(--border);
   font-family: var(--mono);
   font-size: 12.5px;
-  padding: 4px 12px 4px 0;
+  min-width: 52px;
+  padding: 4px 10px;
+  text-align: center;
+  vertical-align: middle;
 }
 
 .dict-render td:first-child {

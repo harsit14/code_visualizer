@@ -276,7 +276,7 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
           data = await runJavaScriptInWorker(code, languageRef.current, RUN_TIMEOUT_MS);
           setStatus({
             phase: 'ready',
-            message: `${languageRef.current === 'typescript' ? 'TypeScript' : 'JavaScript'} ready`,
+            message: 'ready',
             interruptSupported: false,
           });
         }
