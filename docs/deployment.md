@@ -90,9 +90,16 @@ Set these Worker variables and secrets:
 | `ANON_DAILY_EXPLAIN_LIMIT` | Variable | Optional, default `3`.                          |
 | `FREE_DAILY_EXPLAIN_LIMIT` | Variable | Optional, default `5`.                          |
 | `ADMIN_EMAILS`             | Variable | Optional comma/space-separated admin allowlist. |
+| `PASSWORD_PEPPER`          | Secret   | Signs password hashes; set before public launch. |
 
 The landing page lives at `/`. The dashboard lives at `/app`. Shared trace links
 with `#cv=` and iframe embeds still open the dashboard directly.
+
+Password hashes use a Worker-friendly HMAC format signed with `PASSWORD_PEPPER`
+or, if unset, `ANON_USAGE_SALT`. Set `PASSWORD_PEPPER` as an encrypted secret in
+Cloudflare before inviting users. Older PBKDF2 hashes are recognized, but hashes
+above `PBKDF2_VERIFY_ITERATIONS_LIMIT` are refused before they can exhaust free
+Worker CPU.
 
 ### Parked Subscription Code
 

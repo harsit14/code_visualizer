@@ -4,15 +4,23 @@ import type { AuthUser, D1Database, ServerEnv, UserSubscription } from './types'
 export const SESSION_COOKIE = 'cv_session';
 
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
-// Keep the signup path inside Cloudflare Worker CPU limits. Stored hashes
-// include their iteration count, so this can be raised later without breaking
-// existing passwords.
-const PASSWORD_ITERATIONS = 60_000;
-const MIN_PASSWORD_ITERATIONS = 60_000;
+const PASSWORD_HASH_ALGORITHM = 'hmac_sha256_v1';
+const LEGACY_PBKDF2_ALGORITHM = 'pbkdf2_sha256';
+const DEFAULT_LEGACY_PBKDF2_VERIFY_LIMIT = 20_000;
+const MIN_LEGACY_PBKDF2_ITERATIONS = 1_000;
 const PASSWORD_SALT_BYTES = 16;
 const SESSION_BYTES = 32;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const textEncoder = new TextEncoder();
+
+export class PasswordHashUpgradeRequiredError extends Error {
+  constructor() {
+    super(
+      'This account uses an older password hash that is too expensive for this Worker. Recreate the account or update the stored password hash after the latest deployment.',
+    );
+    this.name = 'PasswordHashUpgradeRequiredError';
+  }
+}
 
 type UserRow = {
   created_at: string;
@@ -169,43 +177,48 @@ export async function getSubscriptionForUser(
   return row ? rowToSubscription(row) : null;
 }
 
-export async function hashPassword(password: string): Promise<string> {
+export async function hashPassword(env: ServerEnv, password: string): Promise<string> {
   const salt = crypto.getRandomValues(new Uint8Array(PASSWORD_SALT_BYTES));
-  const key = await crypto.subtle.importKey('raw', textEncoder.encode(password), 'PBKDF2', false, [
-    'deriveBits',
-  ]);
-  const bits = await crypto.subtle.deriveBits(
-    {
-      hash: 'SHA-256',
-      iterations: PASSWORD_ITERATIONS,
-      name: 'PBKDF2',
-      salt: toArrayBuffer(salt),
-    },
-    key,
-    256,
-  );
+  const signature = await passwordSignature(env, password, salt);
 
   return [
-    'pbkdf2_sha256',
-    String(PASSWORD_ITERATIONS),
+    PASSWORD_HASH_ALGORITHM,
     bytesToBase64(salt),
-    bytesToBase64(new Uint8Array(bits)),
+    bytesToBase64(signature),
   ].join('$');
 }
 
-export async function verifyPassword(password: string, stored: string): Promise<boolean> {
-  const [algorithm, iterationsRaw, saltRaw, hashRaw] = stored.split('$');
-  if (algorithm !== 'pbkdf2_sha256' || !iterationsRaw || !saltRaw || !hashRaw) {
+export async function verifyPassword(
+  env: ServerEnv,
+  password: string,
+  stored: string,
+): Promise<boolean> {
+  const [algorithm, firstRaw, secondRaw, thirdRaw] = stored.split('$');
+
+  if (algorithm === PASSWORD_HASH_ALGORITHM) {
+    if (!firstRaw || !secondRaw || thirdRaw) {
+      return false;
+    }
+    const salt = base64ToBytes(firstRaw);
+    const expected = base64ToBytes(secondRaw);
+    const actual = await passwordSignature(env, password, salt);
+    return timingSafeEqual(actual, expected);
+  }
+
+  if (algorithm !== LEGACY_PBKDF2_ALGORITHM || !firstRaw || !secondRaw || !thirdRaw) {
     return false;
   }
 
-  const iterations = Number(iterationsRaw);
-  if (!Number.isSafeInteger(iterations) || iterations < MIN_PASSWORD_ITERATIONS) {
+  const iterations = Number(firstRaw);
+  if (!Number.isSafeInteger(iterations) || iterations < MIN_LEGACY_PBKDF2_ITERATIONS) {
     return false;
   }
+  if (iterations > legacyPbkdf2VerifyLimit(env)) {
+    throw new PasswordHashUpgradeRequiredError();
+  }
 
-  const salt = base64ToBytes(saltRaw);
-  const expected = base64ToBytes(hashRaw);
+  const salt = base64ToBytes(secondRaw);
+  const expected = base64ToBytes(thirdRaw);
   const key = await crypto.subtle.importKey('raw', textEncoder.encode(password), 'PBKDF2', false, [
     'deriveBits',
   ]);
@@ -327,6 +340,40 @@ function rowToSubscription(row: SubscriptionRow): UserSubscription {
 function randomToken(bytes: number): string {
   const value = crypto.getRandomValues(new Uint8Array(bytes));
   return bytesToBase64Url(value);
+}
+
+async function passwordSignature(
+  env: ServerEnv,
+  password: string,
+  salt: Uint8Array,
+): Promise<Uint8Array> {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    textEncoder.encode(passwordPepper(env)),
+    {
+      hash: 'SHA-256',
+      name: 'HMAC',
+    },
+    false,
+    ['sign'],
+  );
+  const signature = await crypto.subtle.sign(
+    'HMAC',
+    key,
+    textEncoder.encode(`${bytesToBase64(salt)}:${password}`),
+  );
+  return new Uint8Array(signature);
+}
+
+function passwordPepper(env: ServerEnv): string {
+  return env.PASSWORD_PEPPER?.trim() || env.ANON_USAGE_SALT?.trim() || 'code-visualizer-passwords';
+}
+
+function legacyPbkdf2VerifyLimit(env: ServerEnv): number {
+  const parsed = Number(env.PBKDF2_VERIFY_ITERATIONS_LIMIT);
+  return Number.isSafeInteger(parsed) && parsed > 0
+    ? parsed
+    : DEFAULT_LEGACY_PBKDF2_VERIFY_LIMIT;
 }
 
 function bytesToHex(bytes: Uint8Array): string {

@@ -35,6 +35,8 @@ export type ServerEnv = {
   PRO_DAILY_EXPLAIN_LIMIT?: string;
   ADMIN_EMAILS?: string;
   ANON_USAGE_SALT?: string;
+  PASSWORD_PEPPER?: string;
+  PBKDF2_VERIFY_ITERATIONS_LIMIT?: string;
 };
 
 export type AuthUser = {

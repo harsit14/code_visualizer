@@ -7,6 +7,7 @@ import {
   getSessionContext,
   hashPassword,
   isUniqueConstraintError,
+  PasswordHashUpgradeRequiredError,
   readAuthPayload,
   serializeAccount,
   verifyPassword,
@@ -92,7 +93,7 @@ async function signUp(env: ServerEnv, request: Request): Promise<Response> {
 
   const userId = createUserId();
   const createdAt = nowIso();
-  const passwordHash = await hashPassword(payload.password);
+  const passwordHash = await hashPassword(env, payload.password);
 
   try {
     await env.DB.prepare(
@@ -149,7 +150,21 @@ async function signIn(env: ServerEnv, request: Request): Promise<Response> {
   }
 
   const user = await findUserByEmail(env.DB, payload.email);
-  if (!user || !(await verifyPassword(payload.password, user.passwordHash))) {
+  if (!user) {
+    return jsonResponse({ error: 'Invalid email or password.' }, 401);
+  }
+
+  let passwordMatches = false;
+  try {
+    passwordMatches = await verifyPassword(env, payload.password, user.passwordHash);
+  } catch (error) {
+    if (error instanceof PasswordHashUpgradeRequiredError) {
+      return jsonResponse({ error: error.message }, 409);
+    }
+    throw error;
+  }
+
+  if (!passwordMatches) {
     return jsonResponse({ error: 'Invalid email or password.' }, 401);
   }
 
