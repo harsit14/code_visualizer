@@ -136,12 +136,6 @@ export function ExplainerPanel({
         {explanation ? (
           <article className="explainer-answer">
             <p>{explanation.text}</p>
-            <footer>
-              <span>Plain-English guide</span>
-              {explanation.usage?.totalTokens ? (
-                <span>{explanation.usage.totalTokens} tokens</span>
-              ) : null}
-            </footer>
           </article>
         ) : null}
       </div>

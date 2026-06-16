@@ -2036,14 +2036,6 @@ input[type='password'] {
   white-space: pre-wrap;
 }
 
-.explainer-answer footer {
-  color: var(--text-faint);
-  display: flex;
-  flex-wrap: wrap;
-  font-size: 11px;
-  gap: 8px;
-}
-
 .complexity-block {
   border-top: 1px solid var(--border);
   display: flex;

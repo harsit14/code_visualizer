@@ -16,6 +16,7 @@ const context = {
   removed: [],
   returnValue: null,
   stdout: '',
+  variableChanges: ['total: created as 1'],
 };
 
 afterEach(() => {
@@ -69,7 +70,11 @@ describe('/api/explain-step', () => {
     };
     expect(body.model).toBe('deepseek-v4-flash');
     expect(body.thinking).toEqual({ type: 'disabled' });
-    expect(body.messages[1].content).toContain('Current locals: {"total":"1"}');
+    expect(body.messages[1].content).toContain('Current locals after this step: {"total":"1"}');
+    expect(body.messages[1].content).toContain(
+      'Variable changes (before -> after): total: created as 1',
+    );
+    expect(body.messages[1].content).toContain('=>   1 | total = 1');
   });
 
   it('does not call DeepSeek when the secret is missing', async () => {

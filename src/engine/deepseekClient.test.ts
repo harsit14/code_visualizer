@@ -63,6 +63,7 @@ describe('buildStepExplanationContext', () => {
     expect(context?.changed).toEqual(['total']);
     expect(context?.added).toEqual(['i']);
     expect(context?.locals).toEqual({ i: '2', total: '3' });
+    expect(context?.variableChanges).toEqual(['i: created as 2', 'total: 1 -> 3']);
   });
 });
 
@@ -80,9 +81,12 @@ describe('buildDeepSeekMessages', () => {
     expect(context).not.toBeNull();
     const messages = buildDeepSeekMessages(context!);
 
-    expect(messages[0].content).toContain('Use the provided trace only');
+    expect(messages[0].content).toContain('using only the trace');
+    expect(messages[0].content).toContain('Tie the active line to its role');
     expect(messages[1].content).toContain('Changed variables: x');
-    expect(messages[1].content).toContain('Line text: x += 1');
+    expect(messages[1].content).toContain('Active line: 2: x += 1');
+    expect(messages[1].content).toContain('Variable changes (before -> after): x: 1 -> 2');
+    expect(messages[1].content).toContain('=>   2 | x += 1');
   });
 });
 

@@ -54,6 +54,8 @@ export function buildStepExplanationContext({
   const locals = frame ? expandSelf(frame.locals) : {};
   const previousLocals = previousFrame ? expandSelf(previousFrame.locals) : undefined;
   const diff = diffLocals(previousLocals, locals);
+  const formattedLocals = formatLocals(locals);
+  const formattedPreviousLocals = previousLocals ? formatLocals(previousLocals) : {};
 
   const currentLineText =
     currentStep.line > 0 ? (code.split(/\r?\n/)[currentStep.line - 1] ?? '') : '';
@@ -67,10 +69,11 @@ export function buildStepExplanationContext({
     currentLineText: currentLineText.trim(),
     event: currentStep.event,
     frameName: frame?.func ?? currentStep.func,
-    locals: formatLocals(locals),
+    locals: formattedLocals,
     added: [...diff.added].sort(),
     changed: [...diff.changed].sort(),
     removed: [...diff.removed].sort(),
+    variableChanges: describeLocalChanges(diff, formattedPreviousLocals, formattedLocals),
     stdout: clipText(stdout, MAX_STDOUT_CHARS),
     returnValue: currentStep.ret ? formatValue(currentStep.ret) : null,
     exception: exception ? `${exception.type}: ${exception.msg}` : null,
@@ -181,6 +184,27 @@ function formatLocals(locals: Record<string, EncodedValue>): Record<string, stri
       .slice(0, MAX_LOCALS)
       .map(([name, value]) => [name, formatValue(value)]),
   );
+}
+
+function describeLocalChanges(
+  diff: ReturnType<typeof diffLocals>,
+  previousLocals: Record<string, string>,
+  currentLocals: Record<string, string>,
+): string[] {
+  return [...new Set([...diff.added, ...diff.changed, ...diff.removed])]
+    .sort()
+    .slice(0, MAX_LOCALS)
+    .map((name) => {
+      if (diff.added.has(name)) {
+        return `${name}: created as ${currentLocals[name] ?? '(unknown)'}`;
+      }
+      if (diff.removed.has(name)) {
+        return `${name}: removed (was ${previousLocals[name] ?? '(unknown)'})`;
+      }
+      return `${name}: ${previousLocals[name] ?? '(unknown)'} -> ${
+        currentLocals[name] ?? '(unknown)'
+      }`;
+    });
 }
 
 function clipText(text: string, maxChars: number): string {

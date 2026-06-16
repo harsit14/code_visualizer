@@ -63,6 +63,7 @@ describe('ExplainerPanel', () => {
     explainStepMock.mockResolvedValueOnce({
       model: 'deepseek-v4-flash',
       text: 'total is now 3 because the current value was added.',
+      usage: { totalTokens: 470 },
     });
 
     const { container } = render(
@@ -90,6 +91,8 @@ describe('ExplainerPanel', () => {
         'total is now 3 because the current value was added.',
       ),
     );
+    expect(container.textContent).not.toContain('Plain-English guide');
+    expect(container.textContent).not.toContain('470 tokens');
   });
 
   it('waits for a trace before allowing explanations', () => {
