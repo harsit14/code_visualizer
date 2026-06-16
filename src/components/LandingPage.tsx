@@ -113,19 +113,6 @@ const audiences = [
 
 const snippetPresets = [
   {
-    code: `def two_sum(nums, target):
-    seen = {}
-    for i, value in enumerate(nums):
-        need = target - value
-        if need in seen:
-            return [seen[need], i]
-        seen[value] = i`,
-    id: 'two-sum',
-    label: 'Two Sum',
-    result: '12 trace steps: value 2 lands in seen, then 7 finds its complement and returns [0, 1].',
-    stat: 'array + dict',
-  },
-  {
     code: `def reverse_list(head):
     prev = None
     curr = head
@@ -139,6 +126,18 @@ const snippetPresets = [
     label: 'Reverse Linked List',
     result: '18 trace steps: prev, curr, and nxt move across the chain as each next link flips.',
     stat: 'linked list',
+  },
+  {
+    code: `def inorder(root):
+    if root is None:
+        return []
+    left = inorder(root.left)
+    right = inorder(root.right)
+    return left + [root.val] + right`,
+    id: 'tree-traversal',
+    label: 'Tree Traversal',
+    result: '22 trace steps: recursive frames open and close while the active node moves through the tree.',
+    stat: 'tree + stack',
   },
   {
     code: `def binary_search(nums, target):
@@ -217,7 +216,7 @@ export function LandingPage() {
         </button>
         <nav aria-label="Landing navigation">
           <a href="#how">How it works</a>
-          <a href="#proof">Proof</a>
+          <a href="#features">Features</a>
           <a href="#try">Try it</a>
           <a href={GITHUB_URL} rel="noreferrer" target="_blank">
             <Github size={14} />
@@ -292,10 +291,10 @@ export function LandingPage() {
           </div>
         </section>
 
-        <section className="landing-section landing-showcase reveal" id="proof">
+        <section className="landing-section landing-showcase reveal" id="features">
           <div className="landing-section-heading">
-            <p className="tour-kicker">Product proof</p>
-            <h2>The page behaves like the product because the product is about motion.</h2>
+            <p className="tour-kicker">Features</p>
+            <h2>Everything your program hides becomes visible.</h2>
           </div>
 
           <div className="landing-proof-grid">
@@ -391,23 +390,25 @@ export function LandingPage() {
         </section>
 
         <section className="landing-section landing-audience-section reveal">
-          <div className="landing-audience-heading">
-            <p className="tour-kicker">Who it is for</p>
-            <h2>Built for the moments when code is correct but still hard to see.</h2>
-          </div>
-          <div className="landing-audience-strip">
-            {audiences.map((audience) => {
-              const Icon = audience.icon;
-              return (
-                <article className="landing-audience-card" key={audience.title}>
-                  <span className="tour-feature-icon" aria-hidden="true">
-                    <Icon size={18} />
-                  </span>
-                  <h3>{audience.title}</h3>
-                  <p>{audience.body}</p>
-                </article>
-              );
-            })}
+          <div className="landing-audience-inner">
+            <div className="landing-audience-heading">
+              <p className="tour-kicker">Who it is for</p>
+              <h2>Built for the moments when code is correct but still hard to see.</h2>
+            </div>
+            <div className="landing-audience-strip">
+              {audiences.map((audience) => {
+                const Icon = audience.icon;
+                return (
+                  <article className="landing-audience-card" key={audience.title}>
+                    <span className="tour-feature-icon" aria-hidden="true">
+                      <Icon size={18} />
+                    </span>
+                    <h3>{audience.title}</h3>
+                    <p>{audience.body}</p>
+                  </article>
+                );
+              })}
+            </div>
           </div>
         </section>
 
@@ -430,7 +431,7 @@ export function LandingPage() {
         </button>
         <div className="landing-footer-links">
           <a href="#how">How it works</a>
-          <a href="#proof">Proof</a>
+          <a href="#features">Features</a>
           <a href="#try">Try it</a>
           <a href={GITHUB_URL} rel="noreferrer" target="_blank">
             <Github size={14} />

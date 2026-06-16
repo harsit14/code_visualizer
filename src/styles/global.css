@@ -3741,11 +3741,17 @@ input[type='password'] {
 
 .landing-audience-section {
   background: color-mix(in srgb, var(--bg-inset) 54%, transparent);
-  margin-left: calc((1180px - 100vw) / 2);
-  margin-right: calc((1180px - 100vw) / 2);
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
   max-width: none;
-  padding-left: max(24px, calc((100vw - 1180px) / 2));
-  padding-right: max(24px, calc((100vw - 1180px) / 2));
+  padding-left: 24px;
+  padding-right: 24px;
+  width: 100vw;
+}
+
+.landing-audience-inner {
+  margin: 0 auto;
+  max-width: 1180px;
 }
 
 .landing-audience-heading {
@@ -4048,8 +4054,6 @@ input[type='password'] {
   }
 
   .landing-audience-section {
-    margin-left: -18px;
-    margin-right: -18px;
     padding-left: 18px;
     padding-right: 18px;
   }
@@ -4073,12 +4077,25 @@ input[type='password'] {
   }
 
   .landing-nav nav {
+    flex-wrap: nowrap;
     justify-content: flex-start;
+    margin-left: -14px;
+    margin-right: -14px;
+    overflow-x: auto;
+    padding: 2px 14px 8px;
+    scrollbar-width: none;
     width: 100%;
   }
 
-  .landing-nav nav a {
+  .landing-nav nav::-webkit-scrollbar {
     display: none;
+  }
+
+  .landing-nav nav a,
+  .landing-nav .landing-nav-cta,
+  .landing-nav .landing-icon-button,
+  .landing-nav .account-menu {
+    flex: 0 0 auto;
   }
 
   .landing-hero {
@@ -4193,8 +4210,6 @@ input[type='password'] {
   }
 
   .landing-audience-section {
-    margin-left: -14px;
-    margin-right: -14px;
     padding-left: 14px;
     padding-right: 14px;
   }
