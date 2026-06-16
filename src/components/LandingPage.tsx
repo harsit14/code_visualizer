@@ -1,26 +1,36 @@
 import { useEffect, useState } from 'react';
 import {
   ArrowRight,
+  Boxes,
   Clipboard,
   Code2,
   Database,
   Eye,
+  Gauge,
   Github,
   GraduationCap,
+  Layers,
+  LayoutGrid,
+  Link2,
+  Menu,
   Moon,
+  Network,
   Play,
   Presentation,
   Share2,
   Sparkles,
   Sun,
+  Terminal,
   Users,
+  Variable,
+  X,
 } from 'lucide-react';
+import { encodeShareState } from '../app/shareState';
 import { AccountMenu } from './AccountMenu';
 import { LandingInteractiveDemo } from './LandingInteractiveDemo';
 import { LandingStructurePreview } from './LandingStructurePreview';
 
 type Theme = 'light' | 'dark';
-type StructureVisualKind = 'array' | 'list' | 'tree';
 
 const GITHUB_URL = 'https://github.com/harsit14/code_visualizer';
 
@@ -67,29 +77,54 @@ const traceHighlights = [
   },
 ];
 
-const structureVisuals: {
-  body: string;
-  kind: StructureVisualKind;
-  title: string;
-  previewKey: string;
-}[] = [
+const structureVisuals = [
+  {
+    body: 'Track locals, their types, and the exact values that changed on the current line.',
+    icon: Variable,
+    previewKey: 'Variables',
+    title: 'Variables',
+  },
   {
     body: 'Index markers and pointer variables move with the array cells they reference.',
-    kind: 'array',
+    icon: LayoutGrid,
     previewKey: 'Arrays',
     title: 'Arrays',
   },
   {
     body: 'Node references make rewires, aliases, and next pointers visible.',
-    kind: 'list',
+    icon: Link2,
     previewKey: 'Linked lists',
     title: 'Linked lists',
   },
   {
     body: 'Traversal paths and active nodes reveal the shape of recursive decisions.',
-    kind: 'tree',
+    icon: Network,
     previewKey: 'Trees',
     title: 'Trees',
+  },
+  {
+    body: 'Follow object aliases and mutations across a connected stack-and-heap map.',
+    icon: Boxes,
+    previewKey: 'Heap references',
+    title: 'Heap references',
+  },
+  {
+    body: 'Watch recursive frames open and close with their own local context.',
+    icon: Layers,
+    previewKey: 'Call stack',
+    title: 'Call stack',
+  },
+  {
+    body: 'See stdout printed in step with the exact lines that produced it.',
+    icon: Terminal,
+    previewKey: 'Console output',
+    title: 'Console output',
+  },
+  {
+    body: 'Estimate Big-O growth from repeated runs at increasing input sizes.',
+    icon: Gauge,
+    previewKey: 'Complexity hints',
+    title: 'Complexity hints',
   },
 ];
 
@@ -166,15 +201,21 @@ function initialTheme(): Theme {
 }
 
 export function LandingPage() {
-  const [activePreview, setActivePreview] = useState('Arrays');
+  const [activePreview, setActivePreview] = useState('Variables');
   const [activeSnippetId, setActiveSnippetId] = useState(snippetPresets[0].id);
-  const [runCount, setRunCount] = useState(0);
   const [theme, setTheme] = useState<Theme>(initialTheme);
+  const [menuOpen, setMenuOpen] = useState(false);
   const activeSnippet =
     snippetPresets.find((snippet) => snippet.id === activeSnippetId) ?? snippetPresets[0];
 
   const openApp = () => {
     window.history.pushState(null, '', '/app');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  };
+
+  const openSnippetInApp = (code: string) => {
+    const hash = encodeShareState({ code, language: 'python' });
+    window.history.pushState(null, '', `/app${hash}`);
     window.dispatchEvent(new PopStateEvent('popstate'));
   };
 
@@ -221,15 +262,42 @@ export function LandingPage() {
           <span className="brand-mark">⟢</span>
           <strong>Code Visualizer</strong>
         </button>
-        <nav aria-label="Landing navigation">
-          <a href="#how">How it works</a>
-          <a href="#features">Features</a>
-          <a href="#try">Try it</a>
+        <button
+          aria-controls="landing-nav-menu"
+          aria-expanded={menuOpen}
+          aria-label={menuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+          className="landing-nav-toggle"
+          onClick={() => setMenuOpen((open) => !open)}
+          type="button"
+        >
+          {menuOpen ? <X size={18} /> : <Menu size={18} />}
+        </button>
+        <nav
+          aria-label="Landing navigation"
+          className={menuOpen ? 'is-open' : ''}
+          id="landing-nav-menu"
+        >
+          <a href="#how" onClick={() => setMenuOpen(false)}>
+            How it works
+          </a>
+          <a href="#features" onClick={() => setMenuOpen(false)}>
+            Features
+          </a>
+          <a href="#try" onClick={() => setMenuOpen(false)}>
+            Try it
+          </a>
           <a href={GITHUB_URL} rel="noreferrer" target="_blank">
             <Github size={14} />
             GitHub
           </a>
-          <button className="landing-nav-cta" onClick={openApp} type="button">
+          <button
+            className="landing-nav-cta"
+            onClick={() => {
+              setMenuOpen(false);
+              openApp();
+            }}
+            type="button"
+          >
             Open dashboard
           </button>
           <button
@@ -321,24 +389,29 @@ export function LandingPage() {
 
           <div className="landing-state-grid">
             <div className="landing-structure-list" aria-label="Data structure previews">
-              {structureVisuals.map((item) => (
-                <button
-                  aria-pressed={activePreview === item.previewKey}
-                  className={`landing-structure-card ${
-                    activePreview === item.previewKey ? 'active-structure' : ''
-                  }`}
-                  key={item.title}
-                  onClick={() => setActivePreview(item.previewKey)}
-                  onMouseEnter={() => setActivePreview(item.previewKey)}
-                  type="button"
-                >
-                  <StructureMiniVisual kind={item.kind} />
-                  <span>
-                    <strong>{item.title}</strong>
-                    <small>{item.body}</small>
-                  </span>
-                </button>
-              ))}
+              {structureVisuals.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <button
+                    aria-pressed={activePreview === item.previewKey}
+                    className={`landing-structure-card ${
+                      activePreview === item.previewKey ? 'active-structure' : ''
+                    }`}
+                    key={item.title}
+                    onClick={() => setActivePreview(item.previewKey)}
+                    onMouseEnter={() => setActivePreview(item.previewKey)}
+                    type="button"
+                  >
+                    <span className="tour-feature-icon" aria-hidden="true">
+                      <Icon size={18} />
+                    </span>
+                    <span>
+                      <strong>{item.title}</strong>
+                      <small>{item.body}</small>
+                    </span>
+                  </button>
+                );
+              })}
             </div>
             <div className="landing-state-preview-panel">
               <LandingStructurePreview activeItem={activePreview} />
@@ -348,8 +421,8 @@ export function LandingPage() {
 
         <section className="landing-section landing-try-section reveal" id="try">
           <div className="landing-section-heading">
-            <p className="tour-kicker">Try it without leaving</p>
-            <h2>Pick a familiar snippet and preview the kind of trace it produces.</h2>
+            <p className="tour-kicker">Try a real snippet</p>
+            <h2>Pick a familiar algorithm and open it straight in the visualizer.</h2>
           </div>
           <div className="landing-snippet-lab">
             <div className="landing-snippet-tabs" role="tablist" aria-label="Preset snippets">
@@ -358,10 +431,7 @@ export function LandingPage() {
                   aria-selected={activeSnippet.id === snippet.id}
                   className={activeSnippet.id === snippet.id ? 'active-snippet' : ''}
                   key={snippet.id}
-                  onClick={() => {
-                    setActiveSnippetId(snippet.id);
-                    setRunCount((count) => count + 1);
-                  }}
+                  onClick={() => setActiveSnippetId(snippet.id)}
                   role="tab"
                   type="button"
                 >
@@ -373,22 +443,19 @@ export function LandingPage() {
             <pre className="landing-snippet-code">
               <code>{activeSnippet.code}</code>
             </pre>
-            <div className="landing-run-panel" key={`${activeSnippet.id}-${runCount}`}>
+            <div className="landing-run-panel" key={activeSnippet.id}>
               <div>
-                <span className="landing-run-label">Preview output</span>
+                <span className="landing-run-label">What you'll see</span>
                 <p>{activeSnippet.result}</p>
               </div>
               <div className="landing-run-actions">
                 <button
-                  className="landing-secondary"
-                  onClick={() => setRunCount((count) => count + 1)}
+                  className="landing-primary"
+                  onClick={() => openSnippetInApp(activeSnippet.code)}
                   type="button"
                 >
                   <Play size={15} />
-                  Run preview
-                </button>
-                <button className="landing-primary" onClick={openApp} type="button">
-                  Open full visualizer
+                  Open this snippet
                   <ArrowRight size={16} />
                 </button>
               </div>
@@ -451,43 +518,5 @@ export function LandingPage() {
         </div>
       </footer>
     </div>
-  );
-}
-
-function StructureMiniVisual({ kind }: { kind: StructureVisualKind }) {
-  if (kind === 'array') {
-    return (
-      <span className="mini-visual mini-array" aria-hidden="true">
-        {[2, 7, 11, 15].map((value, index) => (
-          <i className={index === 1 ? 'active-mini-cell' : ''} key={value}>
-            {value}
-          </i>
-        ))}
-      </span>
-    );
-  }
-
-  if (kind === 'list') {
-    return (
-      <span className="mini-visual mini-list" aria-hidden="true">
-        <i>10</i>
-        <b />
-        <i className="active-mini-cell">20</i>
-        <b />
-        <i>30</i>
-      </span>
-    );
-  }
-
-  return (
-    <span className="mini-visual mini-tree" aria-hidden="true">
-      <svg viewBox="0 0 120 68">
-        <line x1="60" y1="14" x2="32" y2="40" />
-        <line x1="60" y1="14" x2="88" y2="40" />
-        <circle cx="60" cy="14" r="10" />
-        <circle className="active-tree-node" cx="32" cy="40" r="10" />
-        <circle cx="88" cy="40" r="10" />
-      </svg>
-    </span>
   );
 }

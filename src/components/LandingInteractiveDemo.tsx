@@ -191,7 +191,7 @@ export function LandingInteractiveDemo() {
     if (!isPlaying || prefersReducedMotion) return;
     const interval = window.setInterval(() => {
       setStepIndex((current) => (current + 1) % TRACE_STEPS.length);
-    }, 650);
+    }, 1200);
     return () => window.clearInterval(interval);
   }, [isPlaying, prefersReducedMotion]);
 

@@ -2235,6 +2235,11 @@ input[type='password'] {
   border-color: var(--border-strong);
 }
 
+/* Hamburger toggle is mobile-only; never shown on desktop. */
+.landing-nav-toggle {
+  display: none;
+}
+
 .landing-hero,
 .landing-section {
   margin: 0 auto;
@@ -3334,16 +3339,6 @@ input[type='password'] {
     padding: 12px;
   }
 
-  .landing-nav {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .landing-nav nav {
-    justify-content: flex-start;
-    width: 100%;
-  }
-
   .landing-feature-grid {
     grid-template-columns: 1fr;
   }
@@ -3669,10 +3664,9 @@ input[type='password'] {
   color: var(--text);
   cursor: pointer;
   display: grid;
-  gap: 14px;
-  grid-template-columns: 118px minmax(0, 1fr);
-  min-height: 104px;
-  padding: 12px;
+  gap: 13px;
+  grid-template-columns: 38px minmax(0, 1fr);
+  padding: 11px 13px;
   text-align: left;
   transition: border-color 0.2s, transform 0.2s, background-color 0.2s;
   width: 100%;
@@ -3703,80 +3697,16 @@ input[type='password'] {
   line-height: 1.35;
 }
 
-.mini-visual {
-  align-items: center;
-  background: var(--bg-inset);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  display: flex;
-  height: 76px;
-  justify-content: center;
-  overflow: hidden;
-}
-
-.mini-array {
-  gap: 4px;
-}
-
-.mini-array i,
-.mini-list i {
-  align-items: center;
-  background: var(--bg-raised);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text);
-  display: inline-flex;
-  font-family: var(--mono);
-  font-size: 11px;
-  font-style: normal;
-  height: 28px;
-  justify-content: center;
-  min-width: 28px;
-}
-
-.mini-array .active-mini-cell,
-.mini-list .active-mini-cell {
-  background: var(--green-soft);
-  border-color: var(--green);
-  color: var(--green);
-}
-
-.mini-list {
-  gap: 5px;
-}
-
-.mini-list b {
-  background: var(--purple);
-  display: block;
-  height: 1px;
-  opacity: 0.8;
-  width: 12px;
-}
-
-.mini-tree svg {
-  height: 64px;
-  width: 112px;
-}
-
-.mini-tree line {
-  stroke: var(--border-strong);
-  stroke-width: 2;
-}
-
-.mini-tree circle {
-  fill: var(--bg-raised);
-  stroke: var(--border-strong);
-  stroke-width: 2;
-}
-
-.mini-tree .active-tree-node {
-  fill: var(--purple);
-  stroke: var(--purple);
-}
-
 .landing-state-preview-panel {
-  border-radius: 8px;
+  align-self: start;
+  display: flex;
   min-height: 336px;
+  position: sticky;
+  top: 24px;
+}
+
+.landing-state-preview-panel > .structure-preview-content {
+  flex: 1;
 }
 
 .landing-snippet-lab {
@@ -4164,6 +4094,12 @@ input[type='password'] {
     grid-template-columns: 1fr;
   }
 
+  /* Once the grid stacks, the preview sits below the list — no sticky. */
+  .landing-state-preview-panel {
+    position: static;
+    top: auto;
+  }
+
   .landing-flow-grid::before {
     bottom: 10%;
     height: auto;
@@ -4205,31 +4141,62 @@ input[type='password'] {
   .landing-nav {
     align-items: center;
     flex-direction: row;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 9px;
     padding: 12px 0;
   }
 
-  .landing-nav nav {
-    flex-wrap: nowrap;
-    justify-content: flex-start;
-    margin-left: -14px;
-    margin-right: -14px;
-    overflow-x: auto;
-    padding: 2px 14px 8px;
-    scrollbar-width: none;
-    width: 100%;
+  .landing-nav-toggle {
+    align-items: center;
+    aspect-ratio: 1;
+    display: inline-flex;
+    justify-content: center;
+    padding: 7px;
   }
 
-  .landing-nav nav::-webkit-scrollbar {
+  .landing-nav nav {
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
     display: none;
+    flex-direction: column;
+    align-items: stretch;
+    flex-wrap: nowrap;
+    gap: 4px;
+    left: 0;
+    margin: 0;
+    overflow: visible;
+    padding: 10px;
+    position: absolute;
+    right: 0;
+    top: calc(100% + 4px);
+    z-index: 30;
+  }
+
+  .landing-nav nav.is-open {
+    display: flex;
   }
 
   .landing-nav nav a,
-  .landing-nav .landing-nav-cta,
-  .landing-nav .landing-icon-button,
-  .landing-nav .account-menu {
-    flex: 0 0 auto;
+  .landing-nav .landing-nav-cta {
+    border-radius: 8px;
+    font-size: 14px;
+    justify-content: flex-start;
+    padding: 10px 12px;
+    width: 100%;
+  }
+
+  .landing-nav nav a:hover {
+    background: var(--bg-inset);
+  }
+
+  .landing-nav nav .landing-icon-button {
+    align-self: flex-start;
+  }
+
+  .landing-nav nav .account-menu {
+    width: 100%;
   }
 
   .landing-hero {
@@ -4269,10 +4236,6 @@ input[type='password'] {
   .landing-proof-grid,
   .landing-audience-strip,
   .landing-snippet-tabs {
-    grid-template-columns: 1fr;
-  }
-
-  .landing-structure-card {
     grid-template-columns: 1fr;
   }
 
