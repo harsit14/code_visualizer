@@ -89,6 +89,7 @@ Set these Worker variables and secrets:
 | `ANON_USAGE_SALT`          | Secret   | Hashes anonymous usage subjects.                |
 | `ANON_DAILY_EXPLAIN_LIMIT` | Variable | Optional, default `3`.                          |
 | `FREE_DAILY_EXPLAIN_LIMIT` | Variable | Optional, default `5`.                          |
+| `ADMIN_EMAILS`             | Variable | Optional comma/space-separated admin allowlist. |
 
 The landing page lives at `/`. The dashboard lives at `/app`. Shared trace links
 with `#cv=` and iframe embeds still open the dashboard directly.
@@ -133,7 +134,10 @@ Optional: add `DEEPSEEK_MODEL` if you want to override the default
 `deepseek-v4-flash`.
 
 The explainer route is gated before the DeepSeek request. Anonymous visitors get
-the anonymous daily limit, and signed-in users get the free account daily limit.
+the anonymous daily limit, signed-in users get the free account daily limit, and
+emails listed in `ADMIN_EMAILS` get an unlimited admin quota. Admin matching is
+case-insensitive and exact after trimming whitespace; no client-side flag can
+promote an account.
 
 For local testing through Cloudflare's runtime:
 

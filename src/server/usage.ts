@@ -29,6 +29,7 @@ export type UsageDecision =
 const DEFAULT_ANON_DAILY_LIMIT = 3;
 const DEFAULT_FREE_DAILY_LIMIT = 5;
 const DEFAULT_PRO_DAILY_LIMIT = 250;
+const ADMIN_DAILY_LIMIT = Number.MAX_SAFE_INTEGER;
 
 export async function enforceExplainerUsage(
   env: ServerEnv,
@@ -64,7 +65,7 @@ export async function enforceExplainerUsage(
   }
 
   const session = await getSessionContext(env, request);
-  const plan: AccountPlan = session ? 'free' : 'anonymous';
+  const plan = planForUser(env, session?.user ?? null);
   const limit = limitForPlan(env, plan);
   const day = usageDay();
   const subject = session?.user.id
@@ -130,6 +131,9 @@ export function usageDay(date = new Date()): string {
 }
 
 export function limitForPlan(env: ServerEnv, plan: AccountPlan): number {
+  if (plan === 'admin') {
+    return ADMIN_DAILY_LIMIT;
+  }
   if (plan === 'pro') {
     return readLimit(env.PRO_DAILY_EXPLAIN_LIMIT, DEFAULT_PRO_DAILY_LIMIT);
   }
@@ -137,6 +141,21 @@ export function limitForPlan(env: ServerEnv, plan: AccountPlan): number {
     return readLimit(env.FREE_DAILY_EXPLAIN_LIMIT, DEFAULT_FREE_DAILY_LIMIT);
   }
   return readLimit(env.ANON_DAILY_EXPLAIN_LIMIT, DEFAULT_ANON_DAILY_LIMIT);
+}
+
+export function planForUser(env: ServerEnv, user: AuthUser | null): AccountPlan {
+  if (!user) {
+    return 'anonymous';
+  }
+  return isAdminEmail(env, user.email) ? 'admin' : 'free';
+}
+
+export function isAdminEmail(env: ServerEnv, email: string): boolean {
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+  return adminEmailSet(env).has(normalized);
 }
 
 async function anonymousSubject(env: ServerEnv, request: Request): Promise<string> {
@@ -152,6 +171,15 @@ async function anonymousSubject(env: ServerEnv, request: Request): Promise<strin
 function readLimit(value: string | undefined, fallback: number): number {
   const parsed = Number(value);
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function adminEmailSet(env: ServerEnv): Set<string> {
+  return new Set(
+    (env.ADMIN_EMAILS ?? '')
+      .split(/[\s,;]+/)
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean),
+  );
 }
 
 function nextUtcMidnightSeconds(): string {

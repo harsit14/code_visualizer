@@ -13,8 +13,8 @@ import {
 } from './auth';
 import { jsonResponse, methodNotAllowed, nowIso, readJson } from './http';
 import { handleHistoryApi } from './historyApi';
-import { limitForPlan, usageDay } from './usage';
-import type { AccountPlan, ServerEnv } from './types';
+import { limitForPlan, planForUser, usageDay } from './usage';
+import type { AuthUser, ServerEnv } from './types';
 
 type UsageRow = {
   count: number;
@@ -71,7 +71,7 @@ async function accountStatus(env: ServerEnv, request: Request): Promise<Response
     billingConfigured: false,
     ...account,
     subscription: null,
-    usage: await currentUsage(env, request, context?.user.id ?? null, context ? 'free' : 'anonymous'),
+    usage: await currentUsage(env, context?.user ?? null),
   });
 }
 
@@ -109,14 +109,14 @@ async function signUp(env: ServerEnv, request: Request): Promise<Response> {
   }
 
   const cookie = await createUserSession(env.DB, request, userId);
+  const context = await getSessionContext(env, withCookie(request, cookie));
   return jsonResponse(
     {
+      accountConfigured: true,
+      billingConfigured: false,
+      ...serializeAccount(context),
       subscription: null,
-      user: {
-        createdAt,
-        email: payload.email,
-        id: userId,
-      },
+      usage: await currentUsage(env, context?.user ?? null),
     },
     201,
     { 'Set-Cookie': cookie },
@@ -155,9 +155,19 @@ async function signIn(env: ServerEnv, request: Request): Promise<Response> {
 
   const cookie = await createUserSession(env.DB, request, user.id);
   const context = await getSessionContext(env, withCookie(request, cookie));
-  return jsonResponse({ ...serializeAccount(context), subscription: null }, 200, {
-    'Set-Cookie': cookie,
-  });
+  return jsonResponse(
+    {
+      accountConfigured: true,
+      billingConfigured: false,
+      ...serializeAccount(context),
+      subscription: null,
+      usage: await currentUsage(env, context?.user ?? null),
+    },
+    200,
+    {
+      'Set-Cookie': cookie,
+    },
+  );
 }
 
 async function signOut(env: ServerEnv, request: Request): Promise<Response> {
@@ -169,16 +179,14 @@ async function signOut(env: ServerEnv, request: Request): Promise<Response> {
 
 async function currentUsage(
   env: ServerEnv,
-  request: Request,
-  userId: string | null,
-  fallbackPlan: AccountPlan,
+  user: AuthUser | null,
 ) {
   if (!env.DB) {
     return null;
   }
-  const plan: AccountPlan = userId ? 'free' : fallbackPlan;
+  const plan = planForUser(env, user);
   const day = usageDay();
-  const subject = userId ? `user:${userId}` : null;
+  const subject = user ? `user:${user.id}` : null;
   const row =
     subject === null
       ? null

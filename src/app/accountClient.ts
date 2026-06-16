@@ -1,7 +1,7 @@
 export type AccountUsage = {
   day: string;
   limit: number;
-  plan: 'anonymous' | 'free' | 'pro';
+  plan: 'anonymous' | 'free' | 'pro' | 'admin';
   remaining: number;
   used: number;
 };

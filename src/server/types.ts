@@ -33,6 +33,7 @@ export type ServerEnv = {
   ANON_DAILY_EXPLAIN_LIMIT?: string;
   FREE_DAILY_EXPLAIN_LIMIT?: string;
   PRO_DAILY_EXPLAIN_LIMIT?: string;
+  ADMIN_EMAILS?: string;
   ANON_USAGE_SALT?: string;
 };
 
@@ -62,4 +63,4 @@ export type UserSubscription = {
   userId: string;
 };
 
-export type AccountPlan = 'anonymous' | 'free' | 'pro';
+export type AccountPlan = 'anonymous' | 'free' | 'pro' | 'admin';

@@ -44,7 +44,16 @@ export function AccountMenu({ compact = false }: AccountMenuProps) {
   }, [refresh]);
 
   const planLabel = useMemo(() => {
-    return account.user ? 'Free account' : 'Guest';
+    if (!account.user) {
+      return 'Guest';
+    }
+    if (account.usage?.plan === 'admin') {
+      return 'Admin account';
+    }
+    if (account.usage?.plan === 'pro') {
+      return 'Pro account';
+    }
+    return 'Free account';
   }, [account]);
 
   const submitAuth = useCallback(
@@ -117,7 +126,7 @@ export function AccountMenu({ compact = false }: AccountMenuProps) {
               <div className="account-usage">
                 <span>AI explanations today</span>
                 <strong>
-                  {account.usage.used} / {account.usage.limit}
+                  {account.usage.used} / {usageLimitLabel(account.usage.limit)}
                 </strong>
               </div>
             ) : null}
@@ -179,4 +188,8 @@ export function AccountMenu({ compact = false }: AccountMenuProps) {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Account request failed.';
+}
+
+function usageLimitLabel(limit: number): string {
+  return limit >= Number.MAX_SAFE_INTEGER ? 'Unlimited' : String(limit);
 }

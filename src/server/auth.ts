@@ -8,6 +8,7 @@ const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
 // include their iteration count, so this can be raised later without breaking
 // existing passwords.
 const PASSWORD_ITERATIONS = 60_000;
+const MIN_PASSWORD_ITERATIONS = 60_000;
 const PASSWORD_SALT_BYTES = 16;
 const SESSION_BYTES = 32;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -199,7 +200,7 @@ export async function verifyPassword(password: string, stored: string): Promise<
   }
 
   const iterations = Number(iterationsRaw);
-  if (!Number.isSafeInteger(iterations) || iterations < 100_000) {
+  if (!Number.isSafeInteger(iterations) || iterations < MIN_PASSWORD_ITERATIONS) {
     return false;
   }
 
