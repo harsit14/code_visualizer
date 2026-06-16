@@ -5,9 +5,40 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="Visualize Python, JavaScript, and TypeScript execution with step-by-step traces, data structures, call stacks, sharing, exports, and AI explanations."
+      content="See Python, JavaScript, and TypeScript run line by line with replayable traces, moving variables, data structures, call stacks, sharing, embeds, and plain-English step explanations."
     />
-    <title>Code Visualizer</title>
+    <meta property="og:title" content="Code Visualizer | See your code run line by line" />
+    <meta
+      property="og:description"
+      content="An in-browser visual debugger for Python, JavaScript, and TypeScript."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="/screenshots/dashboard-overview.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Code Visualizer | See your code run line by line" />
+    <meta
+      name="twitter:description"
+      content="Watch every variable, pointer, and call come alive in a replayable trace."
+    />
+    <meta name="twitter:image" content="/screenshots/dashboard-overview.png" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <script>
+      (() => {
+        try {
+          const stored = window.localStorage.getItem('cv-theme');
+          const theme =
+            stored === 'light' || stored === 'dark'
+              ? stored
+              : window.matchMedia?.('(prefers-color-scheme: light)').matches
+                ? 'light'
+                : 'dark';
+          document.documentElement.dataset.theme = theme;
+        } catch {
+          document.documentElement.dataset.theme = 'dark';
+        }
+      })();
+    </script>
+    <title>Code Visualizer | See your code run line by line</title>
   </head>
   <body>
     <div id="root"></div>
