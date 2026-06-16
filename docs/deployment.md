@@ -43,10 +43,11 @@ The checked-in `wrangler.jsonc` configures:
 `run_worker_first` is required. Without it, `/api/explain-step` can be served by
 the static SPA fallback and open the dashboard instead of calling the API.
 
-## Accounts, Subscriptions, And Daily Limits
+## Accounts And Daily Limits
 
 Public accounts use the Cloudflare Worker, a D1 database, HttpOnly session
-cookies, and Stripe Checkout.
+cookies, and daily usage counters. Subscription billing code is parked in
+`src/server/billing.ts`, but it is not wired to the public UI or API routes.
 
 Create the D1 database:
 
@@ -76,37 +77,41 @@ The migration creates:
 
 - `users`: email/password account records.
 - `sessions`: hashed HttpOnly session tokens.
-- `subscriptions`: Stripe subscription entitlement state.
+- `subscriptions`: reserved for future Stripe subscription entitlement state.
 - `usage_daily`: daily AI explainer counters.
-- `billing_events`: Stripe webhook idempotency records.
+- `billing_events`: reserved for future Stripe webhook idempotency records.
 
 Set these Worker variables and secrets:
 
 | Name                       | Type     | Purpose                                         |
 | -------------------------- | -------- | ----------------------------------------------- |
-| `STRIPE_SECRET_KEY`        | Secret   | Creates Checkout and billing portal sessions.   |
-| `STRIPE_PRICE_ID`          | Variable | The Stripe recurring Price ID for the Pro plan. |
-| `STRIPE_WEBHOOK_SECRET`    | Secret   | Verifies Stripe webhook signatures.             |
 | `ANON_USAGE_SALT`          | Secret   | Hashes anonymous usage subjects.                |
 | `ANON_DAILY_EXPLAIN_LIMIT` | Variable | Optional, default `3`.                          |
 | `FREE_DAILY_EXPLAIN_LIMIT` | Variable | Optional, default `5`.                          |
-| `PRO_DAILY_EXPLAIN_LIMIT`  | Variable | Optional, default `250`.                        |
 
-In Stripe:
+The landing page lives at `/`. The dashboard lives at `/app`. Shared trace links
+with `#cv=` and iframe embeds still open the dashboard directly.
 
-1. Create a Product and recurring Price for the Pro subscription.
-2. Copy the Price ID into `STRIPE_PRICE_ID`.
-3. Add a webhook endpoint:
+### Parked Subscription Code
+
+Stripe Checkout, billing portal, and webhook helpers are kept in
+`src/server/billing.ts` for a future paid launch. They are intentionally not
+mounted from `src/server/accountApi.ts`, and the account menu does not expose an
+upgrade action.
+
+When subscriptions are ready to ship:
+
+1. Reconnect the billing routes in `src/server/accountApi.ts`.
+2. Reintroduce the checkout or pricing UI.
+3. Create a Stripe Product and recurring Price.
+4. Set `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID`, and `STRIPE_WEBHOOK_SECRET`.
+5. Add the webhook endpoint:
    `https://your-domain.com/api/stripe/webhook`.
-4. Subscribe the webhook to:
+6. Subscribe the webhook to:
    - `checkout.session.completed`
    - `customer.subscription.created`
    - `customer.subscription.updated`
    - `customer.subscription.deleted`
-5. Copy the webhook signing secret into `STRIPE_WEBHOOK_SECRET`.
-
-The landing page lives at `/`. The dashboard lives at `/app`. Shared trace links
-with `#cv=` and iframe embeds still open the dashboard directly.
 
 ## AI Explainer Secret
 
@@ -126,9 +131,8 @@ In Cloudflare:
 Optional: add `DEEPSEEK_MODEL` if you want to override the default
 `deepseek-v4-flash`.
 
-The explainer route is now gated before the DeepSeek request. Anonymous visitors
-get the anonymous daily limit, signed-in free users get the free daily limit,
-and active or trialing Stripe subscribers get the Pro daily limit.
+The explainer route is gated before the DeepSeek request. Anonymous visitors get
+the anonymous daily limit, and signed-in users get the free account daily limit.
 
 For local testing through Cloudflare's runtime:
 

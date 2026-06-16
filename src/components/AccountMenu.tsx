@@ -1,8 +1,6 @@
-import { CreditCard, LogOut, UserRound } from 'lucide-react';
+import { LogOut, UserRound } from 'lucide-react';
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  createCheckoutSession,
-  createPortalSession,
   fetchAccount,
   signIn,
   signOut,
@@ -46,10 +44,7 @@ export function AccountMenu({ compact = false }: AccountMenuProps) {
   }, [refresh]);
 
   const planLabel = useMemo(() => {
-    if (account.subscription?.status === 'active' || account.subscription?.status === 'trialing') {
-      return 'Pro';
-    }
-    return account.user ? 'Free' : 'Guest';
+    return account.user ? 'Free account' : 'Guest';
   }, [account]);
 
   const submitAuth = useCallback(
@@ -77,28 +72,6 @@ export function AccountMenu({ compact = false }: AccountMenuProps) {
     [email, mode, password],
   );
 
-  const startCheckout = useCallback(async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      window.location.href = await createCheckoutSession();
-    } catch (requestError) {
-      setError(errorMessage(requestError));
-      setBusy(false);
-    }
-  }, []);
-
-  const openPortal = useCallback(async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      window.location.href = await createPortalSession();
-    } catch (requestError) {
-      setError(errorMessage(requestError));
-      setBusy(false);
-    }
-  }, []);
-
   const handleSignOut = useCallback(async () => {
     setBusy(true);
     setError(null);
@@ -115,7 +88,7 @@ export function AccountMenu({ compact = false }: AccountMenuProps) {
 
   return (
     <details className={`account-menu${compact ? ' account-menu-compact' : ''}`}>
-      <summary title="Account and subscription">
+      <summary title="Account">
         <UserRound size={14} />
         {account.user ? planLabel : 'Account'}
       </summary>
@@ -141,14 +114,6 @@ export function AccountMenu({ compact = false }: AccountMenuProps) {
                 </strong>
               </div>
             ) : null}
-            <button
-              disabled={busy || !account.billingConfigured}
-              onClick={account.subscription ? openPortal : startCheckout}
-              type="button"
-            >
-              <CreditCard size={14} />
-              {account.subscription ? 'Manage billing' : 'Upgrade to Pro'}
-            </button>
             <button disabled={busy} onClick={handleSignOut} type="button">
               <LogOut size={14} />
               Sign out

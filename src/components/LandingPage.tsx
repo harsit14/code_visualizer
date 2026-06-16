@@ -5,7 +5,6 @@ import {
   Database,
   Gauge,
   GraduationCap,
-  Lock,
   Share2,
   Sparkles,
 } from 'lucide-react';
@@ -36,11 +35,33 @@ const features = [
   },
 ];
 
-const recommendations = [
-  'Terms, privacy, and AI data-use pages before paid launch.',
-  'Admin dashboard for usage, subscriptions, support lookup, and abuse review.',
-  'Email verification and password reset through a transactional email provider.',
-  'Turnstile on signup once public traffic starts.',
+const moments = [
+  {
+    body: 'Pause on a line and see exactly which variables, pointers, frames, and outputs changed.',
+    icon: BrainCircuit,
+    title: 'Debug without the fog',
+  },
+  {
+    body: 'Compare traces and complexity hints so loops, recursion, and growth rates become visible.',
+    icon: Gauge,
+    title: 'Feel the algorithm',
+  },
+  {
+    body: 'Use share links, embeds, and animated exports to turn a small program into a clear lesson.',
+    icon: GraduationCap,
+    title: 'Teach from the trace',
+  },
+];
+
+const visibleState = [
+  'Variables',
+  'Arrays',
+  'Linked lists',
+  'Trees',
+  'Heap references',
+  'Call stack',
+  'Console output',
+  'Complexity hints',
 ];
 
 export function LandingPage() {
@@ -58,7 +79,7 @@ export function LandingPage() {
         </button>
         <nav aria-label="Landing navigation">
           <a href="#features">Features</a>
-          <a href="#pricing">Pricing</a>
+          <a href="#learn">For learners</a>
           <button onClick={openApp} type="button">
             Open dashboard
           </button>
@@ -70,18 +91,19 @@ export function LandingPage() {
         <section className="landing-hero">
           <div className="landing-hero-copy">
             <p className="tour-kicker">Visual code execution for learners</p>
-            <h1>Show what every line changes.</h1>
+            <h1>Watch every line come alive.</h1>
             <p>
-              Code Visualizer turns short programs into replayable traces with data structures, call
-              stacks, output, complexity signals, sharing, and AI explanations.
+              Code Visualizer turns short programs into replayable traces, so learners can see data
+              structures move, calls unfold, output appear, and confusing steps explained in plain
+              language.
             </p>
             <div className="landing-actions">
               <button className="landing-primary" onClick={openApp} type="button">
-                Try the dashboard
+                Start visualizing
                 <ArrowRight size={16} />
               </button>
-              <a className="landing-secondary" href="#pricing">
-                View plans
+              <a className="landing-secondary" href="#features">
+                Explore features
               </a>
             </div>
           </div>
@@ -96,7 +118,7 @@ export function LandingPage() {
         <section className="landing-section" id="features">
           <div className="landing-section-heading">
             <p className="tour-kicker">Features</p>
-            <h2>Built for interview prep, classrooms, and technical writing.</h2>
+            <h2>A clearer way to learn what code actually does.</h2>
           </div>
           <div className="landing-feature-grid">
             {features.map((feature) => {
@@ -114,62 +136,46 @@ export function LandingPage() {
           </div>
         </section>
 
-        <section className="landing-section landing-pricing" id="pricing">
+        <section className="landing-section landing-showcase" id="learn">
           <div className="landing-section-heading">
-            <p className="tour-kicker">Pricing</p>
-            <h2>Start free, upgrade when AI explanations become part of your workflow.</h2>
+            <p className="tour-kicker">Inside the trace</p>
+            <h2>Follow the story your program is already telling.</h2>
           </div>
-          <div className="pricing-grid">
-            <article className="pricing-card">
-              <h3>Free</h3>
-              <p className="pricing-price">$0</p>
-              <p>For trying examples, debugging small snippets, and sharing lightweight traces.</p>
-              <ul>
-                <li>
-                  <Gauge size={15} /> Daily AI explanation limit
-                </li>
-                <li>
-                  <Code2 size={15} /> Full dashboard and local tracing
-                </li>
-                <li>
-                  <Share2 size={15} /> Share links and exports
-                </li>
-              </ul>
-              <button onClick={openApp} type="button">
-                Start free
-              </button>
-            </article>
-
-            <article className="pricing-card pricing-card-featured">
-              <h3>Pro</h3>
-              <p className="pricing-price">Subscription</p>
-              <p>For teachers, creators, and learners who use the AI explainer regularly.</p>
-              <ul>
-                <li>
-                  <BrainCircuit size={15} /> Higher AI explanation quota
-                </li>
-                <li>
-                  <GraduationCap size={15} /> Classroom-friendly embeds
-                </li>
-                <li>
-                  <Lock size={15} /> Billing managed through Stripe
-                </li>
-              </ul>
-              <AccountMenu />
-            </article>
+          <div className="landing-state-grid">
+            <div className="landing-state-copy">
+              <p>
+                Scrub through a run like a timeline. The editor, variables, data view, console, call
+                stack, and explainer stay connected to the same moment, so nothing feels hidden.
+              </p>
+              <div className="landing-pill-list" aria-label="Visible runtime state">
+                {visibleState.map((item) => (
+                  <span key={item}>{item}</span>
+                ))}
+              </div>
+            </div>
+            <div className="landing-moment-grid">
+              {moments.map((moment) => {
+                const Icon = moment.icon;
+                return (
+                  <article className="landing-moment" key={moment.title}>
+                    <span className="tour-feature-icon" aria-hidden="true">
+                      <Icon size={18} />
+                    </span>
+                    <h3>{moment.title}</h3>
+                    <p>{moment.body}</p>
+                  </article>
+                );
+              })}
+            </div>
           </div>
         </section>
 
-        <section className="landing-section launch-checklist">
-          <div className="landing-section-heading">
-            <p className="tour-kicker">Recommended Before Launch</p>
-            <h2>Next public-use safeguards to add after the core account system.</h2>
-          </div>
-          <ul>
-            {recommendations.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
+        <section className="landing-section landing-final-cta">
+          <h2>Paste a snippet. Press play. See the invisible parts.</h2>
+          <button className="landing-primary" onClick={openApp} type="button">
+            Open Code Visualizer
+            <ArrowRight size={16} />
+          </button>
         </section>
       </main>
     </div>

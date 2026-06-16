@@ -604,13 +604,6 @@ input[type='password'] {
   z-index: 24;
 }
 
-.pricing-card .account-popover {
-  bottom: calc(100% + 6px);
-  left: 0;
-  right: auto;
-  top: auto;
-}
-
 .account-popover-header {
   display: flex;
   flex-direction: column;
@@ -2055,8 +2048,8 @@ input[type='password'] {
 
 .landing-hero-copy > p:not(.tour-kicker),
 .landing-section-heading p,
-.pricing-card p,
-.launch-checklist li {
+.landing-state-copy p,
+.landing-moment p {
   color: var(--text-dim);
   font-size: 15px;
 }
@@ -2132,14 +2125,18 @@ input[type='password'] {
 }
 
 .landing-feature-grid,
-.pricing-grid {
+.landing-moment-grid {
   display: grid;
   gap: 12px;
+}
+
+.landing-feature-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .landing-feature,
-.pricing-card {
+.landing-moment,
+.landing-state-copy {
   background: var(--bg-raised);
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -2147,93 +2144,80 @@ input[type='password'] {
 }
 
 .landing-feature h3,
-.pricing-card h3 {
+.landing-moment h3 {
   color: var(--text);
   font-size: 16px;
   margin: 14px 0 0;
 }
 
-.landing-feature p {
+.landing-feature p,
+.landing-moment p {
   color: var(--text-dim);
   font-size: 13px;
   margin: 7px 0 0;
 }
 
-.landing-pricing {
+.landing-showcase {
   scroll-margin-top: 16px;
 }
 
-.pricing-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.landing-state-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(280px, 0.86fr) minmax(0, 1.14fr);
 }
 
-.pricing-card {
+.landing-state-copy {
+  align-content: start;
+  display: grid;
+  gap: 16px;
+}
+
+.landing-state-copy p {
+  margin: 0;
+}
+
+.landing-pill-list {
   display: flex;
-  flex-direction: column;
-  gap: 14px;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
-.pricing-card-featured {
-  border-color: var(--accent);
-  box-shadow: inset 0 0 0 1px var(--accent);
-}
-
-.pricing-price {
+.landing-pill-list span {
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: 999px;
   color: var(--text);
-  font-size: 27px;
-  font-weight: 750;
-  line-height: 1;
-  margin: 0;
+  font-size: 12px;
+  padding: 7px 10px;
 }
 
-.pricing-card p {
-  margin: 0;
+.landing-moment-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.pricing-card ul,
-.launch-checklist ul {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.pricing-card li {
+.landing-final-cta {
   align-items: center;
-  color: var(--text-dim);
   display: flex;
-  font-size: 13px;
-  gap: 8px;
-}
-
-.pricing-card li svg {
-  color: var(--accent);
-  flex: 0 0 auto;
-}
-
-.pricing-card > button {
-  justify-content: center;
-  margin-top: auto;
-}
-
-.launch-checklist {
+  gap: 18px;
+  justify-content: space-between;
   padding-bottom: 68px;
 }
 
-.launch-checklist li {
-  background: var(--bg-raised);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 11px 12px;
+.landing-final-cta h2 {
+  color: var(--text);
+  font-size: 32px;
+  line-height: 1.1;
+  margin: 0;
+  max-width: 720px;
 }
 
 @media (max-width: 960px) {
   .landing-hero,
   .landing-section-heading,
   .landing-feature-grid,
-  .pricing-grid {
+  .landing-state-grid,
+  .landing-moment-grid {
     grid-template-columns: 1fr;
   }
 
@@ -2247,6 +2231,11 @@ input[type='password'] {
 
   .landing-feature-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .landing-final-cta {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 

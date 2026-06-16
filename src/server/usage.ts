@@ -1,4 +1,4 @@
-import { getSessionContext, isSubscribed, sha256Hex } from './auth';
+import { getSessionContext, sha256Hex } from './auth';
 import { jsonResponse, nowIso } from './http';
 import type { AccountPlan, AuthUser, ServerEnv } from './types';
 
@@ -64,8 +64,7 @@ export async function enforceExplainerUsage(
   }
 
   const session = await getSessionContext(env, request);
-  const plan: AccountPlan =
-    session && isSubscribed(session.subscription) ? 'pro' : session ? 'free' : 'anonymous';
+  const plan: AccountPlan = session ? 'free' : 'anonymous';
   const limit = limitForPlan(env, plan);
   const day = usageDay();
   const subject = session?.user.id
@@ -97,9 +96,9 @@ export async function enforceExplainerUsage(
       response: jsonResponse(
         {
           error:
-            plan === 'pro'
-              ? 'Daily AI explanation safety limit reached. Try again tomorrow.'
-              : 'Daily free AI explanation limit reached. Create or upgrade your account for more explanations.',
+            plan === 'anonymous'
+              ? 'Daily guest AI explanation limit reached. Create a free account or try again tomorrow.'
+              : 'Daily free account AI explanation limit reached. Try again tomorrow.',
           usage: snapshot,
         },
         429,

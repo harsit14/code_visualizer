@@ -11,7 +11,6 @@ import {
   serializeAccount,
   verifyPassword,
 } from './auth';
-import { createCheckoutSession, createPortalSession, handleStripeWebhook } from './billing';
 import { jsonResponse, methodNotAllowed, nowIso, readJson } from './http';
 import { limitForPlan, usageDay } from './usage';
 import type { AccountPlan, ServerEnv } from './types';
@@ -40,23 +39,6 @@ export async function handleAccountApi(request: Request, env: ServerEnv): Promis
       return request.method === 'POST' ? signOut(env, request) : methodNotAllowed(['POST']);
     }
 
-    if (url.pathname === '/api/billing/checkout') {
-      return request.method === 'POST'
-        ? createCheckoutSession(env, request)
-        : methodNotAllowed(['POST']);
-    }
-
-    if (url.pathname === '/api/billing/portal') {
-      return request.method === 'POST'
-        ? createPortalSession(env, request)
-        : methodNotAllowed(['POST']);
-    }
-
-    if (url.pathname === '/api/stripe/webhook') {
-      return request.method === 'POST'
-        ? handleStripeWebhook(env, request)
-        : methodNotAllowed(['POST']);
-    }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unexpected account API error.';
     return jsonResponse({ error: message }, 500);
@@ -69,7 +51,7 @@ async function accountStatus(env: ServerEnv, request: Request): Promise<Response
   if (!env.DB) {
     return jsonResponse({
       accountConfigured: false,
-      billingConfigured: Boolean(env.STRIPE_SECRET_KEY && env.STRIPE_PRICE_ID),
+      billingConfigured: false,
       subscription: null,
       usage: null,
       user: null,
@@ -77,16 +59,13 @@ async function accountStatus(env: ServerEnv, request: Request): Promise<Response
   }
 
   const context = await getSessionContext(env, request);
+  const account = serializeAccount(context);
   return jsonResponse({
     accountConfigured: true,
-    billingConfigured: Boolean(env.STRIPE_SECRET_KEY && env.STRIPE_PRICE_ID),
-    ...serializeAccount(context),
-    usage: await currentUsage(
-      env,
-      request,
-      context?.user.id ?? null,
-      context ? 'free' : 'anonymous',
-    ),
+    billingConfigured: false,
+    ...account,
+    subscription: null,
+    usage: await currentUsage(env, request, context?.user.id ?? null, context ? 'free' : 'anonymous'),
   });
 }
 
@@ -155,7 +134,9 @@ async function signIn(env: ServerEnv, request: Request): Promise<Response> {
 
   const cookie = await createUserSession(env.DB, request, user.id);
   const context = await getSessionContext(env, withCookie(request, cookie));
-  return jsonResponse(serializeAccount(context), 200, { 'Set-Cookie': cookie });
+  return jsonResponse({ ...serializeAccount(context), subscription: null }, 200, {
+    'Set-Cookie': cookie,
+  });
 }
 
 async function signOut(env: ServerEnv, request: Request): Promise<Response> {
@@ -174,13 +155,7 @@ async function currentUsage(
   if (!env.DB) {
     return null;
   }
-  const context = await getSessionContext(env, request);
-  const plan: AccountPlan =
-    context?.subscription?.status === 'active' || context?.subscription?.status === 'trialing'
-      ? 'pro'
-      : userId
-        ? 'free'
-        : fallbackPlan;
+  const plan: AccountPlan = userId ? 'free' : fallbackPlan;
   const day = usageDay();
   const subject = userId ? `user:${userId}` : null;
   const row =
