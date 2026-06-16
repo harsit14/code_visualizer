@@ -1,6 +1,7 @@
 import { accountDatabaseMissing, getSessionContext } from './auth';
+import { getDatabase, type AppDatabase, type HistoryRow } from './database';
 import { isRecord, jsonResponse, methodNotAllowed, nowIso, readJson } from './http';
-import type { D1Database, ServerEnv } from './types';
+import type { ServerEnv } from './types';
 
 const HISTORY_LIMIT = 50;
 const LIST_LIMIT = 30;
@@ -11,21 +12,6 @@ const MAX_INPUT_LENGTH = 10_000;
 const ID_PATTERN = /^[a-zA-Z0-9_-]{8,80}$/;
 
 type Language = 'python' | 'javascript' | 'typescript';
-
-type HistoryRow = {
-  code: string;
-  created_at: string;
-  example_id: string | null;
-  function_name: string | null;
-  id: string;
-  inputs_json: string | null;
-  language: Language;
-  last_run_at: string;
-  seed: number | null;
-  title: string;
-  updated_at: string;
-  user_id: string;
-};
 
 type HistoryPayload = {
   code: string;
@@ -73,19 +59,8 @@ async function listHistory(env: ServerEnv, request: Request): Promise<Response> 
     return auth;
   }
 
-  const rows = await auth.db
-    .prepare(
-      `SELECT id, user_id, title, language, code, inputs_json, function_name, seed, example_id,
-              created_at, updated_at, last_run_at
-       FROM code_history
-       WHERE user_id = ?
-       ORDER BY last_run_at DESC
-       LIMIT ?`,
-    )
-    .bind(auth.userId, LIST_LIMIT)
-    .all<HistoryRow>();
-
-  return jsonResponse({ items: rows.results.map(rowToHistoryItem) });
+  const rows = await auth.db.listHistory(auth.userId, LIST_LIMIT);
+  return jsonResponse({ items: rows.map(rowToHistoryItem) });
 }
 
 async function getHistoryItem(env: ServerEnv, request: Request, id: string): Promise<Response> {
@@ -97,15 +72,7 @@ async function getHistoryItem(env: ServerEnv, request: Request, id: string): Pro
     return jsonResponse({ error: 'History item not found.' }, 404);
   }
 
-  const row = await auth.db
-    .prepare(
-      `SELECT id, user_id, title, language, code, inputs_json, function_name, seed, example_id,
-              created_at, updated_at, last_run_at
-       FROM code_history
-       WHERE id = ? AND user_id = ?`,
-    )
-    .bind(id, auth.userId)
-    .first<HistoryRow>();
+  const row = await auth.db.getHistoryItem(id, auth.userId);
 
   return row ? jsonResponse({ item: rowToHistoryItem(row) }) : jsonResponse({ error: 'History item not found.' }, 404);
 }
@@ -128,63 +95,38 @@ async function saveHistory(env: ServerEnv, request: Request): Promise<Response> 
   const id = existingId ?? crypto.randomUUID();
 
   if (existingId) {
-    await auth.db
-      .prepare(
-        `UPDATE code_history
-         SET title = ?, language = ?, code = ?, inputs_json = ?, function_name = ?,
-             seed = ?, example_id = ?, updated_at = ?, last_run_at = ?
-         WHERE id = ? AND user_id = ?`,
-      )
-      .bind(
-        payload.title,
-        payload.language,
-        payload.code,
-        inputsToJson(payload.inputs),
-        payload.functionName,
-        payload.seed,
-        payload.exampleId,
-        now,
-        now,
-        id,
-        auth.userId,
-      )
-      .run();
+    await auth.db.updateHistory({
+      code: payload.code,
+      example_id: payload.exampleId,
+      function_name: payload.functionName,
+      id,
+      inputs_json: inputsToJson(payload.inputs),
+      language: payload.language,
+      last_run_at: now,
+      seed: payload.seed,
+      title: payload.title,
+      updated_at: now,
+      user_id: auth.userId,
+    });
   } else {
-    await auth.db
-      .prepare(
-        `INSERT INTO code_history (
-           id, user_id, title, language, code, inputs_json, function_name, seed, example_id,
-           created_at, updated_at, last_run_at
-         )
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .bind(
-        id,
-        auth.userId,
-        payload.title,
-        payload.language,
-        payload.code,
-        inputsToJson(payload.inputs),
-        payload.functionName,
-        payload.seed,
-        payload.exampleId,
-        now,
-        now,
-        now,
-      )
-      .run();
+    await auth.db.insertHistory({
+      code: payload.code,
+      created_at: now,
+      example_id: payload.exampleId,
+      function_name: payload.functionName,
+      id,
+      inputs_json: inputsToJson(payload.inputs),
+      language: payload.language,
+      last_run_at: now,
+      seed: payload.seed,
+      title: payload.title,
+      updated_at: now,
+      user_id: auth.userId,
+    });
     await pruneHistory(auth.db, auth.userId);
   }
 
-  const row = await auth.db
-    .prepare(
-      `SELECT id, user_id, title, language, code, inputs_json, function_name, seed, example_id,
-              created_at, updated_at, last_run_at
-       FROM code_history
-       WHERE id = ? AND user_id = ?`,
-    )
-    .bind(id, auth.userId)
-    .first<HistoryRow>();
+  const row = await auth.db.getHistoryItem(id, auth.userId);
 
   return jsonResponse({ item: row ? rowToHistoryItem(row) : null }, existingId ? 200 : 201);
 }
@@ -198,15 +140,13 @@ async function deleteHistoryItem(env: ServerEnv, request: Request, id: string): 
     return jsonResponse({ error: 'History item not found.' }, 404);
   }
 
-  await auth.db
-    .prepare('DELETE FROM code_history WHERE id = ? AND user_id = ?')
-    .bind(id, auth.userId)
-    .run();
+  await auth.db.deleteHistoryItem(id, auth.userId);
   return jsonResponse({ ok: true });
 }
 
 async function requireHistoryAuth(env: ServerEnv, request: Request) {
-  if (!env.DB) {
+  const db = getDatabase(env);
+  if (!db) {
     return accountDatabaseMissing();
   }
 
@@ -215,38 +155,22 @@ async function requireHistoryAuth(env: ServerEnv, request: Request) {
     return jsonResponse({ error: 'Sign in to use history.' }, 401);
   }
 
-  return { db: env.DB, userId: context.user.id };
+  return { db, userId: context.user.id };
 }
 
 async function findOwnedHistoryId(
-  db: D1Database,
+  db: AppDatabase,
   userId: string,
   id: string,
 ): Promise<string | null> {
   if (!isHistoryId(id)) {
     return null;
   }
-  const row = await db
-    .prepare('SELECT id FROM code_history WHERE id = ? AND user_id = ?')
-    .bind(id, userId)
-    .first<{ id: string }>();
-  return row?.id ?? null;
+  return db.findOwnedHistoryId(id, userId);
 }
 
-async function pruneHistory(db: D1Database, userId: string): Promise<void> {
-  await db
-    .prepare(
-      `DELETE FROM code_history
-       WHERE user_id = ?
-         AND id NOT IN (
-           SELECT id FROM code_history
-           WHERE user_id = ?
-           ORDER BY last_run_at DESC
-           LIMIT ?
-         )`,
-    )
-    .bind(userId, userId, HISTORY_LIMIT)
-    .run();
+async function pruneHistory(db: AppDatabase, userId: string): Promise<void> {
+  await db.pruneHistory(userId, HISTORY_LIMIT);
 }
 
 function readHistoryPayload(value: unknown): HistoryPayload | null {

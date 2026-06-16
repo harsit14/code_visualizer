@@ -45,33 +45,22 @@ the static SPA fallback and open the dashboard instead of calling the API.
 
 ## Accounts And Daily Limits
 
-Public accounts use the Cloudflare Worker, a D1 database, HttpOnly session
+Public accounts use the Cloudflare Worker, Supabase Postgres, HttpOnly session
 cookies, and daily usage counters. Subscription billing code is parked in
 `src/server/billing.ts`, but it is not wired to the public UI or API routes.
 
-Create the D1 database:
+Create a Supabase project, then run the SQL in
+`supabase/migrations/0001_app_schema.sql` from the Supabase SQL editor. If you
+use the Supabase CLI, connect the project and run:
 
 ```bash
-npx wrangler d1 create code-visualizer-prod
+supabase db push
 ```
 
-Add the returned binding to `wrangler.jsonc`:
-
-```jsonc
-"d1_databases": [
-  {
-    "binding": "DB",
-    "database_name": "code-visualizer-prod",
-    "database_id": "paste-the-database-id-here"
-  }
-]
-```
-
-Run the migration:
-
-```bash
-npx wrangler d1 migrations apply code-visualizer-prod --remote
-```
+The schema enables row-level security on every app table and grants the browser
+roles no direct table access. The Cloudflare Worker uses the Supabase service
+role key server-side only, so never expose that key in Vite client variables or
+frontend code.
 
 The migration creates:
 
@@ -86,6 +75,9 @@ Set these Worker variables and secrets:
 
 | Name                       | Type     | Purpose                                         |
 | -------------------------- | -------- | ----------------------------------------------- |
+| `SUPABASE_URL`             | Variable | Supabase project URL, for example `https://...supabase.co`. |
+| `SUPABASE_SERVICE_ROLE_KEY` | Secret   | Server-side Supabase service role key.          |
+| `SUPABASE_SCHEMA`          | Variable | Optional, default `public`.                     |
 | `ANON_USAGE_SALT`          | Secret   | Hashes anonymous usage subjects.                |
 | `ANON_DAILY_EXPLAIN_LIMIT` | Variable | Optional, default `3`.                          |
 | `FREE_DAILY_EXPLAIN_LIMIT` | Variable | Optional, default `5`.                          |
@@ -150,7 +142,7 @@ For local testing through Cloudflare's runtime:
 
 ```bash
 npm run build
-printf 'DEEPSEEK_API_KEY="your_key_here"\n' > .dev.vars
+printf 'DEEPSEEK_API_KEY="your_key_here"\nSUPABASE_URL="https://your-project.supabase.co"\nSUPABASE_SERVICE_ROLE_KEY="your_service_role_key"\nPASSWORD_PEPPER="your_password_pepper"\nANON_USAGE_SALT="your_usage_salt"\n' > .dev.vars
 npx wrangler dev
 ```
 

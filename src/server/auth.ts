@@ -1,5 +1,12 @@
 import { isRecord, nowIso } from './http';
-import type { AuthUser, D1Database, ServerEnv, UserSubscription } from './types';
+import {
+  getDatabase,
+  isDatabaseUniqueConstraintError,
+  type AppDatabase,
+  type SubscriptionRow,
+  type UserRow,
+} from './database';
+import type { AuthUser, ServerEnv, UserSubscription } from './types';
 
 export const SESSION_COOKIE = 'cv_session';
 
@@ -21,22 +28,6 @@ export class PasswordHashUpgradeRequiredError extends Error {
     this.name = 'PasswordHashUpgradeRequiredError';
   }
 }
-
-type UserRow = {
-  created_at: string;
-  email: string;
-  id: string;
-  stripe_customer_id: string | null;
-};
-
-type SubscriptionRow = {
-  current_period_end: string | null;
-  price_id: string | null;
-  status: string;
-  stripe_subscription_id: string | null;
-  updated_at: string;
-  user_id: string;
-};
 
 export type SessionContext = {
   subscription: UserSubscription | null;
@@ -62,7 +53,7 @@ export function validatePassword(value: unknown): string | null {
 }
 
 export async function createUserSession(
-  db: D1Database,
+  db: AppDatabase,
   request: Request,
   userId: string,
 ): Promise<string> {
@@ -71,50 +62,38 @@ export async function createUserSession(
   const createdAt = nowIso();
   const expiresAt = new Date(Date.now() + SESSION_TTL_SECONDS * 1000).toISOString();
 
-  await db
-    .prepare(
-      `INSERT INTO sessions (token_hash, user_id, created_at, expires_at)
-       VALUES (?, ?, ?, ?)`,
-    )
-    .bind(tokenHash, userId, createdAt, expiresAt)
-    .run();
+  await db.createSession({
+    created_at: createdAt,
+    expires_at: expiresAt,
+    token_hash: tokenHash,
+    user_id: userId,
+  });
 
   return sessionCookie(token, request, SESSION_TTL_SECONDS);
 }
 
 export async function destroyUserSession(env: ServerEnv, request: Request): Promise<void> {
   const token = readSessionCookie(request);
-  if (!token || !env.DB) {
+  const db = getDatabase(env);
+  if (!token || !db) {
     return;
   }
   const tokenHash = await sha256Hex(token);
-  await env.DB.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(tokenHash).run();
+  await db.deleteSession(tokenHash);
 }
 
 export async function getSessionContext(
   env: ServerEnv,
   request: Request,
 ): Promise<SessionContext | null> {
-  const db = env.DB;
+  const db = getDatabase(env);
   const token = readSessionCookie(request);
   if (!db || !token) {
     return null;
   }
 
   const tokenHash = await sha256Hex(token);
-  const row = await db
-    .prepare(
-      `SELECT
-         users.id,
-         users.email,
-         users.created_at,
-         users.stripe_customer_id
-       FROM sessions
-       JOIN users ON users.id = sessions.user_id
-       WHERE sessions.token_hash = ? AND sessions.expires_at > ?`,
-    )
-    .bind(tokenHash, nowIso())
-    .first<UserRow>();
+  const row = await db.findSessionUser(tokenHash, nowIso());
 
   if (!row) {
     return null;
@@ -126,17 +105,10 @@ export async function getSessionContext(
 }
 
 export async function findUserByEmail(
-  db: D1Database,
+  db: AppDatabase,
   email: string,
 ): Promise<(AuthUser & { passwordHash: string }) | null> {
-  const row = await db
-    .prepare(
-      `SELECT id, email, password_hash, created_at, stripe_customer_id
-       FROM users
-       WHERE email = ?`,
-    )
-    .bind(email)
-    .first<UserRow & { password_hash: string }>();
+  const row = await db.findUserByEmail(email);
 
   return row
     ? {
@@ -147,32 +119,18 @@ export async function findUserByEmail(
 }
 
 export async function findUserByStripeCustomerId(
-  db: D1Database,
+  db: AppDatabase,
   customerId: string,
 ): Promise<AuthUser | null> {
-  const row = await db
-    .prepare(
-      `SELECT id, email, created_at, stripe_customer_id
-       FROM users
-       WHERE stripe_customer_id = ?`,
-    )
-    .bind(customerId)
-    .first<UserRow>();
+  const row = await db.findUserByStripeCustomerId(customerId);
   return row ? rowToUser(row) : null;
 }
 
 export async function getSubscriptionForUser(
-  db: D1Database,
+  db: AppDatabase,
   userId: string,
 ): Promise<UserSubscription | null> {
-  const row = await db
-    .prepare(
-      `SELECT user_id, stripe_subscription_id, status, price_id, current_period_end, updated_at
-       FROM subscriptions
-       WHERE user_id = ?`,
-    )
-    .bind(userId)
-    .first<SubscriptionRow>();
+  const row = await db.getSubscriptionForUser(userId);
 
   return row ? rowToSubscription(row) : null;
 }
@@ -262,7 +220,7 @@ export function serializeAccount(context: SessionContext | null) {
 export function accountDatabaseMissing(): Response {
   return new Response(
     JSON.stringify({
-      error: 'Account database is not configured. Add the Cloudflare D1 DB binding first.',
+      error: 'Account database is not configured. Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to the Worker first.',
     }),
     {
       headers: {
@@ -276,8 +234,9 @@ export function accountDatabaseMissing(): Response {
 
 export function isUniqueConstraintError(error: unknown): boolean {
   return (
-    error instanceof Error &&
-    (error.message.includes('UNIQUE') || error.message.includes('constraint failed'))
+    isDatabaseUniqueConstraintError(error) ||
+    (error instanceof Error &&
+      (error.message.includes('UNIQUE') || error.message.includes('constraint failed')))
   );
 }
 

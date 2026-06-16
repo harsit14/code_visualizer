@@ -1,32 +1,15 @@
-export type D1Result = {
-  success: boolean;
-  meta?: {
-    changes?: number;
-    last_row_id?: number;
-  };
-};
-
-export type D1PreparedStatement = {
-  bind(...values: unknown[]): D1PreparedStatement;
-  first<T = Record<string, unknown>>(): Promise<T | null>;
-  run(): Promise<D1Result>;
-  all<T = Record<string, unknown>>(): Promise<{ results: T[] }>;
-};
-
-export type D1Database = {
-  prepare(query: string): D1PreparedStatement;
-};
-
 export type AssetBinding = {
   fetch(request: Request): Promise<Response>;
 };
 
 export type ServerEnv = {
   ASSETS?: AssetBinding;
-  DB?: D1Database;
   DEEPSEEK_API_KEY?: string;
   DEEPSEEK_MODEL?: string;
   DISABLE_USAGE_GATE?: string;
+  SUPABASE_URL?: string;
+  SUPABASE_SERVICE_ROLE_KEY?: string;
+  SUPABASE_SCHEMA?: string;
   STRIPE_SECRET_KEY?: string;
   STRIPE_PRICE_ID?: string;
   STRIPE_WEBHOOK_SECRET?: string;

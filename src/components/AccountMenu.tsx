@@ -115,7 +115,7 @@ export function AccountMenu({ compact = false }: AccountMenuProps) {
 
         {!account.accountConfigured ? (
           <p className="account-note">
-            Accounts require the Cloudflare Worker API and D1 database. This host is serving the
+            Accounts require the Cloudflare Worker API and Supabase database. This host is serving the
             static app only.
           </p>
         ) : null}

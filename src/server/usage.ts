@@ -1,10 +1,7 @@
 import { getSessionContext, sha256Hex } from './auth';
+import { getDatabase } from './database';
 import { jsonResponse, nowIso } from './http';
 import type { AccountPlan, AuthUser, ServerEnv } from './types';
-
-type UsageRow = {
-  count: number;
-};
 
 export type UsageSnapshot = {
   day: string;
@@ -51,13 +48,14 @@ export async function enforceExplainerUsage(
     };
   }
 
-  if (!env.DB) {
+  const db = getDatabase(env);
+  if (!db) {
     return {
       ok: false,
       response: jsonResponse(
         {
           error:
-            'Account database is not configured. Add the Cloudflare D1 DB binding before enabling the hosted AI explainer publicly.',
+            'Account database is not configured. Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY before enabling the hosted AI explainer publicly.',
         },
         503,
       ),
@@ -72,17 +70,12 @@ export async function enforceExplainerUsage(
     ? `user:${session.user.id}`
     : `anon:${await anonymousSubject(env, request)}`;
 
-  const row = await env.DB.prepare(
-    `INSERT INTO usage_daily (subject, day, plan, count, updated_at)
-     VALUES (?, ?, ?, 1, ?)
-     ON CONFLICT(subject, day)
-     DO UPDATE SET count = count + 1, plan = excluded.plan, updated_at = excluded.updated_at
-     RETURNING count`,
-  )
-    .bind(subject, day, plan, nowIso())
-    .first<UsageRow>();
-
-  const used = Number(row?.count ?? 1);
+  const used = await db.incrementUsageDaily({
+    day,
+    plan,
+    subject,
+    updatedAt: nowIso(),
+  });
   const snapshot: UsageSnapshot = {
     day,
     limit,

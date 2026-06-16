@@ -111,7 +111,7 @@ describe('/api/explain-step', () => {
     expect(response.status).toBe(503);
     expect(await response.json()).toEqual({
       error:
-        'Account database is not configured. Add the Cloudflare D1 DB binding before enabling the hosted AI explainer publicly.',
+        'Account database is not configured. Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY before enabling the hosted AI explainer publicly.',
     });
     expect(fetchMock).not.toHaveBeenCalled();
   });

@@ -12,14 +12,11 @@ import {
   serializeAccount,
   verifyPassword,
 } from './auth';
+import { getDatabase } from './database';
 import { jsonResponse, methodNotAllowed, nowIso, readJson } from './http';
 import { handleHistoryApi } from './historyApi';
 import { limitForPlan, planForUser, usageDay } from './usage';
 import type { AuthUser, ServerEnv } from './types';
-
-type UsageRow = {
-  count: number;
-};
 
 export async function handleAccountApi(request: Request, env: ServerEnv): Promise<Response | null> {
   const url = new URL(request.url);
@@ -55,7 +52,7 @@ export async function handleAccountApi(request: Request, env: ServerEnv): Promis
 }
 
 async function accountStatus(env: ServerEnv, request: Request): Promise<Response> {
-  if (!env.DB) {
+  if (!getDatabase(env)) {
     return jsonResponse({
       accountConfigured: false,
       billingConfigured: false,
@@ -77,7 +74,8 @@ async function accountStatus(env: ServerEnv, request: Request): Promise<Response
 }
 
 async function signUp(env: ServerEnv, request: Request): Promise<Response> {
-  if (!env.DB) {
+  const db = getDatabase(env);
+  if (!db) {
     return accountDatabaseMissing();
   }
 
@@ -96,12 +94,12 @@ async function signUp(env: ServerEnv, request: Request): Promise<Response> {
   const passwordHash = await hashPassword(env, payload.password);
 
   try {
-    await env.DB.prepare(
-      `INSERT INTO users (id, email, password_hash, created_at)
-       VALUES (?, ?, ?, ?)`,
-    )
-      .bind(userId, payload.email, passwordHash, createdAt)
-      .run();
+    await db.createUser({
+      created_at: createdAt,
+      email: payload.email,
+      id: userId,
+      password_hash: passwordHash,
+    });
   } catch (error) {
     if (isUniqueConstraintError(error)) {
       return jsonResponse({ error: 'An account already exists for that email.' }, 409);
@@ -109,7 +107,7 @@ async function signUp(env: ServerEnv, request: Request): Promise<Response> {
     throw error;
   }
 
-  const cookie = await createUserSession(env.DB, request, userId);
+  const cookie = await createUserSession(db, request, userId);
   const context = await getSessionContext(env, withCookie(request, cookie));
   return jsonResponse(
     {
@@ -140,7 +138,8 @@ function createUserId(): string {
 }
 
 async function signIn(env: ServerEnv, request: Request): Promise<Response> {
-  if (!env.DB) {
+  const db = getDatabase(env);
+  if (!db) {
     return accountDatabaseMissing();
   }
 
@@ -149,7 +148,7 @@ async function signIn(env: ServerEnv, request: Request): Promise<Response> {
     return jsonResponse({ error: 'Enter your email and password.' }, 400);
   }
 
-  const user = await findUserByEmail(env.DB, payload.email);
+  const user = await findUserByEmail(db, payload.email);
   if (!user) {
     return jsonResponse({ error: 'Invalid email or password.' }, 401);
   }
@@ -168,7 +167,7 @@ async function signIn(env: ServerEnv, request: Request): Promise<Response> {
     return jsonResponse({ error: 'Invalid email or password.' }, 401);
   }
 
-  const cookie = await createUserSession(env.DB, request, user.id);
+  const cookie = await createUserSession(db, request, user.id);
   const context = await getSessionContext(env, withCookie(request, cookie));
   return jsonResponse(
     {
@@ -196,7 +195,8 @@ async function currentUsage(
   env: ServerEnv,
   user: AuthUser | null,
 ) {
-  if (!env.DB) {
+  const db = getDatabase(env);
+  if (!db) {
     return null;
   }
   const plan = planForUser(env, user);
@@ -205,10 +205,8 @@ async function currentUsage(
   const row =
     subject === null
       ? null
-      : await env.DB.prepare('SELECT count FROM usage_daily WHERE subject = ? AND day = ?')
-          .bind(subject, day)
-          .first<UsageRow>();
-  const used = Number(row?.count ?? 0);
+      : await db.getUsageCount(subject, day);
+  const used = Number(row ?? 0);
   const limit = limitForPlan(env, plan);
   return {
     day,

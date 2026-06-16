@@ -1,6 +1,7 @@
 import { findUserByStripeCustomerId, getSessionContext } from './auth';
+import { getDatabase, type AppDatabase } from './database';
 import { isRecord, isoFromEpochSeconds, jsonResponse, nowIso } from './http';
-import type { AuthUser, D1Database, ServerEnv } from './types';
+import type { AuthUser, ServerEnv } from './types';
 
 type StripeCheckoutSession = {
   client_reference_id?: string | null;
@@ -82,7 +83,7 @@ export async function createPortalSession(env: ServerEnv, request: Request): Pro
   if (!env.STRIPE_SECRET_KEY) {
     return jsonResponse({ error: 'Stripe is not configured.' }, 503);
   }
-  if (!env.DB) {
+  if (!getDatabase(env)) {
     return jsonResponse({ error: 'Account database is not configured.' }, 503);
   }
   const session = await getSessionContext(env, request);
@@ -107,7 +108,8 @@ export async function createPortalSession(env: ServerEnv, request: Request): Pro
 }
 
 export async function handleStripeWebhook(env: ServerEnv, request: Request): Promise<Response> {
-  if (!env.DB) {
+  const db = getDatabase(env);
+  if (!db) {
     return jsonResponse({ error: 'Account database is not configured.' }, 503);
   }
   if (!env.STRIPE_WEBHOOK_SECRET) {
@@ -122,16 +124,13 @@ export async function handleStripeWebhook(env: ServerEnv, request: Request): Pro
 
   const event = JSON.parse(body) as StripeEvent;
   if (event.id) {
-    const existing = await env.DB.prepare('SELECT id FROM billing_events WHERE id = ?')
-      .bind(event.id)
-      .first();
-    if (existing) {
+    if (await db.billingEventExists(event.id)) {
       return jsonResponse({ received: true, duplicate: true });
     }
   }
 
   if (event.type === 'checkout.session.completed') {
-    await handleCheckoutCompleted(env.DB, event.data?.object);
+    await handleCheckoutCompleted(db, event.data?.object);
   }
 
   if (
@@ -139,13 +138,15 @@ export async function handleStripeWebhook(env: ServerEnv, request: Request): Pro
     event.type === 'customer.subscription.updated' ||
     event.type === 'customer.subscription.deleted'
   ) {
-    await handleSubscriptionChanged(env.DB, event.data?.object);
+    await handleSubscriptionChanged(db, event.data?.object);
   }
 
   if (event.id) {
-    await env.DB.prepare('INSERT INTO billing_events (id, type, created_at) VALUES (?, ?, ?)')
-      .bind(event.id, event.type ?? 'unknown', nowIso())
-      .run();
+    await db.insertBillingEvent({
+      created_at: nowIso(),
+      id: event.id,
+      type: event.type ?? 'unknown',
+    });
   }
 
   return jsonResponse({ received: true });
@@ -179,7 +180,7 @@ export async function stripeRequest(
 }
 
 function requireBillingConfig(env: ServerEnv): Response | null {
-  if (!env.DB) {
+  if (!getDatabase(env)) {
     return jsonResponse({ error: 'Account database is not configured.' }, 503);
   }
   if (!env.STRIPE_SECRET_KEY || !env.STRIPE_PRICE_ID) {
@@ -188,7 +189,7 @@ function requireBillingConfig(env: ServerEnv): Response | null {
   return null;
 }
 
-async function handleCheckoutCompleted(db: D1Database, value: unknown): Promise<void> {
+async function handleCheckoutCompleted(db: AppDatabase, value: unknown): Promise<void> {
   if (!isCheckoutSession(value)) {
     return;
   }
@@ -198,10 +199,7 @@ async function handleCheckoutCompleted(db: D1Database, value: unknown): Promise<
   }
 
   if (value.customer) {
-    await db
-      .prepare('UPDATE users SET stripe_customer_id = ? WHERE id = ?')
-      .bind(value.customer, userId)
-      .run();
+    await db.updateUserStripeCustomerId(userId, value.customer);
   }
 
   if (value.subscription && value.payment_status === 'paid') {
@@ -216,7 +214,7 @@ async function handleCheckoutCompleted(db: D1Database, value: unknown): Promise<
   }
 }
 
-async function handleSubscriptionChanged(db: D1Database, value: unknown): Promise<void> {
+async function handleSubscriptionChanged(db: AppDatabase, value: unknown): Promise<void> {
   if (!isStripeSubscription(value)) {
     return;
   }
@@ -234,10 +232,7 @@ async function handleSubscriptionChanged(db: D1Database, value: unknown): Promis
   }
 
   if (customerId) {
-    await db
-      .prepare('UPDATE users SET stripe_customer_id = ? WHERE id = ?')
-      .bind(customerId, userId)
-      .run();
+    await db.updateUserStripeCustomerId(userId, customerId);
   }
 
   await upsertSubscription(db, {
@@ -251,7 +246,7 @@ async function handleSubscriptionChanged(db: D1Database, value: unknown): Promis
 }
 
 async function upsertSubscription(
-  db: D1Database,
+  db: AppDatabase,
   subscription: {
     currentPeriodEnd: string | null;
     priceId: string | null;
@@ -261,37 +256,15 @@ async function upsertSubscription(
     userId: string;
   },
 ): Promise<void> {
-  await db
-    .prepare(
-      `INSERT INTO subscriptions (
-         user_id,
-         stripe_customer_id,
-         stripe_subscription_id,
-         status,
-         price_id,
-         current_period_end,
-         updated_at
-       )
-       VALUES (?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(user_id)
-       DO UPDATE SET
-         stripe_customer_id = excluded.stripe_customer_id,
-         stripe_subscription_id = excluded.stripe_subscription_id,
-         status = excluded.status,
-         price_id = excluded.price_id,
-         current_period_end = excluded.current_period_end,
-         updated_at = excluded.updated_at`,
-    )
-    .bind(
-      subscription.userId,
-      subscription.stripeCustomerId,
-      subscription.stripeSubscriptionId,
-      subscription.status,
-      subscription.priceId,
-      subscription.currentPeriodEnd,
-      nowIso(),
-    )
-    .run();
+  await db.upsertSubscription({
+    current_period_end: subscription.currentPeriodEnd,
+    price_id: subscription.priceId,
+    status: subscription.status,
+    stripe_customer_id: subscription.stripeCustomerId,
+    stripe_subscription_id: subscription.stripeSubscriptionId,
+    updated_at: nowIso(),
+    user_id: subscription.userId,
+  });
 }
 
 async function verifyStripeSignature(
