@@ -108,14 +108,22 @@ async function signUp(env: ServerEnv, request: Request): Promise<Response> {
   }
 
   const cookie = await createUserSession(db, request, userId);
-  const context = await getSessionContext(env, withCookie(request, cookie));
   return jsonResponse(
     {
       accountConfigured: true,
       billingConfigured: false,
-      ...serializeAccount(context),
       subscription: null,
-      usage: await currentUsage(env, context?.user ?? null),
+      user: {
+        createdAt,
+        email: payload.email,
+        id: userId,
+      },
+      usage: await currentUsage(env, {
+        createdAt,
+        email: payload.email,
+        id: userId,
+        stripeCustomerId: null,
+      }),
     },
     201,
     { 'Set-Cookie': cookie },
@@ -168,14 +176,17 @@ async function signIn(env: ServerEnv, request: Request): Promise<Response> {
   }
 
   const cookie = await createUserSession(db, request, user.id);
-  const context = await getSessionContext(env, withCookie(request, cookie));
   return jsonResponse(
     {
       accountConfigured: true,
       billingConfigured: false,
-      ...serializeAccount(context),
       subscription: null,
-      usage: await currentUsage(env, context?.user ?? null),
+      user: {
+        createdAt: user.createdAt,
+        email: user.email,
+        id: user.id,
+      },
+      usage: await currentUsage(env, user),
     },
     200,
     {
@@ -215,11 +226,4 @@ async function currentUsage(
     remaining: Math.max(0, limit - used),
     used,
   };
-}
-
-function withCookie(request: Request, cookie: string): Request {
-  const headers = new Headers(request.headers);
-  const [pair] = cookie.split(';');
-  headers.set('Cookie', pair);
-  return new Request(request, { headers });
 }
