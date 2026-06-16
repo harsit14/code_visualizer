@@ -6,6 +6,7 @@ import {
   findUserByEmail,
   getSessionContext,
   hashPassword,
+  hasPasswordPepper,
   isUniqueConstraintError,
   PasswordHashUpgradeRequiredError,
   readAuthPayload,
@@ -13,15 +14,35 @@ import {
   verifyPassword,
 } from './auth';
 import { getDatabase } from './database';
-import { jsonResponse, methodNotAllowed, nowIso, readJson } from './http';
+import {
+  isRequestBodyTooLargeError,
+  jsonResponse,
+  methodNotAllowed,
+  nowIso,
+  readLimitedJson,
+  rejectCrossOriginStateChange,
+  requestBodyTooLargeResponse,
+} from './http';
 import { handleHistoryApi } from './historyApi';
+import { enforceIpRateLimit } from './rateLimit';
 import { limitForPlan, planForUser, usageDay } from './usage';
 import type { AuthUser, ServerEnv } from './types';
+
+const AUTH_BODY_LIMIT_BYTES = 4096;
+const AUTH_RATE_LIMIT = {
+  limit: 5,
+  windowMs: 60_000,
+};
 
 export async function handleAccountApi(request: Request, env: ServerEnv): Promise<Response | null> {
   const url = new URL(request.url);
 
   try {
+    const crossOriginResponse = rejectCrossOriginStateChange(request);
+    if (crossOriginResponse) {
+      return crossOriginResponse;
+    }
+
     const historyResponse = await handleHistoryApi(request, env);
     if (historyResponse) {
       return historyResponse;
@@ -42,7 +63,6 @@ export async function handleAccountApi(request: Request, env: ServerEnv): Promis
     if (url.pathname === '/api/auth/logout') {
       return request.method === 'POST' ? signOut(env, request) : methodNotAllowed(['POST']);
     }
-
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unexpected account API error.';
     return jsonResponse({ error: message }, 500);
@@ -74,12 +94,26 @@ async function accountStatus(env: ServerEnv, request: Request): Promise<Response
 }
 
 async function signUp(env: ServerEnv, request: Request): Promise<Response> {
+  const limited = enforceIpRateLimit(request, {
+    ...AUTH_RATE_LIMIT,
+    namespace: 'auth:signup',
+  });
+  if (limited) {
+    return limited;
+  }
   const db = getDatabase(env);
   if (!db) {
     return accountDatabaseMissing();
   }
+  if (!hasPasswordPepper(env)) {
+    return jsonResponse({ error: 'Password hashing is not configured.' }, 503);
+  }
 
-  const payload = readAuthPayload(await readJson(request));
+  const body = await readAuthJson(request);
+  if (body instanceof Response) {
+    return body;
+  }
+  const payload = readAuthPayload(body);
   if (!payload) {
     return jsonResponse(
       {
@@ -146,12 +180,26 @@ function createUserId(): string {
 }
 
 async function signIn(env: ServerEnv, request: Request): Promise<Response> {
+  const limited = enforceIpRateLimit(request, {
+    ...AUTH_RATE_LIMIT,
+    namespace: 'auth:login',
+  });
+  if (limited) {
+    return limited;
+  }
   const db = getDatabase(env);
   if (!db) {
     return accountDatabaseMissing();
   }
+  if (!hasPasswordPepper(env)) {
+    return jsonResponse({ error: 'Password hashing is not configured.' }, 503);
+  }
 
-  const payload = readAuthPayload(await readJson(request));
+  const body = await readAuthJson(request);
+  if (body instanceof Response) {
+    return body;
+  }
+  const payload = readAuthPayload(body);
   if (!payload) {
     return jsonResponse({ error: 'Enter your email and password.' }, 400);
   }
@@ -195,6 +243,17 @@ async function signIn(env: ServerEnv, request: Request): Promise<Response> {
   );
 }
 
+async function readAuthJson(request: Request): Promise<unknown | Response> {
+  try {
+    return await readLimitedJson(request, AUTH_BODY_LIMIT_BYTES);
+  } catch (error) {
+    if (isRequestBodyTooLargeError(error)) {
+      return requestBodyTooLargeResponse(error);
+    }
+    throw error;
+  }
+}
+
 async function signOut(env: ServerEnv, request: Request): Promise<Response> {
   await destroyUserSession(env, request);
   return jsonResponse({ ok: true }, 200, {
@@ -202,10 +261,7 @@ async function signOut(env: ServerEnv, request: Request): Promise<Response> {
   });
 }
 
-async function currentUsage(
-  env: ServerEnv,
-  user: AuthUser | null,
-) {
+async function currentUsage(env: ServerEnv, user: AuthUser | null) {
   const db = getDatabase(env);
   if (!db) {
     return null;
@@ -213,10 +269,7 @@ async function currentUsage(
   const plan = planForUser(env, user);
   const day = usageDay();
   const subject = user ? `user:${user.id}` : null;
-  const row =
-    subject === null
-      ? null
-      : await db.getUsageCount(subject, day);
+  const row = subject === null ? null : await db.getUsageCount(subject, day);
   const used = Number(row ?? 0);
   const limit = limitForPlan(env, plan);
   return {

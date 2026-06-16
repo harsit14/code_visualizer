@@ -7,6 +7,15 @@ const JSON_HEADERS = {
   'Content-Type': 'application/json; charset=utf-8',
   'X-Code-Visualizer-Function': 'worker-api',
 };
+const STATIC_SECURITY_HEADERS = {
+  'Content-Security-Policy':
+    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'",
+  'Cross-Origin-Embedder-Policy': 'require-corp',
+  'Cross-Origin-Opener-Policy': 'same-origin',
+  'Cross-Origin-Resource-Policy': 'same-origin',
+  'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+  'X-Content-Type-Options': 'nosniff',
+};
 
 export default {
   async fetch(request: Request, env: ServerEnv): Promise<Response> {
@@ -36,6 +45,14 @@ export default {
     if (!env.ASSETS) {
       return new Response('Static assets are not configured.', { status: 503 });
     }
-    return env.ASSETS.fetch(request);
+    return withStaticSecurityHeaders(await env.ASSETS.fetch(request));
   },
 };
+
+function withStaticSecurityHeaders(response: Response): Response {
+  const secured = new Response(response.body, response);
+  Object.entries(STATIC_SECURITY_HEADERS).forEach(([header, value]) => {
+    secured.headers.set(header, value);
+  });
+  return secured;
+}

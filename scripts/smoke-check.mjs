@@ -14,9 +14,11 @@ const requiredFiles = [
   'assets/pyodide/python_stdlib.zip',
 ];
 const requiredHeaders = [
+  'Content-Security-Policy:',
   'Cross-Origin-Opener-Policy: same-origin',
   'Cross-Origin-Embedder-Policy: require-corp',
   'Cross-Origin-Resource-Policy: same-origin',
+  'Strict-Transport-Security: max-age=31536000; includeSubDomains',
   'X-Content-Type-Options: nosniff',
 ];
 const failures = [];

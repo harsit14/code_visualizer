@@ -73,25 +73,29 @@ The migration creates:
 
 Set these Worker variables and secrets:
 
-| Name                       | Type     | Purpose                                         |
-| -------------------------- | -------- | ----------------------------------------------- |
-| `SUPABASE_URL`             | Variable | Supabase project URL, for example `https://...supabase.co`. |
-| `SUPABASE_SERVICE_ROLE_KEY` | Secret   | Server-side Supabase service role key.          |
-| `SUPABASE_SCHEMA`          | Variable | Optional, default `public`.                     |
-| `ANON_USAGE_SALT`          | Secret   | Hashes anonymous usage subjects.                |
-| `ANON_DAILY_EXPLAIN_LIMIT` | Variable | Optional, default `3`.                          |
-| `FREE_DAILY_EXPLAIN_LIMIT` | Variable | Optional, default `5`.                          |
-| `ADMIN_EMAILS`             | Variable | Optional comma/space-separated admin allowlist. |
-| `PASSWORD_PEPPER`          | Secret   | Signs password hashes; set before public launch. |
+| Name                        | Type     | Purpose                                                     |
+| --------------------------- | -------- | ----------------------------------------------------------- |
+| `SUPABASE_URL`              | Variable | Supabase project URL, for example `https://...supabase.co`. |
+| `SUPABASE_SERVICE_ROLE_KEY` | Secret   | Server-side Supabase service role key.                      |
+| `SUPABASE_SCHEMA`           | Variable | Optional, default `public`.                                 |
+| `ANON_USAGE_SALT`           | Secret   | Hashes anonymous usage subjects.                            |
+| `ANON_DAILY_EXPLAIN_LIMIT`  | Variable | Optional, default `3`.                                      |
+| `FREE_DAILY_EXPLAIN_LIMIT`  | Variable | Optional, default `5`.                                      |
+| `ADMIN_EMAILS`              | Variable | Optional comma/space-separated admin allowlist.             |
+| `PASSWORD_PEPPER`           | Secret   | Signs password hashes; set before public launch.            |
 
 The landing page lives at `/`. The dashboard lives at `/app`. Shared trace links
 with `#cv=` and iframe embeds still open the dashboard directly.
 
-Password hashes use a Worker-friendly HMAC format signed with `PASSWORD_PEPPER`
-or, if unset, `ANON_USAGE_SALT`. Set `PASSWORD_PEPPER` as an encrypted secret in
-Cloudflare before inviting users. Older PBKDF2 hashes are recognized, but hashes
-above `PBKDF2_VERIFY_ITERATIONS_LIMIT` are refused before they can exhaust free
-Worker CPU.
+Password hashes use a Worker-friendly HMAC format signed with `PASSWORD_PEPPER`.
+Set `PASSWORD_PEPPER` as an encrypted secret in Cloudflare before inviting
+users; signup and login return `503` when it is missing. Older PBKDF2 hashes are
+recognized, but hashes above `PBKDF2_VERIFY_ITERATIONS_LIMIT` are refused
+before they can exhaust free Worker CPU.
+
+Signup and login are IP-throttled in the Worker at 5 attempts per minute per
+route. Auth JSON bodies are capped at 4 KB, and saved-history POST bodies are
+capped at 600 KB before parsing.
 
 ### Parked Subscription Code
 
@@ -182,18 +186,25 @@ Upload for Pages Functions.
 ## Required Headers
 
 `public/_headers` is copied into `dist/_headers` during build. It enables
-cross-origin isolation so Pyodide can use `SharedArrayBuffer` interrupts:
+cross-origin isolation so Pyodide can use `SharedArrayBuffer` interrupts, and it
+sets the static asset security headers:
 
 ```text
 /*
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Embedder-Policy: require-corp
   Cross-Origin-Resource-Policy: same-origin
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
   X-Content-Type-Options: nosniff
 ```
 
 Do not remove these headers unless the timeout strategy is changed to worker
 termination only.
+
+`frame-ancestors` is intentionally not set while iframe embeds are a product
+feature. If you want to disable external embedding before launch, add
+`frame-ancestors 'self'` to the CSP and remove the public embed affordance.
 
 ## Production Smoke Test
 

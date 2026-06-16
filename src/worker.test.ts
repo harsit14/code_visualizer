@@ -21,6 +21,11 @@ describe('worker', () => {
     });
 
     expect(await response.text()).toBe('asset');
+    expect(response.headers.get('Content-Security-Policy')).toContain("default-src 'self'");
+    expect(response.headers.get('Strict-Transport-Security')).toBe(
+      'max-age=31536000; includeSubDomains',
+    );
+    expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff');
     expect(assetsFetch).toHaveBeenCalledTimes(1);
   });
 

@@ -1,11 +1,20 @@
 import { accountDatabaseMissing, getSessionContext } from './auth';
 import { getDatabase, type AppDatabase, type HistoryRow } from './database';
-import { isRecord, jsonResponse, methodNotAllowed, nowIso, readJson } from './http';
+import {
+  isRecord,
+  isRequestBodyTooLargeError,
+  jsonResponse,
+  methodNotAllowed,
+  nowIso,
+  readLimitedJson,
+  requestBodyTooLargeResponse,
+} from './http';
 import type { ServerEnv } from './types';
 
 const HISTORY_LIMIT = 50;
 const LIST_LIMIT = 30;
 const MAX_CODE_LENGTH = 200_000;
+const MAX_HISTORY_BODY_BYTES = 600_000;
 const MAX_TITLE_LENGTH = 120;
 const MAX_INPUT_COUNT = 24;
 const MAX_INPUT_LENGTH = 10_000;
@@ -24,10 +33,7 @@ type HistoryPayload = {
   title: string;
 };
 
-export async function handleHistoryApi(
-  request: Request,
-  env: ServerEnv,
-): Promise<Response | null> {
+export async function handleHistoryApi(request: Request, env: ServerEnv): Promise<Response | null> {
   const url = new URL(request.url);
   if (url.pathname === '/api/history') {
     if (request.method === 'GET') {
@@ -74,7 +80,9 @@ async function getHistoryItem(env: ServerEnv, request: Request, id: string): Pro
 
   const row = await auth.db.getHistoryItem(id, auth.userId);
 
-  return row ? jsonResponse({ item: rowToHistoryItem(row) }) : jsonResponse({ error: 'History item not found.' }, 404);
+  return row
+    ? jsonResponse({ item: rowToHistoryItem(row) })
+    : jsonResponse({ error: 'History item not found.' }, 404);
 }
 
 async function saveHistory(env: ServerEnv, request: Request): Promise<Response> {
@@ -83,15 +91,17 @@ async function saveHistory(env: ServerEnv, request: Request): Promise<Response> 
     return auth;
   }
 
-  const payload = readHistoryPayload(await readJson(request));
+  const body = await readHistoryJson(request);
+  if (body instanceof Response) {
+    return body;
+  }
+  const payload = readHistoryPayload(body);
   if (!payload) {
     return jsonResponse({ error: 'History item is invalid.' }, 400);
   }
 
   const now = nowIso();
-  const existingId = payload.id
-    ? await findOwnedHistoryId(auth.db, auth.userId, payload.id)
-    : null;
+  const existingId = payload.id ? await findOwnedHistoryId(auth.db, auth.userId, payload.id) : null;
   const id = existingId ?? crypto.randomUUID();
 
   if (existingId) {
@@ -173,6 +183,17 @@ async function pruneHistory(db: AppDatabase, userId: string): Promise<void> {
   await db.pruneHistory(userId, HISTORY_LIMIT);
 }
 
+async function readHistoryJson(request: Request): Promise<unknown | Response> {
+  try {
+    return await readLimitedJson(request, MAX_HISTORY_BODY_BYTES);
+  } catch (error) {
+    if (isRequestBodyTooLargeError(error)) {
+      return requestBodyTooLargeResponse(error);
+    }
+    throw error;
+  }
+}
+
 function readHistoryPayload(value: unknown): HistoryPayload | null {
   if (!isRecord(value)) {
     return null;
@@ -225,7 +246,9 @@ function readInputs(value: unknown): string[] | null {
     return null;
   }
   const inputs = value.map((input) => (typeof input === 'string' ? input : null));
-  return inputs.every((input): input is string => input !== null && input.length <= MAX_INPUT_LENGTH)
+  return inputs.every(
+    (input): input is string => input !== null && input.length <= MAX_INPUT_LENGTH,
+  )
     ? inputs
     : null;
 }

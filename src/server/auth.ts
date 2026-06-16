@@ -1,4 +1,4 @@
-import { isRecord, nowIso } from './http';
+import { isRecord, jsonResponse, nowIso } from './http';
 import {
   getDatabase,
   isDatabaseUniqueConstraintError,
@@ -29,6 +29,13 @@ export class PasswordHashUpgradeRequiredError extends Error {
   }
 }
 
+export class PasswordPepperMissingError extends Error {
+  constructor() {
+    super('PASSWORD_PEPPER is not configured.');
+    this.name = 'PasswordPepperMissingError';
+  }
+}
+
 export type SessionContext = {
   subscription: UserSubscription | null;
   user: AuthUser;
@@ -50,6 +57,10 @@ export function validatePassword(value: unknown): string | null {
     return null;
   }
   return value;
+}
+
+export function hasPasswordPepper(env: ServerEnv): boolean {
+  return Boolean(env.PASSWORD_PEPPER?.trim());
 }
 
 export async function createUserSession(
@@ -139,11 +150,7 @@ export async function hashPassword(env: ServerEnv, password: string): Promise<st
   const salt = crypto.getRandomValues(new Uint8Array(PASSWORD_SALT_BYTES));
   const signature = await passwordSignature(env, password, salt);
 
-  return [
-    PASSWORD_HASH_ALGORITHM,
-    bytesToBase64(salt),
-    bytesToBase64(signature),
-  ].join('$');
+  return [PASSWORD_HASH_ALGORITHM, bytesToBase64(salt), bytesToBase64(signature)].join('$');
 }
 
 export async function verifyPassword(
@@ -218,17 +225,12 @@ export function serializeAccount(context: SessionContext | null) {
 }
 
 export function accountDatabaseMissing(): Response {
-  return new Response(
-    JSON.stringify({
-      error: 'Account database is not configured. Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to the Worker first.',
-    }),
+  return jsonResponse(
     {
-      headers: {
-        'Cache-Control': 'no-store',
-        'Content-Type': 'application/json; charset=utf-8',
-      },
-      status: 503,
+      error:
+        'Account database is not configured. Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to the Worker first.',
     },
+    503,
   );
 }
 
@@ -325,14 +327,16 @@ async function passwordSignature(
 }
 
 function passwordPepper(env: ServerEnv): string {
-  return env.PASSWORD_PEPPER?.trim() || env.ANON_USAGE_SALT?.trim() || 'code-visualizer-passwords';
+  const pepper = env.PASSWORD_PEPPER?.trim();
+  if (!pepper) {
+    throw new PasswordPepperMissingError();
+  }
+  return pepper;
 }
 
 function legacyPbkdf2VerifyLimit(env: ServerEnv): number {
   const parsed = Number(env.PBKDF2_VERIFY_ITERATIONS_LIMIT);
-  return Number.isSafeInteger(parsed) && parsed > 0
-    ? parsed
-    : DEFAULT_LEGACY_PBKDF2_VERIFY_LIMIT;
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : DEFAULT_LEGACY_PBKDF2_VERIFY_LIMIT;
 }
 
 function bytesToHex(bytes: Uint8Array): string {
