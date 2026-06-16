@@ -12,6 +12,7 @@ import { EditorPanel } from '../components/EditorPanel';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { ExplainerPanel } from '../components/ExplainerPanel';
 import { InputsPanel } from '../components/InputsPanel';
+import { LandingPage } from '../components/LandingPage';
 import { ProductTour } from '../components/ProductTour';
 import { TopBar } from '../components/TopBar';
 import { VariablesPanel } from '../components/VariablesPanel';
@@ -95,6 +96,14 @@ function initialEmbedMode() {
   return new URLSearchParams(window.location.search).get(EMBED_SEARCH_PARAM) === '1';
 }
 
+function shouldShowDashboard(): boolean {
+  return (
+    initialEmbedMode() ||
+    window.location.pathname.startsWith('/app') ||
+    window.location.hash.startsWith('#cv=')
+  );
+}
+
 function initialLanguage(exampleId: string | null, sharedLanguage: Language | undefined): Language {
   return sharedLanguage ?? (exampleId ? (getExample(exampleId)?.language ?? 'python') : 'python');
 }
@@ -140,6 +149,22 @@ function workbenchColumns(columnIds: readonly ColumnId[], weights: ColumnWeights
 }
 
 export function App() {
+  const [showDashboard, setShowDashboard] = useState(shouldShowDashboard);
+
+  useEffect(() => {
+    const syncRoute = () => setShowDashboard(shouldShowDashboard());
+    window.addEventListener('popstate', syncRoute);
+    window.addEventListener('hashchange', syncRoute);
+    return () => {
+      window.removeEventListener('popstate', syncRoute);
+      window.removeEventListener('hashchange', syncRoute);
+    };
+  }, []);
+
+  return showDashboard ? <DashboardApp /> : <LandingPage />;
+}
+
+function DashboardApp() {
   const [shared] = useState(initialShare);
   const [exampleId, setExampleId] = useState<string | null>(
     shared ? (shared.exampleId ?? null) : DEFAULT_EXAMPLE_ID,

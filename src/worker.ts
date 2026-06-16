@@ -1,14 +1,6 @@
 import { onRequest, onRequestOptions, onRequestPost } from '../functions/api/explain-step';
-
-type AssetBinding = {
-  fetch(request: Request): Promise<Response>;
-};
-
-type Env = {
-  ASSETS: AssetBinding;
-  DEEPSEEK_API_KEY?: string;
-  DEEPSEEK_MODEL?: string;
-};
+import { handleAccountApi } from './server/accountApi';
+import type { ServerEnv } from './server/types';
 
 const JSON_HEADERS = {
   'Cache-Control': 'no-store',
@@ -17,7 +9,7 @@ const JSON_HEADERS = {
 };
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: ServerEnv): Promise<Response> {
     const url = new URL(request.url);
 
     if (url.pathname === '/api/explain-step') {
@@ -31,12 +23,19 @@ export default {
     }
 
     if (url.pathname.startsWith('/api/')) {
+      const apiResponse = await handleAccountApi(request, env);
+      if (apiResponse) {
+        return apiResponse;
+      }
       return new Response(JSON.stringify({ error: 'API route not found.' }), {
         headers: JSON_HEADERS,
         status: 404,
       });
     }
 
+    if (!env.ASSETS) {
+      return new Response('Static assets are not configured.', { status: 503 });
+    }
     return env.ASSETS.fetch(request);
   },
 };

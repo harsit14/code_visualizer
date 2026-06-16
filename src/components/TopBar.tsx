@@ -14,6 +14,7 @@ import {
   Upload,
 } from 'lucide-react';
 import { useRef } from 'react';
+import { AccountMenu } from './AccountMenu';
 import { examples } from '../examples/examples';
 import type { Language, RuntimeStatus } from '../engine/types';
 
@@ -207,6 +208,7 @@ export function TopBar({
         >
           {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
         </button>
+        <AccountMenu compact />
       </div>
     </header>
   );

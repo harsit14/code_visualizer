@@ -23,4 +23,18 @@ describe('worker', () => {
     expect(await response.text()).toBe('asset');
     expect(assetsFetch).toHaveBeenCalledTimes(1);
   });
+
+  it('serves account API routes before static assets', async () => {
+    const assetsFetch = vi.fn(async () => new Response('asset'));
+    const response = await worker.fetch(new Request('https://example.com/api/me'), {
+      ASSETS: { fetch: assetsFetch },
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      accountConfigured: false,
+      user: null,
+    });
+    expect(assetsFetch).not.toHaveBeenCalled();
+  });
 });

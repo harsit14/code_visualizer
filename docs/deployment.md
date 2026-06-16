@@ -43,6 +43,71 @@ The checked-in `wrangler.jsonc` configures:
 `run_worker_first` is required. Without it, `/api/explain-step` can be served by
 the static SPA fallback and open the dashboard instead of calling the API.
 
+## Accounts, Subscriptions, And Daily Limits
+
+Public accounts use the Cloudflare Worker, a D1 database, HttpOnly session
+cookies, and Stripe Checkout.
+
+Create the D1 database:
+
+```bash
+npx wrangler d1 create code-visualizer-prod
+```
+
+Add the returned binding to `wrangler.jsonc`:
+
+```jsonc
+"d1_databases": [
+  {
+    "binding": "DB",
+    "database_name": "code-visualizer-prod",
+    "database_id": "paste-the-database-id-here"
+  }
+]
+```
+
+Run the migration:
+
+```bash
+npx wrangler d1 migrations apply code-visualizer-prod --remote
+```
+
+The migration creates:
+
+- `users`: email/password account records.
+- `sessions`: hashed HttpOnly session tokens.
+- `subscriptions`: Stripe subscription entitlement state.
+- `usage_daily`: daily AI explainer counters.
+- `billing_events`: Stripe webhook idempotency records.
+
+Set these Worker variables and secrets:
+
+| Name                       | Type     | Purpose                                         |
+| -------------------------- | -------- | ----------------------------------------------- |
+| `STRIPE_SECRET_KEY`        | Secret   | Creates Checkout and billing portal sessions.   |
+| `STRIPE_PRICE_ID`          | Variable | The Stripe recurring Price ID for the Pro plan. |
+| `STRIPE_WEBHOOK_SECRET`    | Secret   | Verifies Stripe webhook signatures.             |
+| `ANON_USAGE_SALT`          | Secret   | Hashes anonymous usage subjects.                |
+| `ANON_DAILY_EXPLAIN_LIMIT` | Variable | Optional, default `3`.                          |
+| `FREE_DAILY_EXPLAIN_LIMIT` | Variable | Optional, default `5`.                          |
+| `PRO_DAILY_EXPLAIN_LIMIT`  | Variable | Optional, default `250`.                        |
+
+In Stripe:
+
+1. Create a Product and recurring Price for the Pro subscription.
+2. Copy the Price ID into `STRIPE_PRICE_ID`.
+3. Add a webhook endpoint:
+   `https://your-domain.com/api/stripe/webhook`.
+4. Subscribe the webhook to:
+   - `checkout.session.completed`
+   - `customer.subscription.created`
+   - `customer.subscription.updated`
+   - `customer.subscription.deleted`
+5. Copy the webhook signing secret into `STRIPE_WEBHOOK_SECRET`.
+
+The landing page lives at `/`. The dashboard lives at `/app`. Shared trace links
+with `#cv=` and iframe embeds still open the dashboard directly.
+
 ## AI Explainer Secret
 
 The Explainer panel calls `/api/explain-step`. The Worker reads your DeepSeek key
@@ -60,6 +125,10 @@ In Cloudflare:
 
 Optional: add `DEEPSEEK_MODEL` if you want to override the default
 `deepseek-v4-flash`.
+
+The explainer route is now gated before the DeepSeek request. Anonymous visitors
+get the anonymous daily limit, signed-in free users get the free daily limit,
+and active or trialing Stripe subscribers get the Pro daily limit.
 
 For local testing through Cloudflare's runtime:
 
@@ -87,17 +156,6 @@ X-Code-Visualizer-Function: explain-step
 If it loads the Code Visualizer app instead, `/api/*` is not running through the
 Worker first. Check that the latest commit deployed and that `wrangler.jsonc`
 includes `assets.run_worker_first = ["/api/*"]`.
-
-Before charging subscriptions publicly, add account/session verification in
-`functions/api/explain-step.ts` or `src/worker.ts` before the DeepSeek request. A
-typical Cloudflare setup is:
-
-- Auth/session provider: Clerk, Auth.js, Supabase Auth, or Cloudflare Access for
-  private beta.
-- Billing: Stripe Checkout or Lemon Squeezy.
-- Entitlements/rate limits: D1 or KV keyed by user ID.
-- Function gate: verify the user token and subscription status before calling
-  DeepSeek.
 
 ## Cloudflare Pages Alternative
 

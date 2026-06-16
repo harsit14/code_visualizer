@@ -37,7 +37,7 @@ describe('/api/explain-step', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const response = await onRequestPost({
-      env: { DEEPSEEK_API_KEY: 'sk-server-only' },
+      env: { DEEPSEEK_API_KEY: 'sk-server-only', DISABLE_USAGE_GATE: '1' },
       request: new Request('https://example.com/api/explain-step', {
         body: JSON.stringify({ context }),
         headers: { 'Content-Type': 'application/json' },
@@ -90,6 +90,27 @@ describe('/api/explain-step', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('does not call DeepSeek when usage storage is missing', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await onRequestPost({
+      env: { DEEPSEEK_API_KEY: 'sk-server-only' },
+      request: new Request('https://example.com/api/explain-step', {
+        body: JSON.stringify({ context }),
+        headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+      }),
+    });
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({
+      error:
+        'Account database is not configured. Add the Cloudflare D1 DB binding before enabling the hosted AI explainer publicly.',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('returns JSON when the DeepSeek fetch throws', async () => {
     const fetchMock = vi.fn(async () => {
       throw new Error('network unavailable');
@@ -97,7 +118,7 @@ describe('/api/explain-step', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const response = await onRequestPost({
-      env: { DEEPSEEK_API_KEY: 'sk-server-only' },
+      env: { DEEPSEEK_API_KEY: 'sk-server-only', DISABLE_USAGE_GATE: '1' },
       request: new Request('https://example.com/api/explain-step', {
         body: JSON.stringify({ context }),
         headers: { 'Content-Type': 'application/json' },

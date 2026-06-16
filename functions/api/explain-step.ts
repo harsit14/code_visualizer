@@ -1,7 +1,10 @@
+import { enforceExplainerUsage } from '../../src/server/usage';
+import type { ServerEnv } from '../../src/server/types';
+
 type Env = {
   DEEPSEEK_API_KEY?: string;
   DEEPSEEK_MODEL?: string;
-};
+} & ServerEnv;
 
 type PagesContext = {
   request: Request;
@@ -102,7 +105,11 @@ async function handlePost({ env, request }: PagesContext): Promise<Response> {
     return json({ error: 'Invalid explanation context.' }, 400);
   }
 
-  // Subscription/auth checks should happen here before spending DeepSeek tokens.
+  const quota = await enforceExplainerUsage(env, request);
+  if (!quota.ok) {
+    return quota.response;
+  }
+
   const model = env.DEEPSEEK_MODEL?.trim() || DEFAULT_DEEPSEEK_MODEL;
   const deepSeekResponse = await fetch(DEEPSEEK_CHAT_COMPLETIONS_URL, {
     body: JSON.stringify({
@@ -137,7 +144,7 @@ async function handlePost({ env, request }: PagesContext): Promise<Response> {
     return json({ error: 'DeepSeek returned an empty explanation.' }, 502);
   }
 
-  return json(explanation);
+  return json(explanation, 200, quota.headers);
 }
 
 export function onRequestOptions(): Response {

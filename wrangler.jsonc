@@ -3,6 +3,13 @@
   "name": "code-visualizer",
   "main": "src/worker.ts",
   "compatibility_date": "2026-06-15",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "codemapper",
+      "database_id": "e4401674-0d86-4b53-9d4b-30ec15130f75",
+    },
+  ],
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
