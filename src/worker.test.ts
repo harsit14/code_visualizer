@@ -37,4 +37,17 @@ describe('worker', () => {
     });
     expect(assetsFetch).not.toHaveBeenCalled();
   });
+
+  it('serves history API routes before static assets', async () => {
+    const assetsFetch = vi.fn(async () => new Response('asset'));
+    const response = await worker.fetch(new Request('https://example.com/api/history'), {
+      ASSETS: { fetch: assetsFetch },
+    });
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({
+      error: expect.stringContaining('Account database is not configured'),
+    });
+    expect(assetsFetch).not.toHaveBeenCalled();
+  });
 });

@@ -33,6 +33,7 @@ import {
   type PanelVisibility,
   type PanelWeights,
 } from './layoutState';
+import { saveCodeHistory, type CodeHistoryItem } from './historyClient';
 import { buildIframeEmbedCode, decodeShareHash, encodeShareState } from './shareState';
 import { buildTraceSvgExport } from './traceSvgExport';
 import { useSession } from './useSession';
@@ -128,6 +129,21 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
+function historyTitle(exampleId: string | null, functionName: string | null, code: string): string {
+  const exampleTitle = exampleId ? getExample(exampleId)?.title : null;
+  if (exampleTitle) {
+    return exampleTitle;
+  }
+  if (functionName) {
+    return functionName;
+  }
+  return code
+    .split('\n')
+    .map((line) => line.trim())
+    .find(Boolean)
+    ?.slice(0, 80) ?? 'Untitled code';
+}
+
 function isPanelId(id: string): id is PanelId {
   return PANEL_DEFINITIONS.some((panel) => panel.id === id);
 }
@@ -177,6 +193,7 @@ function DashboardApp() {
   const [importLabel, setImportLabel] = useState(DEFAULT_IMPORT_LABEL);
   const [importTitle, setImportTitle] = useState(DEFAULT_IMPORT_TITLE);
   const [watchedVariables, setWatchedVariables] = useState<string[]>([]);
+  const [historyRefreshToken, setHistoryRefreshToken] = useState(0);
   const [breakpoints, setBreakpoints] = useState<Set<number>>(() => new Set());
   const [cursorLine, setCursorLine] = useState<number | null>(null);
   const [panelVisibility, setPanelVisibility] = useState<PanelVisibility>(() =>
@@ -209,6 +226,7 @@ function DashboardApp() {
   });
   const panelSlotRefs = useRef<Partial<Record<PanelId, HTMLDivElement | null>>>({});
   const importStatusTimeoutRef = useRef<number | null>(null);
+  const currentHistoryIdRef = useRef<string | null>(null);
 
   const session = useSession(initialCode, {
     language: initialSessionLanguage,
@@ -317,6 +335,45 @@ function DashboardApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (embedMode || session.result?.status !== 'ok' || !session.result.run) {
+      return;
+    }
+
+    let cancelled = false;
+    const run = session.result.run;
+    void saveCodeHistory({
+      code: session.code,
+      exampleId,
+      functionName: run.functionName ?? session.functionOverride,
+      id: currentHistoryIdRef.current,
+      inputs: run.inputs.map((input) => input.literal),
+      language: session.language,
+      seed: run.seed,
+      title: historyTitle(exampleId, run.functionName ?? session.functionOverride, session.code),
+    })
+      .then((item) => {
+        if (!cancelled && item) {
+          currentHistoryIdRef.current = item.id;
+          setHistoryRefreshToken((current) => current + 1);
+        }
+      })
+      .catch(() => {
+        /* History is best-effort: guests and local static dev can still run code. */
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    embedMode,
+    exampleId,
+    session.code,
+    session.functionOverride,
+    session.language,
+    session.result,
+  ]);
+
   // Keyboard transport: ←/→ step, Space play/pause, Home/End jump. Ignored
   // while typing in the editor, inputs, or any form control.
   const { stepBack, stepForward, togglePlay, totalSteps } = session;
@@ -368,6 +425,7 @@ function DashboardApp() {
 
   const handleCodeChange = useCallback(
     (code: string) => {
+      currentHistoryIdRef.current = null;
       setExampleId(null);
       setWatchedVariables([]);
       resetTraceNavigation();
@@ -382,6 +440,7 @@ function DashboardApp() {
       if (!example) {
         return;
       }
+      currentHistoryIdRef.current = null;
       setExampleId(id);
       setWatchedVariables([]);
       resetTraceNavigation();
@@ -393,6 +452,7 @@ function DashboardApp() {
 
   const handleLanguageChange = useCallback(
     (nextLanguage: Language) => {
+      currentHistoryIdRef.current = null;
       setExampleId(null);
       setWatchedVariables([]);
       resetTraceNavigation();
@@ -533,6 +593,7 @@ function DashboardApp() {
                 payload.language === 'javascript' || payload.language === 'typescript'
                   ? payload.language
                   : 'python';
+              currentHistoryIdRef.current = null;
               setExampleId(null);
               setWatchedVariables([]);
               resetTraceNavigation();
@@ -548,6 +609,22 @@ function DashboardApp() {
         .catch(() => showImportStatus('Import failed', 'Could not read selected file'));
     },
     [resetTraceNavigation, importSession, showImportStatus],
+  );
+
+  const handleOpenHistoryItem = useCallback(
+    (item: CodeHistoryItem) => {
+      currentHistoryIdRef.current = item.id;
+      setExampleId(item.exampleId);
+      setWatchedVariables([]);
+      resetTraceNavigation();
+      session.loadSource(item.code, {
+        functionName: item.functionName,
+        inputs: item.inputs,
+        language: item.language,
+        seed: item.seed,
+      });
+    },
+    [resetTraceNavigation, session],
   );
 
   const toggleWatchedVariable = useCallback((name: string) => {
@@ -948,11 +1025,13 @@ function DashboardApp() {
             onExport={handleExport}
             onExportSvg={handleExportSvg}
             onImport={handleImport}
+            onOpenHistoryItem={handleOpenHistoryItem}
             onLanguageChange={handleLanguageChange}
             onResetLayout={resetLayout}
             onShare={() => void handleShare()}
             onTogglePanel={togglePanelVisibility}
             onToggleTheme={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))}
+            historyRefreshToken={historyRefreshToken}
             panelControls={panelControls}
             shareLabel={shareLabel}
             status={session.status}

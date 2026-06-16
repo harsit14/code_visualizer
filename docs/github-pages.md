@@ -28,11 +28,11 @@ The project Pages URL is:
 https://harsit14.github.io/code_visualizer/
 ```
 
-## AI Explainer Limitation
+## Backend Limitations
 
-GitHub Pages is static-only, so it cannot run `/api/explain-step` or keep a
-DeepSeek key secret. Use Cloudflare Pages, Vercel, Netlify, or another host with
-serverless functions for the AI explainer.
+GitHub Pages is static-only, so it cannot run `/api/explain-step`, create
+accounts, save code history, or keep a DeepSeek key secret. Use the Cloudflare
+Worker deployment for the AI explainer, accounts, and saved history.
 
 ## If The Page Is Blank
 

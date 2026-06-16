@@ -80,6 +80,7 @@ The migration creates:
 - `subscriptions`: reserved for future Stripe subscription entitlement state.
 - `usage_daily`: daily AI explainer counters.
 - `billing_events`: reserved for future Stripe webhook idempotency records.
+- `code_history`: saved rerunnable code sessions for signed-in users.
 
 Set these Worker variables and secrets:
 

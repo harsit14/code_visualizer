@@ -94,13 +94,20 @@ export function AccountMenu({ compact = false }: AccountMenuProps) {
       </summary>
       <div className="account-popover">
         <header className="account-popover-header">
-          <strong>{account.user ? account.user.email : 'Create your account'}</strong>
-          <span>{planLabel}</span>
+          <strong>
+            {account.user
+              ? account.user.email
+              : account.accountConfigured
+                ? 'Create your account'
+                : 'Accounts unavailable'}
+          </strong>
+          <span>{account.accountConfigured ? planLabel : 'Static host'}</span>
         </header>
 
         {!account.accountConfigured ? (
           <p className="account-note">
-            Account storage is not configured yet. Add the Cloudflare D1 binding before launch.
+            Accounts require the Cloudflare Worker API and D1 database. This host is serving the
+            static app only.
           </p>
         ) : null}
 
@@ -119,7 +126,7 @@ export function AccountMenu({ compact = false }: AccountMenuProps) {
               Sign out
             </button>
           </div>
-        ) : (
+        ) : account.accountConfigured ? (
           <form className="account-form" onSubmit={(event) => void submitAuth(event)}>
             <label>
               Email
@@ -153,7 +160,7 @@ export function AccountMenu({ compact = false }: AccountMenuProps) {
               {mode === 'signup' ? 'I already have an account' : 'Create a new account'}
             </button>
           </form>
-        )}
+        ) : null}
 
         {message ? <p className="account-message">{message}</p> : null}
         {error ? (

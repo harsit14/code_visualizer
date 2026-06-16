@@ -75,7 +75,7 @@ async function requestJson<T = unknown>(url: string, init: RequestInit): Promise
   const text = await response.text();
   if (!contentType.includes('application/json')) {
     throw new Error(
-      'Account API is not available from the static dev server. Use the deployed Worker or wrangler dev.',
+      'Account API is not available from this static host. Use the Cloudflare Worker deployment or wrangler dev.',
     );
   }
   const payload = text ? (JSON.parse(text) as unknown) : null;

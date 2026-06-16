@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 import { useRef } from 'react';
 import { AccountMenu } from './AccountMenu';
+import { HistoryMenu } from './HistoryMenu';
+import type { CodeHistoryItem } from '../app/historyClient';
 import { examples } from '../examples/examples';
 import type { Language, RuntimeStatus } from '../engine/types';
 
@@ -40,10 +42,12 @@ type TopBarProps = {
   canExport: boolean;
   onExport: () => void;
   onExportSvg: () => void;
+  onOpenHistoryItem: (item: CodeHistoryItem) => void;
   onImport: (file: File) => void;
   onResetLayout: () => void;
   onTogglePanel: (id: string, visible: boolean) => void;
   panelControls: readonly PanelControl[];
+  historyRefreshToken: number;
   status: RuntimeStatus;
 };
 
@@ -74,10 +78,12 @@ export function TopBar({
   canExport,
   onExport,
   onExportSvg,
+  onOpenHistoryItem,
   onImport,
   onResetLayout,
   onTogglePanel,
   panelControls,
+  historyRefreshToken,
   status,
 }: TopBarProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -148,6 +154,7 @@ export function TopBar({
           <Upload size={14} />
           {importLabel}
         </button>
+        <HistoryMenu onOpen={onOpenHistoryItem} refreshToken={historyRefreshToken} />
         <details className="panel-menu shortcuts-menu">
           <summary title="Show keyboard and editor shortcuts">
             <HelpCircle size={14} />

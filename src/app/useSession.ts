@@ -30,6 +30,13 @@ type InitialSessionOptions = {
   seed?: number;
 };
 
+type LoadSourceOptions = {
+  functionName?: string | null;
+  inputs?: string[] | null;
+  language: Language;
+  seed?: number | null;
+};
+
 function scriptAnalysis(): AnalysisInfo {
   return {
     mode: 'script',
@@ -181,6 +188,32 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
       setInputDrafts(null);
       setPendingInitialInputs(null);
       scheduleAnalyze(codeRef.current, nextLanguage);
+    },
+    [scheduleAnalyze],
+  );
+
+  const loadSource = useCallback(
+    (nextCode: string, options: LoadSourceOptions) => {
+      if (analyzeTimer.current) {
+        window.clearTimeout(analyzeTimer.current);
+        analyzeTimer.current = null;
+      }
+      codeRef.current = nextCode;
+      languageRef.current = options.language;
+      analyzeSerial.current += 1;
+      setCodeState(nextCode);
+      setLanguageState(options.language);
+      setStatus(idleStatus(options.language));
+      setResult(null);
+      setComplexity(null);
+      setStep(0);
+      setPlaying(false);
+      setSelectedFrameIndex(null);
+      setFunctionOverrideState(options.language === 'python' ? (options.functionName ?? null) : null);
+      setInputDrafts(null);
+      setPendingInitialInputs(options.language === 'python' ? (options.inputs ?? null) : null);
+      setSeed(options.language === 'python' ? (options.seed ?? null) : null);
+      scheduleAnalyze(nextCode, options.language);
     },
     [scheduleAnalyze],
   );
@@ -477,6 +510,7 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
     complexityBusy,
     measureComplexity,
     importSession,
+    loadSource,
     scheduleAnalyze,
   };
 }

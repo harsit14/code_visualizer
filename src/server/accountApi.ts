@@ -12,6 +12,7 @@ import {
   verifyPassword,
 } from './auth';
 import { jsonResponse, methodNotAllowed, nowIso, readJson } from './http';
+import { handleHistoryApi } from './historyApi';
 import { limitForPlan, usageDay } from './usage';
 import type { AccountPlan, ServerEnv } from './types';
 
@@ -23,6 +24,11 @@ export async function handleAccountApi(request: Request, env: ServerEnv): Promis
   const url = new URL(request.url);
 
   try {
+    const historyResponse = await handleHistoryApi(request, env);
+    if (historyResponse) {
+      return historyResponse;
+    }
+
     if (url.pathname === '/api/me') {
       return request.method === 'GET' ? accountStatus(env, request) : methodNotAllowed(['GET']);
     }
