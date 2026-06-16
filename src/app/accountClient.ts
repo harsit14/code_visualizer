@@ -74,6 +74,11 @@ async function requestJson<T = unknown>(url: string, init: RequestInit): Promise
   const contentType = response.headers.get('Content-Type')?.toLowerCase() ?? '';
   const text = await response.text();
   if (!contentType.includes('application/json')) {
+    if (response.status >= 500) {
+      throw new Error(
+        `Account API returned a server error (${response.status}). Check the Worker logs for /api/auth/signup.`,
+      );
+    }
     throw new Error(
       'Account API is not available from this static host. Use the Cloudflare Worker deployment or wrangler dev.',
     );

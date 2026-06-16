@@ -132,6 +132,8 @@ export function AccountMenu({ compact = false }: AccountMenuProps) {
               Email
               <input
                 autoComplete="email"
+                id="account-email"
+                name="email"
                 onChange={(event) => setEmail(event.target.value)}
                 required
                 type="email"
@@ -142,7 +144,9 @@ export function AccountMenu({ compact = false }: AccountMenuProps) {
               Password
               <input
                 autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+                id="account-password"
                 minLength={10}
+                name="password"
                 onChange={(event) => setPassword(event.target.value)}
                 required
                 type="password"

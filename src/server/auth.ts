@@ -4,7 +4,10 @@ import type { AuthUser, D1Database, ServerEnv, UserSubscription } from './types'
 export const SESSION_COOKIE = 'cv_session';
 
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
-const PASSWORD_ITERATIONS = 210_000;
+// Keep the signup path inside Cloudflare Worker CPU limits. Stored hashes
+// include their iteration count, so this can be raised later without breaking
+// existing passwords.
+const PASSWORD_ITERATIONS = 60_000;
 const PASSWORD_SALT_BYTES = 16;
 const SESSION_BYTES = 32;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
