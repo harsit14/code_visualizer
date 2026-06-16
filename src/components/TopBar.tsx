@@ -3,6 +3,7 @@
  * trace export/import, layout controls, shortcuts, and runtime status.
  */
 import {
+  ArrowLeft,
   Code2,
   Columns3,
   Download,
@@ -49,6 +50,7 @@ type TopBarProps = {
   panelControls: readonly PanelControl[];
   historyRefreshToken: number;
   status: RuntimeStatus;
+  onOpenLanding: () => void;
 };
 
 const CUSTOM_ID = '__custom__';
@@ -79,6 +81,7 @@ export function TopBar({
   onExport,
   onExportSvg,
   onOpenHistoryItem,
+  onOpenLanding,
   onImport,
   onResetLayout,
   onTogglePanel,
@@ -98,6 +101,11 @@ export function TopBar({
       </div>
 
       <div className="top-actions">
+        <button onClick={onOpenLanding} title="Back to the landing page" type="button">
+          <ArrowLeft size={14} />
+          Landing
+        </button>
+
         <select
           aria-label="Load example"
           onChange={(event) => onExampleChange(event.target.value)}

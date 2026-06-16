@@ -165,6 +165,10 @@ function workbenchColumns(columnIds: readonly ColumnId[], weights: ColumnWeights
 
 export function App() {
   const [showDashboard, setShowDashboard] = useState(shouldShowDashboard);
+  const openLanding = useCallback(() => {
+    window.history.pushState(null, '', '/');
+    setShowDashboard(false);
+  }, []);
 
   useEffect(() => {
     const syncRoute = () => setShowDashboard(shouldShowDashboard());
@@ -176,10 +180,14 @@ export function App() {
     };
   }, []);
 
-  return showDashboard ? <DashboardApp /> : <LandingPage />;
+  return showDashboard ? <DashboardApp onOpenLanding={openLanding} /> : <LandingPage />;
 }
 
-function DashboardApp() {
+type DashboardAppProps = {
+  onOpenLanding: () => void;
+};
+
+function DashboardApp({ onOpenLanding }: DashboardAppProps) {
   const [shared] = useState(initialShare);
   const [exampleId, setExampleId] = useState<string | null>(
     shared ? (shared.exampleId ?? null) : DEFAULT_EXAMPLE_ID,
@@ -1027,6 +1035,7 @@ function DashboardApp() {
             onImport={handleImport}
             onOpenHistoryItem={handleOpenHistoryItem}
             onLanguageChange={handleLanguageChange}
+            onOpenLanding={onOpenLanding}
             onResetLayout={resetLayout}
             onShare={() => void handleShare()}
             onTogglePanel={togglePanelVisibility}
