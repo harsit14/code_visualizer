@@ -58,44 +58,11 @@ hints.
 Python tracing runs through Pyodide and WebAssembly inside a Web Worker.
 JavaScript and TypeScript run in a separate browser worker.
 
-## Architecture
-
-Most tracing work happens client-side. The hosted backend is only used for
-accounts, saved history, daily AI quotas, and the server-side AI explainer
-proxy.
-
-```mermaid
-flowchart LR
-  Editor["Editor"] --> UI["React dashboard"]
-  UI --> PyWorker["Pyodide worker"]
-  UI --> JsWorker["JavaScript worker"]
-  PyWorker --> Trace["Serialized trace"]
-  JsWorker --> Trace
-  Trace --> Panels["Timeline and visual panels"]
-  UI --> Worker["Cloudflare Worker API"]
-  Worker --> Supabase["Supabase Postgres"]
-  Worker --> DeepSeek["DeepSeek API"]
-```
-
-### Privacy Model
+## Privacy Model
 
 - User code execution and trace generation happen in the browser.
-- The browser never receives the DeepSeek API key.
-- AI explanations send only the selected trace context to the Worker route
-  `/api/explain-step`.
-- Account, session, usage, and history data live in Supabase behind the
-  Cloudflare Worker.
-
-## Tech Stack
-
-- React 19 and Vite
-- CodeMirror editor
-- Pyodide for Python execution
-- Browser Web Workers for runtime isolation
-- Cloudflare Workers with Static Assets
-- Supabase Postgres for accounts, sessions, usage counters, and saved history
-- DeepSeek for hosted step explanations
-- Vitest, ESLint, TypeScript, and Python engine tests
+- AI explanations use only the selected trace step and surrounding code context.
+- Signed-in history is stored for your account so traces can be reopened later.
 
 ## Quick Start
 
@@ -120,61 +87,18 @@ and run again.
 | Binary Search                 | `lo`, `mid`, and `hi` converging on the answer.                              |
 | Loop accumulator              | Plain script execution with stdout and variable changes.                     |
 
-## Hosted Deployment
-
-The production shape is Cloudflare Workers with Static Assets plus Supabase.
+## Development
 
 ```bash
+npm run test
 npm run build
-npx wrangler deploy
+npm run ci
 ```
 
-Required Worker runtime variables and secrets:
-
-| Name                        | Type     | Purpose                                           |
-| --------------------------- | -------- | ------------------------------------------------- |
-| `SUPABASE_URL`              | Variable | Supabase project URL.                             |
-| `SUPABASE_SERVICE_ROLE_KEY` | Secret   | Server-side Supabase service role key.            |
-| `PASSWORD_PEPPER`           | Secret   | Signs account password hashes.                    |
-| `ANON_USAGE_SALT`           | Secret   | Hashes anonymous usage subjects for daily limits. |
-| `DEEPSEEK_API_KEY`          | Secret   | Enables hosted AI explanations.                   |
-| `ADMIN_EMAILS`              | Variable | Optional comma/space-separated admin allowlist.   |
-
-Run the Supabase schema from:
-
-```text
-supabase/migrations/0001_app_schema.sql
-```
-
-Full deployment notes live in [docs/deployment.md](docs/deployment.md).
-
-## Development Commands
-
-```bash
-npm run typecheck      # TypeScript project checks
-npm run lint           # ESLint
-npm run test           # Vitest suite
-npm run build          # Production build
-npm run smoke          # Production smoke check
-npm run ci             # Typecheck, lint, tests, build, smoke
-```
-
-Python engine tests:
-
-```bash
-python3 -m venv engine/.venv
-engine/.venv/bin/pip install pytest
-npm run test:engine
-```
-
-The Python engine targets Python 3.11+ and uses the standard library at
-runtime.
+Full deployment and operations notes live in [docs/deployment.md](docs/deployment.md).
 
 ## Project Notes
 
 - Custom Python class instances render as attribute tables unless they match
   recognized `TreeNode` or `ListNode` shapes.
 - JavaScript and TypeScript tracing is intentionally lighter than Python mode.
-- Stripe billing helpers are present but parked until pricing is ready to ship.
-- Static-only hosts can run the visualizer, but accounts, saved history, and
-  AI explanations require the Cloudflare Worker API.
