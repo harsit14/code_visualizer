@@ -179,6 +179,13 @@ export function LandingPage() {
   };
 
   useEffect(() => {
+    document.documentElement.classList.add('landing-document');
+    return () => {
+      document.documentElement.classList.remove('landing-document');
+    };
+  }, []);
+
+  useEffect(() => {
     document.documentElement.dataset.theme = theme;
     window.localStorage.setItem('cv-theme', theme);
   }, [theme]);

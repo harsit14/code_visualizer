@@ -1,10 +1,6 @@
 import { Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  DEFAULT_DEEPSEEK_MODEL,
-  type DeepSeekStepExplanation,
-  explainStepWithDeepSeek,
-} from '../engine/deepseekClient';
+import { type DeepSeekStepExplanation, explainStepWithDeepSeek } from '../engine/deepseekClient';
 import type { Language, SessionResult, TraceStep } from '../engine/types';
 
 type ExplainerPanelProps = {
@@ -42,7 +38,7 @@ export function ExplainerPanel({
   const [busy, setBusy] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const canExplain = Boolean(currentStep && result?.run);
-  const stepLabel = currentStep ? `step ${currentStep.i + 1}` : DEFAULT_DEEPSEEK_MODEL;
+  const stepLabel = currentStep ? `step ${currentStep.i + 1}` : 'plain English';
   const contextKey = useMemo(
     () =>
       [
@@ -116,14 +112,15 @@ export function ExplainerPanel({
         {!canExplain ? <p className="panel-empty">Run code to explain a step.</p> : null}
 
         <p className="explainer-privacy">
-          Uses the hosted DeepSeek explainer service. No API key is stored in this browser.
+          Plain-English explanations use the hosted AI service. No API key is stored in this
+          browser.
         </p>
 
         <button
           className="explainer-action"
           disabled={!canExplain || busy}
           onClick={() => void handleExplain()}
-          title="Ask the hosted AI service to explain the selected trace step"
+          title="Explain the selected trace step in plain English"
           type="button"
         >
           <Sparkles size={13} />
@@ -140,7 +137,7 @@ export function ExplainerPanel({
           <article className="explainer-answer">
             <p>{explanation.text}</p>
             <footer>
-              <span>{explanation.model}</span>
+              <span>Plain-English guide</span>
               {explanation.usage?.totalTokens ? (
                 <span>{explanation.usage.totalTokens} tokens</span>
               ) : null}

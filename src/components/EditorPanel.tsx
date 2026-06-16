@@ -194,6 +194,31 @@ function lineNumberGutter(onRunToLine?: (line: number) => void): Extension {
 
 const baseExtensions = [python(), lineMarksField, lintGutter(), EditorView.lineWrapping];
 
+function scrollLineWithinEditor(view: EditorView, lineNumber: number) {
+  const scroller = view.scrollDOM;
+  if (scroller.clientHeight <= 0) {
+    return;
+  }
+
+  const line = view.state.doc.line(lineNumber);
+  const block = view.lineBlockAt(line.from);
+  const margin = Math.min(24, Math.max(6, scroller.clientHeight * 0.08));
+  const visibleTop = scroller.scrollTop;
+  const visibleBottom = visibleTop + scroller.clientHeight;
+
+  if (block.top < visibleTop + margin) {
+    scroller.scrollTop = Math.max(0, block.top - margin);
+    return;
+  }
+
+  if (block.bottom > visibleBottom - margin) {
+    scroller.scrollTop = Math.min(
+      scroller.scrollHeight - scroller.clientHeight,
+      block.bottom - scroller.clientHeight + margin,
+    );
+  }
+}
+
 /** Map analyzer diagnostics to CodeMirror diagnostics with document offsets. */
 function toCmDiagnostics(view: EditorView, diagnostics: Diagnostic[]): CMDiagnostic[] {
   const doc = view.state.doc;
@@ -256,11 +281,7 @@ export function EditorPanel({
     if (view) {
       view.dispatch({ effects: setLineMarks.of({ active: activeLine, error: errorLine }) });
       if (activeLine !== null && activeLine >= 1 && activeLine <= view.state.doc.lines) {
-        view.dispatch({
-          effects: EditorView.scrollIntoView(view.state.doc.line(activeLine).from, {
-            y: 'nearest',
-          }),
-        });
+        scrollLineWithinEditor(view, activeLine);
       }
     }
   }, [activeLine, errorLine, code]);

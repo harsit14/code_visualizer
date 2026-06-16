@@ -1976,6 +1976,11 @@ input[type='password'] {
 
 /* ---------------------------------------------------------- landing */
 
+.landing-document {
+  scroll-padding-top: 18px;
+  scroll-behavior: smooth;
+}
+
 .landing-page {
   background: var(--bg);
   color: var(--text);
@@ -2011,9 +2016,10 @@ input[type='password'] {
 /* Scroll reveal triggers */
 .reveal {
   opacity: 0;
-  transform: translateY(22px);
-  transition: opacity 0.9s cubic-bezier(0.16, 1, 0.3, 1),
-              transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+  transform: translateY(12px);
+  transition:
+    opacity 0.48s ease-out,
+    transform 0.48s ease-out;
 }
 
 .reveal.active-reveal {
@@ -3828,7 +3834,9 @@ input[type='password'] {
 
 .interactive-demo-card {
   background: color-mix(in srgb, var(--bg-raised) 92%, transparent);
+  backdrop-filter: none;
   border-radius: 8px;
+  -webkit-backdrop-filter: none;
 }
 
 .demo-static-fallback {
@@ -3987,6 +3995,10 @@ input[type='password'] {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .landing-document {
+    scroll-behavior: auto;
+  }
+
   .reveal,
   .reveal.active-reveal,
   .animate-fade-in {
@@ -4594,5 +4606,494 @@ input[type='password'] {
 
   .step-jump {
     width: 44px;
+  }
+}
+
+/* ------------------------------------------------ workbench visual refresh */
+
+.app-shell {
+  background:
+    radial-gradient(circle at 10% 0%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 28%),
+    radial-gradient(circle at 88% 6%, color-mix(in srgb, var(--purple) 6%, transparent), transparent 30%),
+    linear-gradient(180deg, color-mix(in srgb, var(--bg-inset) 42%, var(--bg)), var(--bg));
+  overflow-anchor: none;
+}
+
+.dashboard-stage {
+  background:
+    linear-gradient(color-mix(in srgb, var(--border) 24%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--border) 18%, transparent) 1px, transparent 1px),
+    linear-gradient(180deg, color-mix(in srgb, var(--bg-raised) 38%, var(--bg)), var(--bg));
+  background-size: 26px 26px, 26px 26px, auto;
+  border: 1px solid color-mix(in srgb, var(--border-strong) 78%, transparent);
+  border-radius: 12px;
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--text) 5%, transparent),
+    0 18px 42px rgba(0, 0, 0, 0.22);
+  overflow-anchor: none;
+  padding: 10px;
+}
+
+.app-shell-embed .dashboard-stage {
+  border-radius: 10px;
+  padding: 8px;
+}
+
+.top-bar,
+.embed-bar,
+.controls-bar {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--bg-raised) 92%, var(--bg)), var(--bg-raised));
+  border-color: color-mix(in srgb, var(--border-strong) 72%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--text) 5%, transparent),
+    0 8px 22px rgba(0, 0, 0, 0.12);
+}
+
+.top-bar {
+  border: 1px solid color-mix(in srgb, var(--border-strong) 72%, transparent);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.brand-mark {
+  color: var(--green);
+  text-shadow: 0 0 12px color-mix(in srgb, var(--green) 34%, transparent);
+}
+
+.brand {
+  flex: 0 0 auto;
+}
+
+.brand h1 {
+  letter-spacing: 0;
+}
+
+.status-pill {
+  background: var(--bg-inset);
+  flex: 0 0 auto;
+  max-width: none;
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--text-faint) 55%, transparent);
+}
+
+.status-running,
+.status-loading,
+.status-interrupting {
+  background: var(--amber-soft);
+  box-shadow: inset 3px 0 0 var(--amber);
+}
+
+.status-ready {
+  background: var(--green-soft);
+  box-shadow: inset 3px 0 0 var(--green);
+}
+
+.top-actions select,
+.top-actions button,
+.panel-menu summary,
+.account-menu summary {
+  background: color-mix(in srgb, var(--bg-inset) 78%, var(--bg-raised));
+  border-color: color-mix(in srgb, var(--border) 78%, transparent);
+  border-radius: 7px;
+}
+
+.top-actions select:hover,
+.top-actions button:hover:not(:disabled),
+.panel-menu summary:hover,
+.account-menu summary:hover {
+  background: var(--bg-inset);
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--border-strong));
+}
+
+.panel-menu[open] summary,
+.account-menu[open] summary {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.panel-menu-popover,
+.account-popover {
+  background: color-mix(in srgb, var(--bg-raised) 95%, var(--bg));
+  border-color: color-mix(in srgb, var(--border-strong) 72%, transparent);
+  border-radius: 9px;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.32);
+}
+
+.workbench {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--bg-inset) 84%, var(--bg)), var(--bg-inset));
+  border: 1px solid color-mix(in srgb, var(--border-strong) 76%, transparent);
+  border-radius: 10px;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 4%, transparent);
+  gap: 0;
+  overflow: hidden;
+  overflow-anchor: none;
+  padding: 1px;
+}
+
+.column {
+  gap: 0;
+}
+
+.column-resizer,
+.stack-resizer {
+  background: transparent;
+}
+
+.column-resizer::before,
+.stack-resizer::before {
+  background: color-mix(in srgb, var(--border-strong) 64%, transparent);
+}
+
+.column-resizer:hover::before,
+.stack-resizer:hover::before {
+  background: var(--green);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--green) 34%, transparent);
+}
+
+.panel {
+  --panel-accent: var(--accent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--bg-raised) 94%, var(--bg)), var(--bg-raised));
+  border-color: color-mix(in srgb, var(--border-strong) 62%, transparent);
+  border-radius: 8px;
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--text) 4%, transparent),
+    inset 3px 0 0 color-mix(in srgb, var(--panel-accent) 24%, transparent);
+}
+
+.editor-panel {
+  --panel-accent: var(--accent);
+}
+
+.data-panel {
+  --panel-accent: var(--green);
+}
+
+.variables-panel,
+.inputs-panel {
+  --panel-accent: var(--amber);
+}
+
+.watch-panel,
+.callstack-panel,
+.explainer-panel {
+  --panel-accent: var(--purple);
+}
+
+.console-panel {
+  --panel-accent: var(--green);
+}
+
+.panel:focus-within {
+  border-color: color-mix(in srgb, var(--panel-accent) 42%, var(--border-strong));
+}
+
+.panel-header {
+  align-items: center;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--bg-inset) 54%, transparent), transparent);
+  min-height: 36px;
+  padding: 7px 11px;
+}
+
+.panel-header h2 {
+  color: var(--text);
+  letter-spacing: 0.055em;
+}
+
+.panel-header h2::before {
+  background: var(--panel-accent);
+  border-radius: 999px;
+  box-shadow: 0 0 10px color-mix(in srgb, var(--panel-accent) 38%, transparent);
+  content: '';
+  display: inline-block;
+  height: 7px;
+  margin-right: 1px;
+  width: 7px;
+}
+
+.panel-header h2 svg {
+  color: color-mix(in srgb, var(--panel-accent) 76%, var(--text));
+}
+
+.panel-hint {
+  background: color-mix(in srgb, var(--bg-inset) 82%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius: 999px;
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  padding: 2px 7px;
+}
+
+.panel-empty {
+  align-items: center;
+  background: color-mix(in srgb, var(--bg-inset) 62%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--border-strong) 62%, transparent);
+  border-radius: 8px;
+  display: flex;
+  margin: 10px;
+  min-height: 58px;
+}
+
+.panel-scroll {
+  scrollbar-color: color-mix(in srgb, var(--border-strong) 88%, transparent) transparent;
+  scrollbar-width: thin;
+}
+
+.editor-panel .editor-host {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--accent) 4%, transparent), transparent 34%),
+    var(--bg-inset);
+}
+
+.editor-host .cm-editor {
+  font-size: 13.25px;
+}
+
+.editor-host .cm-gutters {
+  background: color-mix(in srgb, var(--bg-inset) 86%, var(--bg));
+  border-right: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  color: var(--text-faint);
+}
+
+.cv-exec-line {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--accent) 28%, transparent), transparent 68%);
+  box-shadow:
+    inset 3px 0 0 var(--accent),
+    inset 0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.cv-error-line {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--red) 28%, transparent), transparent 68%);
+  box-shadow:
+    inset 3px 0 0 var(--red),
+    inset 0 0 0 1px color-mix(in srgb, var(--red) 14%, transparent);
+}
+
+.cv-breakpoint-marker {
+  box-shadow:
+    0 0 0 2px var(--red-soft),
+    0 0 10px color-mix(in srgb, var(--red) 34%, transparent);
+}
+
+.data-card,
+.watch-card,
+.explainer-answer,
+.console-stdout,
+.console-stderr,
+.console-explanation,
+.console-error,
+.complexity-bar-track {
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 3%, transparent);
+}
+
+.data-card {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--bg-inset) 82%, transparent), var(--bg-inset));
+  border-radius: 8px;
+}
+
+.data-card h3 {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+}
+
+.data-card h3::before {
+  background: var(--green);
+  border-radius: 2px;
+  content: '';
+  height: 12px;
+  width: 3px;
+}
+
+.data-card-return h3::before {
+  background: var(--green);
+}
+
+.data-card-shared h3::before {
+  background: var(--purple);
+}
+
+.array-cell,
+.grid-render td,
+.chain-node {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--bg-raised) 92%, var(--bg)), var(--bg-raised));
+}
+
+.array-cell.has-pointer,
+.chain-node.is-current {
+  background: var(--green-soft);
+  border-color: var(--green);
+  box-shadow:
+    inset 0 -2px 0 color-mix(in srgb, var(--green) 42%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--green) 42%, transparent);
+}
+
+.array-pointer,
+.chain-pointer {
+  color: var(--green);
+  font-weight: 700;
+}
+
+.dict-render td:first-child,
+.shared-ref-paths code,
+.alias-badge,
+.watch-sources span {
+  background: var(--purple);
+  color: #fff;
+}
+
+.var-table td {
+  border-bottom-color: color-mix(in srgb, var(--border) 66%, transparent);
+}
+
+.var-table tr.is-new td {
+  background: color-mix(in srgb, var(--green-soft) 68%, transparent);
+}
+
+.var-table tr.is-changed td {
+  background: color-mix(in srgb, var(--amber-soft) 76%, transparent);
+}
+
+.var-watch-button.is-active {
+  background: var(--accent-soft);
+  border-radius: 5px;
+  padding-left: 4px;
+}
+
+.stack-frame,
+.call-tree-node {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--bg-inset) 82%, transparent), var(--bg-inset));
+}
+
+.stack-frame.is-top {
+  border-left-color: var(--green);
+}
+
+.stack-frame.is-selected,
+.call-tree-node.is-current {
+  background: color-mix(in srgb, var(--accent-soft) 74%, var(--bg-inset));
+  border-color: var(--accent);
+}
+
+.watch-timeline li.is-current {
+  border-left-color: var(--green);
+}
+
+.watch-step {
+  border-color: color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.console-return {
+  background: var(--green-soft);
+  border: 1px solid color-mix(in srgb, var(--green) 34%, transparent);
+  border-radius: 7px;
+  padding: 7px 9px;
+}
+
+.complexity-bar {
+  background: linear-gradient(90deg, var(--purple), var(--accent));
+}
+
+.controls-bar {
+  border-radius: 10px;
+  gap: 12px;
+  padding: 9px 11px;
+}
+
+.run-button {
+  background: var(--green);
+  border-color: color-mix(in srgb, var(--green) 82%, white);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--green) 18%, transparent);
+}
+
+.run-button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--green) 86%, white);
+  border-color: color-mix(in srgb, var(--green) 70%, white);
+  filter: none;
+}
+
+.transport {
+  background: var(--bg-inset);
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  border-radius: 8px;
+  gap: 2px;
+  padding: 3px;
+}
+
+.transport button {
+  background: transparent;
+  border-color: transparent;
+  border-radius: 6px;
+  padding: 5px 7px;
+}
+
+.transport button:hover:not(:disabled) {
+  background: var(--bg-raised);
+  border-color: color-mix(in srgb, var(--accent) 32%, var(--border));
+}
+
+.play-toggle {
+  background: var(--accent-soft) !important;
+  border-color: color-mix(in srgb, var(--accent) 58%, transparent) !important;
+}
+
+.scrubber {
+  background: var(--bg-inset);
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  border-radius: 8px;
+  padding: 6px 8px 5px;
+}
+
+.scrubber input[type='range'],
+.speed-control input {
+  accent-color: var(--green);
+}
+
+.step-meta {
+  color: var(--text-dim);
+}
+
+.step-count {
+  color: var(--text-faint);
+}
+
+.step-jump {
+  background: color-mix(in srgb, var(--bg-raised) 82%, var(--bg-inset));
+  border-radius: 5px;
+}
+
+.speed-control {
+  background: var(--bg-inset);
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  border-radius: 8px;
+  padding: 5px 7px;
+}
+
+.ghost-button {
+  border-color: color-mix(in srgb, var(--border) 76%, transparent);
+  color: var(--text-dim);
+}
+
+.ghost-button:hover:not(:disabled) {
+  color: var(--text);
+}
+
+@media (max-width: 1100px) {
+  .dashboard-stage {
+    border-radius: 10px;
+  }
+
+  .workbench {
+    overflow: visible;
   }
 }

@@ -13,7 +13,6 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 import { ExplainerPanel } from '../components/ExplainerPanel';
 import { InputsPanel } from '../components/InputsPanel';
 import { LandingPage } from '../components/LandingPage';
-import { ProductTour } from '../components/ProductTour';
 import { TopBar } from '../components/TopBar';
 import { VariablesPanel } from '../components/VariablesPanel';
 import { WatchPanel } from '../components/WatchPanel';
@@ -1014,7 +1013,6 @@ function DashboardApp() {
           totalSteps={session.totalSteps}
         />
       </section>
-      {!embedMode ? <ProductTour /> : null}
     </div>
   );
 }
