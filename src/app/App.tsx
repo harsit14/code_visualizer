@@ -44,6 +44,8 @@ type DesignMode = 'classic' | 'traced';
 const EXPORT_VERSION = 2;
 const DEFAULT_IMPORT_LABEL = 'Import';
 const DEFAULT_IMPORT_TITLE = 'Import a previously exported trace';
+const THEME_STORAGE_KEY = 'cv-theme';
+const DESIGN_STORAGE_KEY = 'cv-design-v2';
 const PANEL_VISIBILITY_STORAGE_KEY = 'cv-panel-visibility-v1';
 const COLUMN_WEIGHTS_STORAGE_KEY = 'cv-column-weights-v1';
 const PANEL_WEIGHTS_STORAGE_KEY = 'cv-panel-weights-v1';
@@ -82,15 +84,16 @@ function isPanelSlot(slot: PanelSlotConfig | null): slot is PanelSlotConfig {
 }
 
 function initialTheme(): Theme {
-  const stored = window.localStorage.getItem('cv-theme');
+  const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
   if (stored === 'light' || stored === 'dark') {
     return stored;
   }
-  return window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+  return 'light';
 }
 
 function initialDesign(): DesignMode {
-  return window.localStorage.getItem('cv-design') === 'traced' ? 'traced' : 'classic';
+  const stored = window.localStorage.getItem(DESIGN_STORAGE_KEY);
+  return stored === 'classic' || stored === 'traced' ? stored : 'traced';
 }
 
 function initialShare() {
@@ -314,11 +317,11 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
-    window.localStorage.setItem('cv-theme', theme);
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
   }, [theme]);
 
   useEffect(() => {
-    window.localStorage.setItem('cv-design', designMode);
+    window.localStorage.setItem(DESIGN_STORAGE_KEY, designMode);
   }, [designMode]);
 
   useEffect(() => {
