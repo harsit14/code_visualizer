@@ -7,7 +7,6 @@ import {
   Database,
   Eye,
   Gauge,
-  Github,
   GraduationCap,
   Layers,
   LayoutGrid,
@@ -31,8 +30,6 @@ import { LandingInteractiveDemo } from './LandingInteractiveDemo';
 import { LandingStructurePreview } from './LandingStructurePreview';
 
 type Theme = 'light' | 'dark';
-
-const GITHUB_URL = 'https://github.com/harsit14/code_visualizer';
 
 const languageBadges = ['Python', 'JavaScript', 'TypeScript'];
 
@@ -286,10 +283,6 @@ export function LandingPage() {
           <a href="#try" onClick={() => setMenuOpen(false)}>
             Try it
           </a>
-          <a href={GITHUB_URL} rel="noreferrer" target="_blank">
-            <Github size={14} />
-            GitHub
-          </a>
           <button
             className="landing-nav-cta"
             onClick={() => {
@@ -507,10 +500,6 @@ export function LandingPage() {
           <a href="#how">How it works</a>
           <a href="#features">Features</a>
           <a href="#try">Try it</a>
-          <a href={GITHUB_URL} rel="noreferrer" target="_blank">
-            <Github size={14} />
-            GitHub
-          </a>
           <button onClick={toggleTheme} type="button">
             {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
             {theme === 'dark' ? 'Light' : 'Dark'}
