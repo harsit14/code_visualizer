@@ -5234,6 +5234,31 @@ input[type='password'] {
   background: var(--bg);
 }
 
+/* light-theme variant: the same instrument rendered on paper */
+:root[data-theme='light'] .app-shell.design-traced {
+  --bg: #eef1f6;
+  --bg-raised: #ffffff;
+  --bg-inset: #e6eaf1;
+  --border: #d6dde7;
+  --border-strong: #bfc8d5;
+  --text: #1b2230;
+  --text-dim: #5a6577;
+  --text-faint: #8b95a6;
+  --accent: #2769d8;
+  --accent-soft: rgba(39, 105, 216, 0.12);
+  --green: #1d8a58;
+  --green-soft: rgba(29, 138, 88, 0.13);
+  --amber: #b07f1a;
+  --amber-soft: rgba(176, 127, 26, 0.14);
+  --red: #c93f2e;
+  --red-soft: rgba(201, 63, 46, 0.12);
+  --purple: #6d48cf;
+  --exec-line: rgba(39, 105, 216, 0.14);
+  --error-line: rgba(201, 63, 46, 0.16);
+  --shadow: 0 16px 44px rgba(23, 32, 51, 0.14);
+  --tl-grid: color-mix(in srgb, var(--border) 72%, transparent);
+}
+
 /* the ground: ink + a luminous 44px lattice, the plate's signature */
 .design-traced .dashboard-stage {
   background:
@@ -5245,7 +5270,7 @@ input[type='password'] {
   border: 1px solid var(--border-strong);
   box-shadow:
     inset 0 1px 0 color-mix(in srgb, var(--text) 4%, transparent),
-    0 24px 60px rgba(0, 0, 0, 0.45);
+    var(--shadow);
 }
 
 /* chrome: flat ink bars, hairline rules, no glossy gradient */
@@ -5257,13 +5282,13 @@ input[type='password'] {
   box-shadow: 0 1px 0 color-mix(in srgb, var(--text) 3%, transparent);
 }
 
-/* identity: an elegant high-contrast serif wordmark against the mono UI */
+/* identity: an elegant serif wordmark against the mono UI.
+   Keep the font-size/spacing close to classic so the top bar does not
+   reflow when switching designs (the action cluster stays put). */
 .design-traced .brand h1 {
   font-family: 'Italiana TL', var(--sans);
   font-weight: 400;
-  font-size: 19px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 .design-traced .brand-mark {
@@ -5335,10 +5360,14 @@ input[type='password'] {
 }
 
 /* the opt-in control itself */
+/* Fixed width so the button occupies the same box whether it reads
+   "Traced Light" or "Classic" - the cursor lands on it either way. */
 .design-toggle {
   align-items: center;
   display: inline-flex;
   gap: 6px;
+  justify-content: center;
+  min-width: 132px;
 }
 
 .design-toggle-active {

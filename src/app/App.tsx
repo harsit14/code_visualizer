@@ -833,7 +833,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
               onRunToLine={embedMode ? undefined : runToLine}
               onToggleBreakpoint={embedMode ? undefined : toggleBreakpoint}
               readOnly={embedMode}
-              theme={isTracedDesign ? 'dark' : theme}
+              theme={theme}
             />
           </ErrorBoundary>,
         )
