@@ -5182,3 +5182,170 @@ input[type='password'] {
     overflow: visible;
   }
 }
+
+/* ============================================================ *
+ *  ALTERNATE DESIGN - "Traced Light" skin                       *
+ *  Opt-in via the top-bar toggle (.app-shell.design-traced).    *
+ *  Purely additive: classic styling above is left untouched.    *
+ *  The whole app is variable-driven, so re-declaring the tokens *
+ *  on the shell recolors every panel; the rules below add the   *
+ *  instrument-plate flourishes (ink ground, grid, glow, serif). *
+ * ============================================================ */
+
+@font-face {
+  font-family: 'Italiana TL';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../assets/fonts/Italiana-Regular.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Geist Mono TL';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../assets/fonts/GeistMono-Regular.ttf') format('truetype');
+}
+
+.app-shell.design-traced {
+  --bg: #0b0e14;
+  --bg-raised: #10141c;
+  --bg-inset: #080b10;
+  --border: #1c2330;
+  --border-strong: #2b3443;
+  --text: #e7ecf3;
+  --text-dim: #8a95a8;
+  --text-faint: #586275;
+  --accent: #4f8ef7;
+  --accent-soft: rgba(79, 142, 247, 0.16);
+  --green: #3fb97f;
+  --green-soft: rgba(63, 185, 127, 0.16);
+  --amber: #e0a93e;
+  --amber-soft: rgba(224, 169, 62, 0.16);
+  --red: #e5604f;
+  --red-soft: rgba(229, 96, 79, 0.14);
+  --purple: #a584f5;
+  --exec-line: rgba(79, 142, 247, 0.2);
+  --error-line: rgba(229, 96, 79, 0.22);
+  --shadow: 0 18px 52px rgba(0, 0, 0, 0.55);
+  --mono: 'Geist Mono TL', 'SF Mono', ui-monospace, 'Cascadia Code', Menlo, Consolas, monospace;
+  --tl-grid: color-mix(in srgb, var(--border) 62%, transparent);
+  background: var(--bg);
+}
+
+/* the ground: ink + a luminous 44px lattice, the plate's signature */
+.design-traced .dashboard-stage {
+  background:
+    linear-gradient(var(--tl-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--tl-grid) 1px, transparent 1px),
+    radial-gradient(120% 80% at 50% -10%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 60%),
+    var(--bg);
+  background-size: 44px 44px, 44px 44px, auto, auto;
+  border: 1px solid var(--border-strong);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--text) 4%, transparent),
+    0 24px 60px rgba(0, 0, 0, 0.45);
+}
+
+/* chrome: flat ink bars, hairline rules, no glossy gradient */
+.design-traced .top-bar,
+.design-traced .controls-bar,
+.design-traced .embed-bar {
+  background: color-mix(in srgb, var(--bg-raised) 86%, transparent);
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--text) 3%, transparent);
+}
+
+/* identity: an elegant high-contrast serif wordmark against the mono UI */
+.design-traced .brand h1 {
+  font-family: 'Italiana TL', var(--sans);
+  font-weight: 400;
+  font-size: 19px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.design-traced .brand-mark {
+  color: var(--accent);
+  text-shadow: 0 0 14px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+/* panels: flat instrument cards; the per-panel accent reads as a state key */
+.design-traced .panel {
+  background: color-mix(in srgb, var(--bg-raised) 92%, var(--bg));
+  border-color: var(--border);
+  border-radius: 7px;
+  box-shadow: inset 2px 0 0 color-mix(in srgb, var(--panel-accent) 30%, transparent);
+}
+
+.design-traced .panel:focus-within {
+  border-color: color-mix(in srgb, var(--panel-accent) 46%, var(--border-strong));
+  box-shadow:
+    inset 2px 0 0 var(--panel-accent),
+    0 0 0 1px color-mix(in srgb, var(--panel-accent) 22%, transparent);
+}
+
+/* clinical labels: monospaced, tracked, quiet instrumentation */
+.design-traced .panel-header {
+  background: transparent;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.design-traced .panel-header h2 {
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+/* the single luminous focal: the active line burns brighter here */
+.design-traced .cv-exec-line {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--accent) 34%, transparent), transparent 72%);
+  box-shadow:
+    inset 3px 0 0 var(--accent),
+    inset 0 0 22px color-mix(in srgb, var(--accent) 16%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+/* the scrubber as a horizon line crossing the full field */
+.design-traced .scrubber {
+  background: transparent;
+  border: 0;
+  border-top: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: 0;
+  padding-top: 9px;
+}
+
+.design-traced .scrubber input[type='range'] {
+  accent-color: var(--accent);
+}
+
+.design-traced .transport,
+.design-traced .speed-control {
+  background: color-mix(in srgb, var(--bg-inset) 70%, transparent);
+  border-color: var(--border);
+}
+
+.design-traced .run-button {
+  box-shadow: 0 0 22px color-mix(in srgb, var(--green) 26%, transparent);
+}
+
+/* the opt-in control itself */
+.design-toggle {
+  align-items: center;
+  display: inline-flex;
+  gap: 6px;
+}
+
+.design-toggle-active {
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--border-strong)) !important;
+  color: var(--accent) !important;
+}
+
+.design-toggle-active svg {
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 55%, transparent));
+}

@@ -11,6 +11,7 @@ import {
   HelpCircle,
   Link2,
   Moon,
+  Sparkles,
   Sun,
   Upload,
 } from 'lucide-react';
@@ -34,6 +35,8 @@ type TopBarProps = {
   onLanguageChange: (language: Language) => void;
   theme: 'light' | 'dark';
   onToggleTheme: () => void;
+  designMode: 'classic' | 'traced';
+  onToggleDesign: () => void;
   onShare: () => void;
   shareLabel: string;
   onEmbed: () => void;
@@ -71,6 +74,8 @@ export function TopBar({
   onLanguageChange,
   theme,
   onToggleTheme,
+  designMode,
+  onToggleDesign,
   onShare,
   shareLabel,
   onEmbed,
@@ -215,6 +220,20 @@ export function TopBar({
           ref={fileInputRef}
           type="file"
         />
+        <button
+          aria-pressed={designMode === 'traced'}
+          className={`design-toggle${designMode === 'traced' ? ' design-toggle-active' : ''}`}
+          onClick={onToggleDesign}
+          title={
+            designMode === 'traced'
+              ? 'Switch back to the Classic design'
+              : 'Switch to the Traced Light design'
+          }
+          type="button"
+        >
+          <Sparkles size={14} />
+          {designMode === 'traced' ? 'Classic' : 'Traced Light'}
+        </button>
         <button
           aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
           className="icon-button"

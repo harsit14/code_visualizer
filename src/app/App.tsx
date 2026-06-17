@@ -39,6 +39,7 @@ import { buildTraceSvgExport } from './traceSvgExport';
 import { useSession } from './useSession';
 
 type Theme = 'light' | 'dark';
+type DesignMode = 'classic' | 'traced';
 
 const EXPORT_VERSION = 2;
 const DEFAULT_IMPORT_LABEL = 'Import';
@@ -86,6 +87,10 @@ function initialTheme(): Theme {
     return stored;
   }
   return window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+}
+
+function initialDesign(): DesignMode {
+  return window.localStorage.getItem('cv-design') === 'traced' ? 'traced' : 'classic';
 }
 
 function initialShare() {
@@ -195,9 +200,11 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
   const initialCode = shared?.code ?? getExample(exampleId ?? DEFAULT_EXAMPLE_ID)?.code ?? '';
   const initialSessionLanguage = initialLanguage(exampleId, shared?.language);
   const [theme, setTheme] = useState<Theme>(initialTheme);
+  const [designMode, setDesignMode] = useState<DesignMode>(initialDesign);
   const [shareLabel, setShareLabel] = useState('Share');
   const [embedLabel, setEmbedLabel] = useState('Embed');
   const [embedMode] = useState(initialEmbedMode);
+  const isTracedDesign = !embedMode && designMode === 'traced';
   const [importLabel, setImportLabel] = useState(DEFAULT_IMPORT_LABEL);
   const [importTitle, setImportTitle] = useState(DEFAULT_IMPORT_TITLE);
   const [watchedVariables, setWatchedVariables] = useState<string[]>([]);
@@ -309,6 +316,10 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
     document.documentElement.dataset.theme = theme;
     window.localStorage.setItem('cv-theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    window.localStorage.setItem('cv-design', designMode);
+  }, [designMode]);
 
   useEffect(() => {
     if (!embedMode) {
@@ -822,7 +833,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
               onRunToLine={embedMode ? undefined : runToLine}
               onToggleBreakpoint={embedMode ? undefined : toggleBreakpoint}
               readOnly={embedMode}
-              theme={theme}
+              theme={isTracedDesign ? 'dark' : theme}
             />
           </ErrorBoundary>,
         )
@@ -1011,7 +1022,11 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
   );
 
   return (
-    <div className={`app-shell${embedMode ? ' app-shell-embed' : ''}`}>
+    <div
+      className={`app-shell${embedMode ? ' app-shell-embed' : ''}${
+        isTracedDesign ? ' design-traced' : ''
+      }`}
+    >
       <section className="dashboard-stage" aria-label="Code Visualizer dashboard">
         {embedMode ? (
           <header className="embed-bar">
@@ -1040,6 +1055,10 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
             onShare={() => void handleShare()}
             onTogglePanel={togglePanelVisibility}
             onToggleTheme={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))}
+            designMode={designMode}
+            onToggleDesign={() =>
+              setDesignMode((current) => (current === 'traced' ? 'classic' : 'traced'))
+            }
             historyRefreshToken={historyRefreshToken}
             panelControls={panelControls}
             shareLabel={shareLabel}
