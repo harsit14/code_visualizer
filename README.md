@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="public/brand/step-logo.svg" alt="Code Visualizer Step logo" width="96" />
+</p>
+
 # Code Visualizer
 
 **See your code run, line by line.**

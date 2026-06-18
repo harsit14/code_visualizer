@@ -110,6 +110,12 @@ input[type='password'] {
   font-size: 13px;
 }
 
+.embed-brand {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+}
+
 .workbench {
   display: grid;
   flex: 1;
@@ -398,8 +404,12 @@ input[type='password'] {
 }
 
 .brand-mark {
-  color: var(--accent);
-  font-size: 20px;
+  border-radius: 6px;
+  display: block;
+  flex: 0 0 auto;
+  height: 24px;
+  object-fit: contain;
+  width: 24px;
 }
 
 .brand h1 {
@@ -2190,8 +2200,8 @@ input[type='password'] {
 }
 
 .landing-brand .brand-mark {
-  color: var(--accent);
-  font-size: 22px;
+  height: 26px;
+  width: 26px;
 }
 
 .landing-brand:hover:not(:disabled) {
@@ -3427,7 +3437,7 @@ input[type='password'] {
 
 .landing-brand .brand-mark,
 .landing-footer-brand .brand-mark {
-  color: var(--green);
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--accent) 24%, transparent));
 }
 
 .landing-hero,
@@ -4742,8 +4752,7 @@ input[type='password'] {
 }
 
 .brand-mark {
-  color: var(--green);
-  text-shadow: 0 0 12px color-mix(in srgb, var(--green) 34%, transparent);
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--accent) 24%, transparent));
 }
 
 .brand {
@@ -5292,8 +5301,7 @@ input[type='password'] {
 }
 
 .design-traced .brand-mark {
-  color: var(--accent);
-  text-shadow: 0 0 14px color-mix(in srgb, var(--accent) 45%, transparent);
+  filter: drop-shadow(0 0 14px color-mix(in srgb, var(--accent) 38%, transparent));
 }
 
 /* panels: flat instrument cards; the per-panel accent reads as a state key */

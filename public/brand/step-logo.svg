@@ -1,4 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title id="title">Code Visualizer Step logo</title>
+  <desc id="desc">An execution axis with measured ticks and one illuminated current-step node.</desc>
   <defs>
     <filter id="glow" x="-90%" y="-90%" width="280%" height="280%">
       <feGaussianBlur stdDeviation="3.4" />

@@ -13,6 +13,7 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 import { ExplainerPanel } from '../components/ExplainerPanel';
 import { InputsPanel } from '../components/InputsPanel';
 import { LandingPage } from '../components/LandingPage';
+import { LogoMark } from '../components/LogoMark';
 import { TopBar } from '../components/TopBar';
 import { VariablesPanel } from '../components/VariablesPanel';
 import { WatchPanel } from '../components/WatchPanel';
@@ -1033,7 +1034,10 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
       <section className="dashboard-stage" aria-label="Code Visualizer dashboard">
         {embedMode ? (
           <header className="embed-bar">
-            <strong>Code Visualizer</strong>
+            <span className="embed-brand">
+              <LogoMark />
+              <strong>Code Visualizer</strong>
+            </span>
             <span className={`status-pill status-${session.status.phase}`}>
               {session.status.message}
             </span>

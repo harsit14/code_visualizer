@@ -28,6 +28,7 @@ import { encodeShareState } from '../app/shareState';
 import { AccountMenu } from './AccountMenu';
 import { LandingInteractiveDemo } from './LandingInteractiveDemo';
 import { LandingStructurePreview } from './LandingStructurePreview';
+import { LogoMark } from './LogoMark';
 
 type Theme = 'light' | 'dark';
 
@@ -256,7 +257,7 @@ export function LandingPage() {
     <div className="landing-page">
       <header className="landing-nav reveal">
         <button className="landing-brand" onClick={openApp} type="button">
-          <span className="brand-mark">⟢</span>
+          <LogoMark />
           <strong>Code Visualizer</strong>
         </button>
         <button
@@ -493,7 +494,7 @@ export function LandingPage() {
 
       <footer className="landing-footer reveal">
         <button className="landing-footer-brand" onClick={openApp} type="button">
-          <span className="brand-mark">⟢</span>
+          <LogoMark />
           <span>Code Visualizer</span>
         </button>
         <div className="landing-footer-links">

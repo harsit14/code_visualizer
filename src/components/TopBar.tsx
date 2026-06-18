@@ -18,6 +18,7 @@ import {
 import { useRef } from 'react';
 import { AccountMenu } from './AccountMenu';
 import { HistoryMenu } from './HistoryMenu';
+import { LogoMark } from './LogoMark';
 import type { CodeHistoryItem } from '../app/historyClient';
 import { examples } from '../examples/examples';
 import type { Language, RuntimeStatus } from '../engine/types';
@@ -100,7 +101,7 @@ export function TopBar({
   return (
     <header className="top-bar">
       <div className="brand">
-        <span className="brand-mark">⟢</span>
+        <LogoMark />
         <h1>Code Visualizer</h1>
         <span className={`status-pill status-${status.phase}`}>{status.message}</span>
       </div>
