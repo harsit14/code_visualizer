@@ -58,6 +58,7 @@ describe('ControlsBar', () => {
 
     expect(html).toContain('controls-bar-prerun');
     expect(html).toContain('Load an example');
+    expect(html).toMatch(/(?:Cmd|Ctrl) Enter/);
     expect(html).not.toContain('Step navigation');
     expect(html).not.toContain('Trace position');
     expect(html).not.toContain('Playback speed');
@@ -90,5 +91,6 @@ describe('ControlsBar', () => {
     expect(html).toContain('Trace position');
     expect(html).toContain('Playback speed');
     expect(html).not.toContain('controls-bar-prerun');
+    expect(html).not.toMatch(/(?:Cmd|Ctrl) Enter/);
   });
 });

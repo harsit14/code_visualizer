@@ -62,6 +62,7 @@ type TopBarProps = {
 
 const CUSTOM_ID = '__custom__';
 const SHORTCUTS = [
+  { keys: ['Cmd/Ctrl', 'Enter'], label: 'Run code' },
   { keys: ['←'], label: 'Step back' },
   { keys: ['→'], label: 'Step forward' },
   { keys: ['Space'], label: 'Play or pause' },

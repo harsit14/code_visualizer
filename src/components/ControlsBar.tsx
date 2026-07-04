@@ -120,6 +120,10 @@ export function ControlsBar({
 }: ControlsBarProps) {
   const hasTrace = totalSteps > 0;
   const categories = [...new Set(examples.map((example) => example.category))];
+  const runShortcutLabel =
+    typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform)
+      ? 'Cmd Enter'
+      : 'Ctrl Enter';
   const runTitle = isBusy ? 'Runtime is working' : 'Run the current code with the current inputs';
   const startTitle = hasTrace ? 'Jump to the first recorded step' : 'Run code first';
   const backTitle = hasTrace ? 'Move one recorded step backward' : 'Run code first';
@@ -165,6 +169,7 @@ export function ControlsBar({
         <button className="run-button" disabled={isBusy} onClick={onRun} type="button">
           <Play size={14} />
           {isBusy ? 'Working…' : 'Run'}
+          {!hasTrace && !isBusy ? <span className="run-shortcut-badge">{runShortcutLabel}</span> : null}
         </button>
       </ControlTip>
 

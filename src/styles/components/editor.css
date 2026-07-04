@@ -72,7 +72,7 @@
 }
 
 .cv-exec-line {
-  animation: exec-line-pulse 0.42s ease-out;
+  animation: exec-line-land 420ms ease-out;
   background: var(--exec-line);
   box-shadow: inset 4px 0 0 var(--accent);
 }
@@ -82,13 +82,17 @@
   box-shadow: inset 4px 0 0 var(--red);
 }
 
-@keyframes exec-line-pulse {
+@keyframes exec-line-land {
   0% {
-    filter: brightness(1.18);
+    background: color-mix(in srgb, var(--accent) 48%, transparent);
   }
 
   100% {
-    filter: brightness(1);
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--accent) 32%, transparent),
+      transparent 68%
+    );
   }
 }
 

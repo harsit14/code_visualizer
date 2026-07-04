@@ -419,11 +419,16 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
     session.result,
   ]);
 
-  // Keyboard transport: ←/→ step, Space play/pause, Home/End jump. Ignored
-  // while typing in the editor, inputs, or any form control.
-  const { stepBack, stepForward, togglePlay, totalSteps } = session;
+  // Keyboard transport: Cmd/Ctrl+Enter run, ←/→ step, Space play/pause,
+  // Home/End jump. Transport keys are ignored while typing; run is global.
+  const { stepBack, stepForward, togglePlay, totalSteps, run: runSession } = session;
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key === 'Enter') {
+        event.preventDefault();
+        void runSession();
+        return;
+      }
       if (event.metaKey || event.ctrlKey || event.altKey) {
         return;
       }
@@ -466,7 +471,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [stepBack, stepForward, togglePlay, jumpToStep, totalSteps]);
+  }, [stepBack, stepForward, togglePlay, jumpToStep, totalSteps, runSession]);
 
   const handleCodeChange = useCallback(
     (code: string) => {

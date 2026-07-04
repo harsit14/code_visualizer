@@ -159,7 +159,13 @@ input[type='password'] {
 }
 
 .column-right {
-  overflow: hidden;
+  overflow: auto;
+  scrollbar-color: color-mix(in srgb, var(--border-strong) 88%, transparent) transparent;
+  scrollbar-width: thin;
+}
+
+.column-right .panel-slot {
+  min-height: 120px;
 }
 
 .column-resizer,
