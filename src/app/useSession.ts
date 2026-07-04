@@ -9,6 +9,11 @@ import { runJavaScriptInWorker } from '../engine/jsRuntimeClient';
 import { RuntimeClient, TimeoutError } from '../engine/runtimeClient';
 import { firstExceptionStep } from '../engine/trace';
 import {
+  buildPracticeCaseStorageKey,
+  loadStoredPracticeCases,
+  saveStoredPracticeCases,
+} from './practiceCaseStorage';
+import {
   createEdgePracticeCases,
   createPracticeTestCase,
   summarizePracticeRun,
@@ -113,6 +118,8 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
   const analyzeSerial = useRef(0);
   const codeRef = useRef(initialCode);
   const languageRef = useRef<Language>(initialOptions.language ?? 'python');
+  const practiceCasesStorageKeyRef = useRef<string | null>(null);
+  const skipPracticeCaseSaveRef = useRef(false);
 
   const getClient = useCallback(() => {
     if (!clientRef.current) {
@@ -237,6 +244,37 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
     const name = functionOverride ?? analysis?.defaultFunction ?? null;
     return analysis?.functions.find((fn) => fn.qualname === name) ?? null;
   }, [analysis, functionOverride]);
+
+  const practiceCasesStorageKey = useMemo(() => {
+    if (language !== 'python' || !activeFunction) {
+      return null;
+    }
+    return buildPracticeCaseStorageKey(code, activeFunction.qualname);
+  }, [activeFunction, code, language]);
+
+  useEffect(() => {
+    if (practiceCasesStorageKey === practiceCasesStorageKeyRef.current) {
+      return;
+    }
+    practiceCasesStorageKeyRef.current = practiceCasesStorageKey;
+    skipPracticeCaseSaveRef.current = true;
+    if (!practiceCasesStorageKey || !activeFunction) {
+      setTestCases([]);
+      return;
+    }
+    setTestCases(loadStoredPracticeCases(practiceCasesStorageKey, activeFunction.params.length));
+  }, [activeFunction, practiceCasesStorageKey]);
+
+  useEffect(() => {
+    if (!practiceCasesStorageKey) {
+      return;
+    }
+    if (skipPracticeCaseSaveRef.current) {
+      skipPracticeCaseSaveRef.current = false;
+      return;
+    }
+    saveStoredPracticeCases(practiceCasesStorageKey, testCases);
+  }, [practiceCasesStorageKey, testCases]);
 
   useEffect(() => {
     if (!activeFunction || !pendingInitialInputs) {

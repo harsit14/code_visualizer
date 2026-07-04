@@ -31,6 +31,17 @@ vi.mock('../engine/jsRuntimeClient', () => ({
 import { TimeoutError } from '../engine/runtimeClient';
 import { useSession } from './useSession';
 
+const localStorageItems = new Map<string, string>();
+const localStorageMock = {
+  getItem: vi.fn((key: string) => localStorageItems.get(key) ?? null),
+  removeItem: vi.fn((key: string) => {
+    localStorageItems.delete(key);
+  }),
+  setItem: vi.fn((key: string, value: string) => {
+    localStorageItems.set(key, value);
+  }),
+};
+
 const num = (value: number): EncodedValue => ({ k: 'num', t: 'int', v: String(value) });
 
 function scriptResult(
@@ -145,6 +156,14 @@ function functionResult(returnValue: EncodedValue = num(21)): SessionResult {
 
 beforeEach(() => {
   vi.useFakeTimers();
+  localStorageItems.clear();
+  localStorageMock.getItem.mockClear();
+  localStorageMock.removeItem.mockClear();
+  localStorageMock.setItem.mockClear();
+  Object.defineProperty(window, 'localStorage', {
+    configurable: true,
+    value: localStorageMock,
+  });
   requestMock.mockReset();
   runJavaScriptMock.mockReset();
 });
@@ -287,5 +306,34 @@ describe('useSession', () => {
       { timeoutMs: 15000 },
     );
     unmount();
+  });
+
+  it('restores practice cases from local storage for the same code and function', async () => {
+    const code = 'def solve(nums):\n    return 21';
+    const imported = functionResult();
+    const first = renderHook(() => useSession(code));
+
+    act(() => first.result.current.importSession(code, imported, 0));
+    await act(async () => {});
+    act(() => first.result.current.addTestCase());
+    act(() => {
+      first.result.current.updateTestCase(first.result.current.testCases[0].id, {
+        expected: '21',
+      });
+    });
+    await act(async () => {});
+    first.unmount();
+
+    const second = renderHook(() => useSession(code));
+    act(() => second.result.current.importSession(code, imported, 0));
+    await act(async () => {});
+
+    expect(second.result.current.testCases).toHaveLength(1);
+    expect(second.result.current.testCases[0]).toMatchObject({
+      expected: '21',
+      inputs: ['[1, 2, 3]'],
+      name: 'Case 1',
+    });
+    second.unmount();
   });
 });
