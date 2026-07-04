@@ -12,6 +12,7 @@ import {
   NotebookPen,
   Play,
   Plus,
+  RefreshCcw,
   Route,
   Trash2,
 } from 'lucide-react';
@@ -37,6 +38,7 @@ type InputsPanelProps = {
   onUpdateTestCase: (id: string, patch: PracticeTestCaseUpdate) => void;
   onRemoveTestCase: (id: string) => void;
   onRunTestCases: () => void;
+  onRunFailedTestCases: () => void;
   onTraceTestCase: (id: string) => void;
   practiceNotebook: PracticeNotebook;
   onPracticeNotebookChange: (patch: PracticeNotebookUpdate) => void;
@@ -67,6 +69,7 @@ export function InputsPanel({
   onUpdateTestCase,
   onRemoveTestCase,
   onRunTestCases,
+  onRunFailedTestCases,
   onTraceTestCase,
   practiceNotebook,
   onPracticeNotebookChange,
@@ -78,6 +81,9 @@ export function InputsPanel({
   const functions = analysis.functions;
   const params = activeFunction?.params ?? [];
   const caseSummary = formatCaseSummary(testCases);
+  const failedCaseCount = testCases.filter(
+    (testCase) => testCase.status === 'fail' || testCase.status === 'error',
+  ).length;
   const notebookSummary = formatNotebookSummary(practiceNotebook);
 
   const literalFor = (name: string, index: number): string => {
@@ -203,6 +209,16 @@ export function InputsPanel({
                 <Play size={13} />
                 {testCasesBusy ? 'Running' : 'Run cases'}
               </button>
+              {failedCaseCount > 0 ? (
+                <button
+                  disabled={isBusy || testCasesBusy}
+                  onClick={onRunFailedTestCases}
+                  type="button"
+                >
+                  <RefreshCcw size={13} />
+                  Run failed
+                </button>
+              ) : null}
             </div>
 
             {testCases.length === 0 ? (

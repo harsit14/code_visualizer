@@ -365,4 +365,50 @@ describe('useSession', () => {
     });
     second.unmount();
   });
+
+  it('reruns only failed practice cases', async () => {
+    const code = 'def solve(nums):\n    return 21';
+    const imported = functionResult();
+    const { result, unmount } = renderHook(() => useSession(code));
+
+    act(() => result.current.importSession(code, imported, 0));
+    act(() => result.current.addTestCase());
+    act(() => result.current.addTestCase());
+    act(() => {
+      result.current.updateTestCase(result.current.testCases[0].id, { expected: '21' });
+      result.current.updateTestCase(result.current.testCases[1].id, {
+        expected: '99',
+        inputs: ['[9]'],
+      });
+    });
+
+    requestMock.mockResolvedValueOnce(functionResult(num(21)));
+    requestMock.mockResolvedValueOnce(functionResult(num(21)));
+    await act(async () => {
+      await result.current.runTestCases();
+    });
+    expect(result.current.testCases.map((testCase) => testCase.status)).toEqual(['pass', 'fail']);
+
+    requestMock.mockClear();
+    requestMock.mockResolvedValueOnce(functionResult(num(99)));
+    await act(async () => {
+      await result.current.runFailedTestCases();
+    });
+
+    expect(requestMock).toHaveBeenCalledTimes(1);
+    expect(requestMock).toHaveBeenCalledWith(
+      {
+        op: 'run',
+        source: code,
+        options: {
+          function: 'solve',
+          inputs: ['[9]'],
+          seed: 1,
+        },
+      },
+      { timeoutMs: 15000 },
+    );
+    expect(result.current.testCases.map((testCase) => testCase.status)).toEqual(['pass', 'pass']);
+    unmount();
+  });
 });

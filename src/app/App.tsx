@@ -868,6 +868,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
               onPracticeNotebookChange={session.updatePracticeNotebook}
               onRegenerate={session.regenerateInputs}
               onRemoveTestCase={session.removeTestCase}
+              onRunFailedTestCases={session.runFailedTestCases}
               onRunTestCases={session.runTestCases}
               onSeedChange={session.setSeed}
               onTraceTestCase={session.traceTestCase}

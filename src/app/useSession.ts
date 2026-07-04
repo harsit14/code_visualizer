@@ -538,13 +538,13 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
     [activeFunction, run, testCases],
   );
 
-  const runTestCases = useCallback(async () => {
+  const runPracticeCaseBatch = useCallback(async (casesToRun: readonly PracticeTestCase[]) => {
     if (
       languageRef.current !== 'python' ||
       isBusy ||
       testCasesBusy ||
       !activeFunction ||
-      testCases.length === 0
+      casesToRun.length === 0
     ) {
       return;
     }
@@ -555,7 +555,7 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
 
     setTestCasesBusy(true);
     try {
-      for (const testCase of testCases) {
+      for (const testCase of casesToRun) {
         setTestCases((current) =>
           current.map((candidate) =>
             candidate.id === testCase.id
@@ -612,9 +612,18 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
     getClient,
     isBusy,
     seed,
-    testCases,
     testCasesBusy,
   ]);
+
+  const runTestCases = useCallback(async () => {
+    await runPracticeCaseBatch(testCases);
+  }, [runPracticeCaseBatch, testCases]);
+
+  const runFailedTestCases = useCallback(async () => {
+    await runPracticeCaseBatch(
+      testCases.filter((testCase) => testCase.status === 'fail' || testCase.status === 'error'),
+    );
+  }, [runPracticeCaseBatch, testCases]);
 
   const measureComplexity = useCallback(async () => {
     if (languageRef.current !== 'python' || isBusy || complexityBusy) {
@@ -766,6 +775,7 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
     practiceNotebook,
     updatePracticeNotebook,
     runTestCases,
+    runFailedTestCases,
     traceTestCase,
     complexity,
     complexityBusy,

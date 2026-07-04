@@ -85,6 +85,7 @@ function renderInputsPanel(testCases: PracticeTestCase[] = []) {
       onPracticeNotebookChange={() => {}}
       onRegenerate={() => {}}
       onRemoveTestCase={() => {}}
+      onRunFailedTestCases={() => {}}
       onRunTestCases={() => {}}
       onSeedChange={() => {}}
       onTraceTestCase={() => {}}
@@ -127,5 +128,10 @@ describe('InputsPanel', () => {
   it('summarizes scored and exploratory practice runs in the folded header', () => {
     expect(renderInputsPanel([caseOne, caseTwo])).toContain('1/2 pass');
     expect(renderInputsPanel([exploratoryCase])).toContain('1 ran');
+  });
+
+  it('shows the rerun-failed action only when a case failed', () => {
+    expect(renderInputsPanel([caseOne])).not.toContain('Run failed');
+    expect(renderInputsPanel([caseOne, caseTwo])).toContain('Run failed');
   });
 });
