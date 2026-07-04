@@ -336,4 +336,33 @@ describe('useSession', () => {
     });
     second.unmount();
   });
+
+  it('restores practice notebook notes for the same code and function', async () => {
+    const code = 'def solve(nums):\n    return 21';
+    const imported = functionResult();
+    const first = renderHook(() => useSession(code));
+
+    act(() => first.result.current.importSession(code, imported, 0));
+    await act(async () => {});
+    act(() => {
+      first.result.current.updatePracticeNotebook({
+        notes: 'Watch the invariant.',
+        patterns: 'two pointers',
+        status: 'practicing',
+      });
+    });
+    await act(async () => {});
+    first.unmount();
+
+    const second = renderHook(() => useSession(code));
+    act(() => second.result.current.importSession(code, imported, 0));
+    await act(async () => {});
+
+    expect(second.result.current.practiceNotebook).toMatchObject({
+      notes: 'Watch the invariant.',
+      patterns: 'two pointers',
+      status: 'practicing',
+    });
+    second.unmount();
+  });
 });

@@ -979,13 +979,15 @@ input[type='password'] {
   width: 90px;
 }
 
-.test-cases-block {
+.test-cases-block,
+.practice-notebook-block {
   border-top: 1px solid var(--border);
   margin-top: 2px;
   padding-top: 8px;
 }
 
-.test-cases-block summary {
+.test-cases-block summary,
+.practice-notebook-block summary {
   align-items: center;
   color: var(--text);
   cursor: pointer;
@@ -995,17 +997,20 @@ input[type='password'] {
   list-style: none;
 }
 
-.test-cases-block summary::-webkit-details-marker {
+.test-cases-block summary::-webkit-details-marker,
+.practice-notebook-block summary::-webkit-details-marker {
   display: none;
 }
 
-.test-cases-block summary span {
+.test-cases-block summary span,
+.practice-notebook-block summary span {
   align-items: center;
   display: inline-flex;
   gap: 6px;
 }
 
-.test-cases-block summary em {
+.test-cases-block summary em,
+.practice-notebook-block summary em {
   background: var(--bg-inset);
   border: 1px solid var(--border);
   border-radius: 999px;
@@ -1014,6 +1019,40 @@ input[type='password'] {
   font-size: 10.5px;
   font-style: normal;
   padding: 1px 6px;
+}
+
+.practice-notebook-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 8px;
+}
+
+.practice-notebook-body label {
+  display: grid;
+  gap: 3px;
+}
+
+.practice-notebook-body span {
+  color: var(--text-faint);
+  font-size: 10.5px;
+  text-transform: uppercase;
+}
+
+.practice-notebook-body select,
+.practice-notebook-body textarea {
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  padding: 5px 8px;
+}
+
+.practice-notebook-body textarea {
+  min-height: 78px;
+  resize: vertical;
 }
 
 .test-cases-body {

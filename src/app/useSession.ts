@@ -14,6 +14,14 @@ import {
   saveStoredPracticeCases,
 } from './practiceCaseStorage';
 import {
+  EMPTY_PRACTICE_NOTEBOOK,
+  buildPracticeNotebookStorageKey,
+  loadStoredPracticeNotebook,
+  saveStoredPracticeNotebook,
+  type PracticeNotebook,
+  type PracticeNotebookUpdate,
+} from './practiceNotebook';
+import {
   createEdgePracticeCases,
   createPracticeTestCase,
   summarizePracticeRun,
@@ -104,6 +112,9 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
     initialOptions.functionName ?? null,
   );
   const [inputDrafts, setInputDrafts] = useState<Record<string, string> | null>(null);
+  const [practiceNotebook, setPracticeNotebook] = useState<PracticeNotebook>(
+    EMPTY_PRACTICE_NOTEBOOK,
+  );
   const [testCases, setTestCases] = useState<PracticeTestCase[]>([]);
   const [testCasesBusy, setTestCasesBusy] = useState(false);
   const [pendingInitialInputs, setPendingInitialInputs] = useState<string[] | null>(
@@ -120,6 +131,8 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
   const languageRef = useRef<Language>(initialOptions.language ?? 'python');
   const practiceCasesStorageKeyRef = useRef<string | null>(null);
   const skipPracticeCaseSaveRef = useRef(false);
+  const practiceNotebookStorageKeyRef = useRef<string | null>(null);
+  const skipPracticeNotebookSaveRef = useRef(false);
 
   const getClient = useCallback(() => {
     if (!clientRef.current) {
@@ -187,6 +200,7 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
       setSelectedFrameIndex(null);
       setFunctionOverrideState(null);
       setInputDrafts(null);
+      setPracticeNotebook(EMPTY_PRACTICE_NOTEBOOK);
       setTestCases([]);
       setPendingInitialInputs(null);
       scheduleAnalyze(nextCode);
@@ -206,6 +220,7 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
       setSelectedFrameIndex(null);
       setFunctionOverrideState(null);
       setInputDrafts(null);
+      setPracticeNotebook(EMPTY_PRACTICE_NOTEBOOK);
       setTestCases([]);
       setPendingInitialInputs(null);
       scheduleAnalyze(codeRef.current, nextLanguage);
@@ -232,6 +247,7 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
       setSelectedFrameIndex(null);
       setFunctionOverrideState(options.language === 'python' ? (options.functionName ?? null) : null);
       setInputDrafts(null);
+      setPracticeNotebook(EMPTY_PRACTICE_NOTEBOOK);
       setTestCases([]);
       setPendingInitialInputs(options.language === 'python' ? (options.inputs ?? null) : null);
       setSeed(options.language === 'python' ? (options.seed ?? null) : null);
@@ -250,6 +266,13 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
       return null;
     }
     return buildPracticeCaseStorageKey(code, activeFunction.qualname);
+  }, [activeFunction, code, language]);
+
+  const practiceNotebookStorageKey = useMemo(() => {
+    if (language !== 'python' || !activeFunction) {
+      return null;
+    }
+    return buildPracticeNotebookStorageKey(code, activeFunction.qualname);
   }, [activeFunction, code, language]);
 
   useEffect(() => {
@@ -275,6 +298,30 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
     }
     saveStoredPracticeCases(practiceCasesStorageKey, testCases);
   }, [practiceCasesStorageKey, testCases]);
+
+  useEffect(() => {
+    if (practiceNotebookStorageKey === practiceNotebookStorageKeyRef.current) {
+      return;
+    }
+    practiceNotebookStorageKeyRef.current = practiceNotebookStorageKey;
+    skipPracticeNotebookSaveRef.current = true;
+    if (!practiceNotebookStorageKey) {
+      setPracticeNotebook(EMPTY_PRACTICE_NOTEBOOK);
+      return;
+    }
+    setPracticeNotebook(loadStoredPracticeNotebook(practiceNotebookStorageKey));
+  }, [practiceNotebookStorageKey]);
+
+  useEffect(() => {
+    if (!practiceNotebookStorageKey) {
+      return;
+    }
+    if (skipPracticeNotebookSaveRef.current) {
+      skipPracticeNotebookSaveRef.current = false;
+      return;
+    }
+    saveStoredPracticeNotebook(practiceNotebookStorageKey, practiceNotebook);
+  }, [practiceNotebook, practiceNotebookStorageKey]);
 
   useEffect(() => {
     if (!activeFunction || !pendingInitialInputs) {
@@ -317,6 +364,7 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
     setPlaying(false);
     setSelectedFrameIndex(null);
     setInputDrafts(null);
+    setPracticeNotebook(EMPTY_PRACTICE_NOTEBOOK);
     setTestCases([]);
     setPendingInitialInputs(null);
   }, []);
@@ -464,6 +512,14 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
 
   const removeTestCase = useCallback((id: string) => {
     setTestCases((current) => current.filter((testCase) => testCase.id !== id));
+  }, []);
+
+  const updatePracticeNotebook = useCallback((patch: PracticeNotebookUpdate) => {
+    setPracticeNotebook((current) => ({
+      ...current,
+      ...patch,
+      updatedAt: Date.now(),
+    }));
   }, []);
 
   const traceTestCase = useCallback(
@@ -707,6 +763,8 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
     addEdgeTestCases,
     updateTestCase,
     removeTestCase,
+    practiceNotebook,
+    updatePracticeNotebook,
     runTestCases,
     traceTestCase,
     complexity,

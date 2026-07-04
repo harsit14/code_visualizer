@@ -865,12 +865,14 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
               onAddTestCase={session.addTestCase}
               onDraftsChange={session.setInputDrafts}
               onFunctionChange={session.setFunctionOverride}
+              onPracticeNotebookChange={session.updatePracticeNotebook}
               onRegenerate={session.regenerateInputs}
               onRemoveTestCase={session.removeTestCase}
               onRunTestCases={session.runTestCases}
               onSeedChange={session.setSeed}
               onTraceTestCase={session.traceTestCase}
               onUpdateTestCase={session.updateTestCase}
+              practiceNotebook={session.practiceNotebook}
               seed={session.seed}
               testCases={session.testCases}
               testCasesBusy={session.testCasesBusy}

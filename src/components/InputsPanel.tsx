@@ -5,7 +5,17 @@
  * Literals accept plain Python literals plus `tree([...])` and
  * `linked([...])` builders for TreeNode / ListNode arguments.
  */
-import { Dices, FlaskConical, ListChecks, Play, Plus, Route, Trash2 } from 'lucide-react';
+import {
+  Dices,
+  FlaskConical,
+  ListChecks,
+  NotebookPen,
+  Play,
+  Plus,
+  Route,
+  Trash2,
+} from 'lucide-react';
+import type { PracticeNotebook, PracticeNotebookUpdate } from '../app/practiceNotebook';
 import type { PracticeTestCase, PracticeTestCaseUpdate } from '../app/practiceCases';
 import type { AnalysisInfo, FunctionInfo, GeneratedInputInfo } from '../engine/types';
 
@@ -28,6 +38,8 @@ type InputsPanelProps = {
   onRemoveTestCase: (id: string) => void;
   onRunTestCases: () => void;
   onTraceTestCase: (id: string) => void;
+  practiceNotebook: PracticeNotebook;
+  onPracticeNotebookChange: (patch: PracticeNotebookUpdate) => void;
 };
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -56,6 +68,8 @@ export function InputsPanel({
   onRemoveTestCase,
   onRunTestCases,
   onTraceTestCase,
+  practiceNotebook,
+  onPracticeNotebookChange,
 }: InputsPanelProps) {
   if (!analysis || analysis.mode !== 'function') {
     return null;
@@ -64,6 +78,7 @@ export function InputsPanel({
   const functions = analysis.functions;
   const params = activeFunction?.params ?? [];
   const caseSummary = formatCaseSummary(testCases);
+  const notebookSummary = formatNotebookSummary(practiceNotebook);
 
   const literalFor = (name: string, index: number): string => {
     if (drafts?.[name] !== undefined) {
@@ -268,6 +283,54 @@ export function InputsPanel({
             )}
           </div>
         </details>
+
+        <details className="practice-notebook-block">
+          <summary>
+            <span>
+              <NotebookPen size={13} /> Notebook
+            </span>
+            <em>{notebookSummary}</em>
+          </summary>
+
+          <div className="practice-notebook-body">
+            <label className="practice-notebook-status">
+              <span>status</span>
+              <select
+                onChange={(event) =>
+                  onPracticeNotebookChange({
+                    status: event.target.value as PracticeNotebook['status'],
+                  })
+                }
+                value={practiceNotebook.status}
+              >
+                <option value="new">new</option>
+                <option value="practicing">practicing</option>
+                <option value="reviewed">reviewed</option>
+              </select>
+            </label>
+            <label>
+              <span>patterns</span>
+              <input
+                onChange={(event) =>
+                  onPracticeNotebookChange({ patterns: event.target.value })
+                }
+                placeholder="two pointers, binary search"
+                spellCheck={false}
+                type="text"
+                value={practiceNotebook.patterns}
+              />
+            </label>
+            <label>
+              <span>notes</span>
+              <textarea
+                onChange={(event) => onPracticeNotebookChange({ notes: event.target.value })}
+                placeholder="invariant, mistake, recurrence"
+                spellCheck={false}
+                value={practiceNotebook.notes}
+              />
+            </label>
+          </div>
+        </details>
       </div>
     </section>
   );
@@ -321,6 +384,26 @@ function formatCaseSummary(testCases: PracticeTestCase[]): string {
   }
 
   return String(testCases.length);
+}
+
+function formatNotebookSummary(notebook: PracticeNotebook): string {
+  if (notebook.status === 'reviewed') {
+    return 'reviewed';
+  }
+  if (notebook.status === 'practicing') {
+    return 'practicing';
+  }
+  const firstPattern = notebook.patterns
+    .split(',')
+    .map((pattern) => pattern.trim())
+    .find(Boolean);
+  if (firstPattern) {
+    return firstPattern;
+  }
+  if (notebook.notes.trim()) {
+    return 'notes';
+  }
+  return 'empty';
 }
 
 function formatCaseMetrics(runtimeMs: number | null, memoryMb: number | null): string {

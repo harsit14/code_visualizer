@@ -1,5 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
+import type { PracticeNotebook } from '../app/practiceNotebook';
 import type { PracticeTestCase } from '../app/practiceCases';
 import type { AnalysisInfo, FunctionInfo } from '../engine/types';
 import { InputsPanel } from './InputsPanel';
@@ -62,6 +63,13 @@ const exploratoryCase: PracticeTestCase = {
   status: 'ran',
 };
 
+const notebook: PracticeNotebook = {
+  notes: '',
+  patterns: 'two pointers, sorting',
+  status: 'practicing',
+  updatedAt: 123,
+};
+
 function renderInputsPanel(testCases: PracticeTestCase[] = []) {
   return renderToStaticMarkup(
     <InputsPanel
@@ -74,12 +82,14 @@ function renderInputsPanel(testCases: PracticeTestCase[] = []) {
       onAddTestCase={() => {}}
       onDraftsChange={() => {}}
       onFunctionChange={() => {}}
+      onPracticeNotebookChange={() => {}}
       onRegenerate={() => {}}
       onRemoveTestCase={() => {}}
       onRunTestCases={() => {}}
       onSeedChange={() => {}}
       onTraceTestCase={() => {}}
       onUpdateTestCase={() => {}}
+      practiceNotebook={notebook}
       seed={null}
       testCases={testCases}
       testCasesBusy={false}
@@ -93,6 +103,14 @@ describe('InputsPanel', () => {
 
     expect(html).toContain('inputs are generated');
     expect(html).not.toContain('no entry point');
+  });
+
+  it('renders the compact practice notebook summary', () => {
+    const html = renderInputsPanel();
+
+    expect(html).toContain('Notebook');
+    expect(html).toContain('practicing');
+    expect(html).toContain('two pointers, sorting');
   });
 
   it('renders saved practice cases without opening a separate surface', () => {
