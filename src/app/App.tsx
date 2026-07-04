@@ -8,6 +8,7 @@ import { CallStackPanel } from '../components/CallStackPanel';
 import { ConsolePanel } from '../components/ConsolePanel';
 import { ControlsBar } from '../components/ControlsBar';
 import { DataPanel } from '../components/DataPanel';
+import { DashboardOnboardingBar } from '../components/DashboardOnboardingBar';
 import { EditorPanel } from '../components/EditorPanel';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { ExplainerPanel } from '../components/ExplainerPanel';
@@ -30,6 +31,7 @@ import {
   DEFAULT_COLUMN_WEIGHTS,
   DEFAULT_PANEL_VISIBILITY,
   DEFAULT_PANEL_WEIGHTS,
+  FULL_PANEL_VISIBILITY,
   PANEL_DEFINITIONS,
   normalizePanelVisibility,
   normalizeWeights,
@@ -55,6 +57,7 @@ const DESIGN_STORAGE_KEY = 'cv-design-v2';
 const PANEL_VISIBILITY_STORAGE_KEY = 'cv-panel-visibility-v1';
 const COLUMN_WEIGHTS_STORAGE_KEY = 'cv-column-weights-v1';
 const PANEL_WEIGHTS_STORAGE_KEY = 'cv-panel-weights-v1';
+const DASHBOARD_ONBOARDING_STORAGE_KEY = 'cv-dashboard-onboarding-v1';
 
 const COLUMN_MIN_WIDTHS: Record<ColumnId, number> = {
   left: 300,
@@ -108,6 +111,17 @@ function initialShare() {
 
 function initialEmbedMode() {
   return new URLSearchParams(window.location.search).get(EMBED_SEARCH_PARAM) === '1';
+}
+
+function initialDashboardOnboarding(embedMode: boolean) {
+  if (embedMode) {
+    return false;
+  }
+  try {
+    return window.localStorage.getItem(DASHBOARD_ONBOARDING_STORAGE_KEY) !== 'dismissed';
+  } catch {
+    return true;
+  }
 }
 
 function shouldShowDashboard(): boolean {
@@ -213,6 +227,9 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
   const [shareLabel, setShareLabel] = useState('Share');
   const [embedLabel, setEmbedLabel] = useState('Embed');
   const [embedMode] = useState(initialEmbedMode);
+  const [showDashboardOnboarding, setShowDashboardOnboarding] = useState(() =>
+    initialDashboardOnboarding(embedMode),
+  );
   const isTracedDesign = !embedMode && designMode === 'traced';
   const [importLabel, setImportLabel] = useState(DEFAULT_IMPORT_LABEL);
   const [importTitle, setImportTitle] = useState(DEFAULT_IMPORT_TITLE);
@@ -688,6 +705,21 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
     setPanelWeights({ ...DEFAULT_PANEL_WEIGHTS });
   }, [embedMode]);
 
+  const showAllPanels = useCallback(() => {
+    setPanelVisibility(embedMode ? { ...DEFAULT_EMBED_PANEL_VISIBILITY } : { ...FULL_PANEL_VISIBILITY });
+    setColumnWeights({ ...DEFAULT_COLUMN_WEIGHTS });
+    setPanelWeights({ ...DEFAULT_PANEL_WEIGHTS });
+  }, [embedMode]);
+
+  const dismissDashboardOnboarding = useCallback(() => {
+    setShowDashboardOnboarding(false);
+    try {
+      window.localStorage.setItem(DASHBOARD_ONBOARDING_STORAGE_KEY, 'dismissed');
+    } catch {
+      /* local storage unavailable */
+    }
+  }, []);
+
   const startColumnResize = useCallback(
     (beforeColumn: ColumnId, afterColumn: ColumnId, event: ReactPointerEvent) => {
       if (event.button !== 0) {
@@ -924,7 +956,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
           </ErrorBoundary>,
         )
       : null,
-    watchedVariables.length > 0 && panelVisibility.watch
+    panelVisibility.watch
       ? panelSlot(
           'watch',
           <ErrorBoundary
@@ -1077,6 +1109,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
             onOpenLanding={onOpenLanding}
             onResetLayout={resetLayout}
             onShare={() => void handleShare()}
+            onShowAllPanels={showAllPanels}
             onTogglePanel={togglePanelVisibility}
             onToggleTheme={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))}
             designMode={designMode}
@@ -1090,6 +1123,10 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
             theme={theme}
           />
         )}
+
+        {!embedMode && showDashboardOnboarding ? (
+          <DashboardOnboardingBar onDismiss={dismissDashboardOnboarding} />
+        ) : null}
 
         <p className="viewport-note">Best on desktop or tablet.</p>
 
@@ -1128,7 +1165,9 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
           canStepOver={stepOverTarget !== null}
           cursorLine={cursorLine}
           currentStep={session.currentStep}
+          exampleId={exampleId}
           isBusy={session.isBusy}
+          onExampleChange={handleExampleChange}
           onJump={session.jumpToStep}
           onRun={() => void session.run()}
           onRunToBreakpoint={runToBreakpoint}
@@ -1140,6 +1179,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
           onTogglePlay={session.togglePlay}
           playing={session.playing}
           speed={session.speed}
+          status={session.status}
           step={session.step}
           totalSteps={session.totalSteps}
         />

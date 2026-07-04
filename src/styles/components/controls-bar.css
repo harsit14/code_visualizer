@@ -1,0 +1,189 @@
+/* ------------------------------------------------------ controls bar */
+
+.controls-bar {
+  align-items: center;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 8px 12px;
+}
+
+.controls-bar-prerun {
+  align-items: center;
+  gap: 10px;
+}
+
+.run-button {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  padding: 6px 16px;
+}
+
+.run-button:hover:not(:disabled) {
+  background: var(--accent);
+  filter: brightness(1.1);
+}
+
+.transport {
+  display: flex;
+  gap: 4px;
+}
+
+.control-tip {
+  display: inline-flex;
+  min-width: 0;
+}
+
+.pretrace-actions {
+  align-items: center;
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-width: 0;
+}
+
+.pretrace-example-select {
+  min-width: 190px;
+}
+
+.runtime-progress {
+  align-items: center;
+  color: var(--text-dim);
+  display: flex;
+  flex: 1;
+  gap: 10px;
+  min-width: min(260px, 100%);
+}
+
+.runtime-progress-label {
+  flex: 0 1 auto;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.runtime-progress-track {
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  flex: 1;
+  height: 8px;
+  min-width: 96px;
+  overflow: hidden;
+}
+
+.runtime-progress-bar {
+  background: linear-gradient(90deg, var(--green), var(--accent));
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+  transition: width 0.2s ease;
+}
+
+.transport button {
+  padding: 5px 8px;
+}
+
+.debug-nav-button {
+  color: var(--text-dim);
+}
+
+.debug-nav-button:hover:not(:disabled) {
+  color: var(--accent);
+}
+
+.play-toggle {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.scrubber {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.scrubber input[type='range'] {
+  accent-color: var(--accent);
+  width: 100%;
+}
+
+.scrubber-meta {
+  align-items: center;
+  color: var(--text-faint);
+  display: flex;
+  font-size: 11.5px;
+  justify-content: space-between;
+}
+
+.step-meta {
+  font-family: var(--mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.step-count {
+  align-items: center;
+  display: inline-flex;
+  font-family: var(--mono);
+  gap: 4px;
+}
+
+.step-jump {
+  padding: 1px 4px;
+  text-align: right;
+  width: 58px;
+}
+
+.speed-control {
+  align-items: center;
+  color: var(--text-dim);
+  display: flex;
+  font-size: 11.5px;
+  gap: 6px;
+}
+
+.speed-control input {
+  accent-color: var(--accent);
+  width: 90px;
+}
+
+.ghost-button {
+  background: transparent;
+}
+
+@media (max-width: 720px) {
+  .controls-bar {
+    bottom: 0;
+    box-shadow: 0 -6px 16px var(--bg);
+    position: sticky;
+    z-index: 5;
+  }
+}
+
+@media (max-width: 480px) {
+  .controls-bar {
+    gap: 9px;
+  }
+
+  .step-count {
+    font-size: 11px;
+    gap: 3px;
+  }
+
+  .step-jump {
+    width: 44px;
+  }
+}

@@ -3,7 +3,7 @@
  * function mode), with per-step diff highlighting — what changed, what's
  * new, what disappeared this step.
  */
-import { Pin } from 'lucide-react';
+import { Pin, Plus } from 'lucide-react';
 import { diffLocals, expandSelf, formatValue, typeNameOf } from '../engine/trace';
 import { effectiveFrame } from '../engine/traceNavigation';
 import type { EncodedValue, TraceStep } from '../engine/types';
@@ -32,15 +32,16 @@ function VariableRow({ name, value, badge, isWatched, onToggleWatch }: RowProps)
         .join(' ')}
     >
       <td className="var-name">
+        <span className="var-name-text">{name}</span>
         <button
+          aria-label={isWatched ? `Remove ${name} from watch` : `Add ${name} to watch`}
           aria-pressed={isWatched}
           className={['var-watch-button', isWatched ? 'is-active' : ''].filter(Boolean).join(' ')}
           onClick={() => onToggleWatch(name)}
-          title={isWatched ? `Stop watching ${name}` : `Watch ${name}`}
+          title={isWatched ? `Remove ${name} from watch` : `Add ${name} to watch`}
           type="button"
         >
-          <Pin size={11} />
-          <span>{name}</span>
+          {isWatched ? <Pin size={12} /> : <Plus size={12} />}
         </button>
       </td>
       <td className="var-type">{typeNameOf(value)}</td>
@@ -76,11 +77,17 @@ export function VariablesPanel({
     <section className="panel variables-panel" aria-label="Variables">
       <header className="panel-header">
         <h2>Variables</h2>
-        {frame ? (
-          <span className="panel-hint">
-            {frame.func === '<module>' ? 'module scope' : `${frame.func}()`}
+        <div className="variables-header-meta">
+          {frame ? (
+            <span className="panel-hint">
+              {frame.func === '<module>' ? 'module scope' : `${frame.func}()`}
+            </span>
+          ) : null}
+          <span className="watch-affordance" title="Pin variables to track changes across steps">
+            <Pin size={12} />
+            Pin to Watch
           </span>
-        ) : null}
+        </div>
       </header>
 
       {!frame ? (

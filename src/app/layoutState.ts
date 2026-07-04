@@ -31,6 +31,17 @@ export const PANEL_DEFINITIONS: PanelDefinition[] = [
 
 export const DEFAULT_PANEL_VISIBILITY: PanelVisibility = {
   code: true,
+  inputs: false,
+  data: true,
+  variables: true,
+  watch: false,
+  callStack: true,
+  explainer: false,
+  console: true,
+};
+
+export const FULL_PANEL_VISIBILITY: PanelVisibility = {
+  code: true,
   inputs: true,
   data: true,
   variables: true,

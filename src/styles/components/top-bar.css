@@ -1,0 +1,348 @@
+/* ----------------------------------------------------------- top bar */
+
+.top-bar {
+  align-items: center;
+  display: flex;
+  flex-shrink: 0;
+  gap: 10px;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.brand {
+  align-items: center;
+  align-self: center;
+  display: flex;
+  flex: 0 1 auto;
+  gap: 8px;
+  min-width: 0;
+}
+
+.brand-mark {
+  border-radius: 6px;
+  display: block;
+  flex: 0 0 auto;
+  height: 24px;
+  object-fit: contain;
+  width: 24px;
+}
+
+.brand h1 {
+  font-size: 15.5px;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.status-pill {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  color: var(--text-dim);
+  font-size: 11px;
+  max-width: 320px;
+  overflow: hidden;
+  padding: 3px 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-running,
+.status-loading,
+.status-interrupting,
+.status-restarting {
+  border-color: var(--amber);
+  color: var(--amber);
+}
+
+.status-ready {
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.top-actions {
+  align-items: center;
+  display: flex;
+  flex: 1 1 auto;
+  flex-flow: row nowrap;
+  gap: 7px;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.top-action-row {
+  display: contents;
+}
+
+.top-action-group {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  gap: 5px;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.top-action-context {
+  flex: 1 1 auto;
+  justify-content: flex-start;
+}
+
+.top-action-appearance {
+  flex: 0 0 auto;
+}
+
+.example-select {
+  flex: 0 1 220px;
+  min-width: 170px;
+  width: clamp(170px, 15vw, 220px);
+}
+
+.language-select {
+  min-width: 104px;
+  width: 104px;
+}
+
+.top-action-group > select,
+.top-action-group > button,
+.top-action-group > .panel-menu > summary,
+.top-action-group > .account-menu > summary {
+  flex-shrink: 0;
+  font-size: 12px;
+  gap: 5px;
+  min-height: 30px;
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+
+.top-action-group > button > svg,
+.top-action-group > .panel-menu > summary > svg,
+.top-action-group > .account-menu > summary > svg {
+  flex: 0 0 auto;
+}
+
+.icon-button {
+  justify-content: center;
+  padding: 4px 7px;
+  width: 30px;
+}
+
+.panel-menu {
+  position: relative;
+}
+
+.panel-menu summary {
+  align-items: center;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--text);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 12px;
+  gap: 5px;
+  list-style: none;
+  min-height: 30px;
+  padding: 4px 8px;
+  user-select: none;
+}
+
+@media (max-width: 1600px) {
+  .brand {
+    gap: 7px;
+  }
+
+  .brand h1 {
+    font-size: 14.5px;
+  }
+
+  .status-pill {
+    padding: 2px 8px;
+  }
+
+  .top-actions {
+    gap: 5px;
+  }
+
+  .top-action-group {
+    gap: 4px;
+  }
+
+  .top-action-group > button,
+  .top-action-group > .panel-menu > summary,
+  .top-action-group > .account-menu > summary {
+    gap: 0;
+    justify-content: center;
+    min-width: 30px;
+    padding-inline: 0;
+    width: 30px;
+  }
+
+  .top-action-group > button .top-action-label,
+  .top-action-group > .panel-menu > summary .top-action-label,
+  .top-action-group > .account-menu > summary .account-summary-label {
+    display: none;
+  }
+
+  .example-select {
+    flex-basis: 180px;
+    min-width: 160px;
+    width: clamp(160px, 16vw, 190px);
+  }
+
+  .language-select {
+    min-width: 96px;
+    width: 96px;
+  }
+}
+
+@media (max-width: 720px) {
+  .top-bar {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .brand {
+    justify-content: flex-start;
+  }
+
+  .status-pill {
+    flex-shrink: 0;
+    max-width: none;
+  }
+
+  .top-actions {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .top-action-group {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .example-select {
+    flex: 1 1 180px;
+    width: auto;
+  }
+}
+
+.panel-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.panel-menu summary:hover {
+  background: var(--bg-inset);
+  border-color: var(--border-strong);
+}
+
+.panel-menu[open] summary {
+  border-color: var(--accent);
+}
+
+.panel-menu-popover {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 174px;
+  padding: 8px;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 20;
+}
+
+.shortcuts-popover {
+  gap: 6px;
+  min-width: 238px;
+}
+
+.shortcut-row {
+  align-items: center;
+  color: var(--text-dim);
+  display: grid;
+  font-size: 12.5px;
+  gap: 10px;
+  grid-template-columns: minmax(92px, auto) 1fr;
+}
+
+.shortcut-keys {
+  align-items: center;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.shortcut-row kbd {
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-bottom-color: var(--border-strong);
+  border-radius: 5px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  line-height: 1;
+  min-width: 22px;
+  padding: 4px 6px;
+  text-align: center;
+}
+
+.panel-menu-item {
+  align-items: center;
+  border-radius: 6px;
+  color: var(--text-dim);
+  cursor: pointer;
+  display: flex;
+  font-size: 12.5px;
+  gap: 8px;
+  padding: 5px 6px;
+}
+
+.panel-menu-item:hover {
+  background: var(--bg-inset);
+  color: var(--text);
+}
+
+.panel-menu-item input {
+  accent-color: var(--accent);
+}
+
+.panel-menu-presets {
+  border-bottom: 1px solid var(--border);
+  display: grid;
+  gap: 5px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 4px;
+  padding-bottom: 7px;
+}
+
+.panel-menu-action {
+  justify-content: flex-start;
+  min-height: 30px;
+  width: 100%;
+}
+
+.panel-menu-action svg {
+  flex: 0 0 auto;
+}
+
+.action-popover,
+.appearance-popover {
+  min-width: 190px;
+}
+
+.appearance-popover .design-toggle {
+  min-width: 0;
+}
+
+.panel-menu-reset {
+  justify-content: center;
+  margin-top: 5px;
+  width: 100%;
+}

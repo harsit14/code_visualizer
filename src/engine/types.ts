@@ -186,10 +186,24 @@ export type EngineRequest =
 
 export type RuntimePhase = 'idle' | 'loading' | 'ready' | 'running' | 'interrupting' | 'restarting';
 
+export type RuntimeStage =
+  | 'idle'
+  | 'runtime-loading'
+  | 'engine-preparing'
+  | 'analyzing'
+  | 'instrumenting'
+  | 'trace-generating'
+  | 'executing'
+  | 'ready'
+  | 'interrupting'
+  | 'restarting';
+
 export type RuntimeStatus = {
   phase: RuntimePhase;
   message: string;
   interruptSupported: boolean;
+  progress?: number;
+  stage?: RuntimeStage;
 };
 
 export type WorkerInbound =

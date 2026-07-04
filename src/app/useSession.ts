@@ -78,6 +78,8 @@ function idleStatus(language: Language): RuntimeStatus {
         ? 'Python loads on first run'
         : `${language === 'typescript' ? 'TypeScript' : 'JavaScript'} runs in a browser worker`,
     interruptSupported: false,
+    progress: 0,
+    stage: 'idle',
   };
 }
 
@@ -147,6 +149,7 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
     status.phase === 'loading' ||
     status.phase === 'running' ||
     status.phase === 'interrupting' ||
+    status.phase === 'restarting' ||
     testCasesBusy;
 
   const steps = result?.run?.steps ?? [];
@@ -405,14 +408,18 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
         } else {
           setStatus({
             phase: 'running',
-            message: `Running ${languageRef.current === 'typescript' ? 'TypeScript' : 'JavaScript'} code`,
+            message: `Generating ${languageRef.current === 'typescript' ? 'TypeScript' : 'JavaScript'} trace...`,
             interruptSupported: false,
+            progress: 0.74,
+            stage: 'trace-generating',
           });
           data = await runJavaScriptInWorker(code, languageRef.current, RUN_TIMEOUT_MS);
           setStatus({
             phase: 'ready',
-            message: 'ready',
+            message: 'Ready',
             interruptSupported: false,
+            progress: 1,
+            stage: 'ready',
           });
         }
 

@@ -6,7 +6,7 @@
  * to `codeviz.api.handle_request`.
  */
 import { loadPyodide, version as pyodideVersion, type PyodideAPI } from 'pyodide';
-import type { RuntimeStatus, WorkerInbound, WorkerOutbound } from './types';
+import type { EngineRequest, RuntimeStatus, WorkerInbound, WorkerOutbound } from './types';
 
 import enginInitPy from '../../engine/codeviz/__init__.py?raw';
 import structuresPy from '../../engine/codeviz/structures.py?raw';
@@ -35,10 +35,14 @@ function post(message: WorkerOutbound) {
   self.postMessage(message);
 }
 
-function emitStatus(phase: RuntimeStatus['phase'], message: string) {
+function emitStatus(
+  phase: RuntimeStatus['phase'],
+  message: string,
+  details: Pick<RuntimeStatus, 'progress' | 'stage'> = {},
+) {
   post({
     type: 'status',
-    status: { phase, message, interruptSupported: Boolean(interruptBuffer) },
+    status: { phase, message, interruptSupported: Boolean(interruptBuffer), ...details },
   });
 }
 
@@ -52,8 +56,15 @@ function getPyodideBaseUrl() {
 
 async function ensurePyodide(): Promise<PyodideAPI> {
   if (!pyodidePromise) {
-    emitStatus('loading', 'Loading Python runtime');
+    emitStatus('loading', 'Loading Python runtime...', {
+      progress: 0.18,
+      stage: 'runtime-loading',
+    });
     pyodidePromise = loadPyodide({ indexURL: getPyodideBaseUrl() }).then((pyodide) => {
+      emitStatus('loading', 'Preparing trace engine...', {
+        progress: 0.46,
+        stage: 'engine-preparing',
+      });
       if (interruptBuffer) {
         pyodide.setInterruptBuffer(interruptBuffer);
       }
@@ -70,7 +81,7 @@ async function ensurePyodide(): Promise<PyodideAPI> {
         ].join('\n'),
       );
 
-      emitStatus('ready', 'ready');
+      emitStatus('ready', 'Ready', { progress: 1, stage: 'ready' });
       return pyodide;
     });
   }
@@ -78,12 +89,32 @@ async function ensurePyodide(): Promise<PyodideAPI> {
   return pyodidePromise;
 }
 
-async function handleRequest(requestId: string, request: unknown) {
+function runningStatusFor(request: EngineRequest): Pick<RuntimeStatus, 'message' | 'progress' | 'stage'> {
+  if (request.op === 'analyze') {
+    return { message: 'Analyzing code...', progress: 0.62, stage: 'analyzing' };
+  }
+  if (request.op === 'complexity') {
+    return { message: 'Measuring complexity...', progress: 0.7, stage: 'executing' };
+  }
+  return { message: 'Generating trace...', progress: 0.74, stage: 'trace-generating' };
+}
+
+async function handleRequest(requestId: string, request: EngineRequest) {
   const startedAt = performance.now();
 
   try {
     const pyodide = await ensurePyodide();
-    emitStatus('running', 'Running Python code');
+    if (request.op === 'run') {
+      emitStatus('running', 'Instrumenting code...', {
+        progress: 0.58,
+        stage: 'instrumenting',
+      });
+    }
+    const runningStatus = runningStatusFor(request);
+    emitStatus('running', runningStatus.message, {
+      progress: runningStatus.progress,
+      stage: runningStatus.stage,
+    });
     pyodide.globals.set('_codeviz_request_json', JSON.stringify(request));
     const responseJson = pyodide.runPython(
       '_codeviz_api.handle_request(_codeviz_request_json)',
@@ -98,7 +129,7 @@ async function handleRequest(requestId: string, request: unknown) {
       data,
       durationMs: performance.now() - startedAt,
     });
-    emitStatus('ready', 'ready');
+    emitStatus('ready', 'Ready', { progress: 1, stage: 'ready' });
   } catch (error) {
     // handle_request never throws for Python-level errors, so anything here
     // is a worker/runtime failure (including interrupt during dispatch).
@@ -115,7 +146,7 @@ async function handleRequest(requestId: string, request: unknown) {
       },
       durationMs: performance.now() - startedAt,
     });
-    emitStatus('ready', 'ready');
+    emitStatus('ready', 'Ready', { progress: 1, stage: 'ready' });
   }
 }
 

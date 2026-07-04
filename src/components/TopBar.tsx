@@ -10,7 +10,9 @@ import {
   FileImage,
   HelpCircle,
   Link2,
+  MoreHorizontal,
   Moon,
+  Palette,
   Sparkles,
   Sun,
   Upload,
@@ -50,6 +52,7 @@ type TopBarProps = {
   onOpenHistoryItem: (item: CodeHistoryItem) => void;
   onImport: (file: File) => void;
   onResetLayout: () => void;
+  onShowAllPanels: () => void;
   onTogglePanel: (id: string, visible: boolean) => void;
   panelControls: readonly PanelControl[];
   historyRefreshToken: number;
@@ -90,6 +93,7 @@ export function TopBar({
   onOpenLanding,
   onImport,
   onResetLayout,
+  onShowAllPanels,
   onTogglePanel,
   panelControls,
   historyRefreshToken,
@@ -147,39 +151,6 @@ export function TopBar({
               <option value="typescript">TypeScript</option>
             </select>
           </div>
-
-          <div className="top-action-group" aria-label="Share and file actions">
-            <button onClick={onShare} title="Copy a shareable link" type="button">
-              <Link2 size={14} />
-              <span className="top-action-label">{shareLabel}</span>
-            </button>
-            <button onClick={onEmbed} title="Copy iframe embed code" type="button">
-              <Code2 size={14} />
-              <span className="top-action-label">{embedLabel}</span>
-            </button>
-            <button
-              disabled={!canExport}
-              onClick={onExport}
-              title="Export trace JSON"
-              type="button"
-            >
-              <Download size={14} />
-              <span className="top-action-label">Export</span>
-            </button>
-            <button
-              disabled={!canExport}
-              onClick={onExportSvg}
-              title="Export animated trace SVG"
-              type="button"
-            >
-              <FileImage size={14} />
-              <span className="top-action-label">SVG</span>
-            </button>
-            <button onClick={() => fileInputRef.current?.click()} title={importTitle} type="button">
-              <Upload size={14} />
-              <span className="top-action-label">{importLabel}</span>
-            </button>
-          </div>
         </div>
 
         <div className="top-action-row top-action-row-secondary">
@@ -209,6 +180,14 @@ export function TopBar({
                 <span className="top-action-label">Panels</span>
               </summary>
               <div className="panel-menu-popover">
+                <div className="panel-menu-presets" aria-label="Panel layout presets">
+                  <button className="panel-menu-action" onClick={onResetLayout} type="button">
+                    Beginner
+                  </button>
+                  <button className="panel-menu-action" onClick={onShowAllPanels} type="button">
+                    Show all
+                  </button>
+                </div>
                 {panelControls.map((panel) => (
                   <label className="panel-menu-item" key={panel.id}>
                     <input
@@ -219,8 +198,48 @@ export function TopBar({
                     <span>{panel.label}</span>
                   </label>
                 ))}
-                <button className="panel-menu-reset" onClick={onResetLayout} type="button">
-                  Reset layout
+              </div>
+            </details>
+            <details className="panel-menu trace-actions-menu">
+              <summary title="Share, import, and export traces">
+                <MoreHorizontal size={14} />
+                <span className="top-action-label">Actions</span>
+              </summary>
+              <div className="panel-menu-popover action-popover">
+                <button className="panel-menu-action" onClick={onShare} type="button">
+                  <Link2 size={14} />
+                  <span>{shareLabel}</span>
+                </button>
+                <button className="panel-menu-action" onClick={onEmbed} type="button">
+                  <Code2 size={14} />
+                  <span>{embedLabel}</span>
+                </button>
+                <button
+                  className="panel-menu-action"
+                  disabled={!canExport}
+                  onClick={onExport}
+                  type="button"
+                >
+                  <Download size={14} />
+                  <span>Export JSON</span>
+                </button>
+                <button
+                  className="panel-menu-action"
+                  disabled={!canExport}
+                  onClick={onExportSvg}
+                  type="button"
+                >
+                  <FileImage size={14} />
+                  <span>Export SVG</span>
+                </button>
+                <button
+                  className="panel-menu-action"
+                  onClick={() => fileInputRef.current?.click()}
+                  title={importTitle}
+                  type="button"
+                >
+                  <Upload size={14} />
+                  <span>{importLabel}</span>
                 </button>
               </div>
             </details>
@@ -230,30 +249,29 @@ export function TopBar({
             className="top-action-group top-action-appearance"
             aria-label="Appearance and account"
           >
-            <button
-              aria-pressed={designMode === 'traced'}
-              className={`design-toggle${designMode === 'traced' ? ' design-toggle-active' : ''}`}
-              onClick={onToggleDesign}
-              title={
-                designMode === 'traced'
-                  ? 'Switch back to the Classic design'
-                  : 'Switch to the Traced Light design'
-              }
-              type="button"
-            >
-              <Sparkles size={14} />
-              <span className="top-action-label">
-                {designMode === 'traced' ? 'Classic' : 'Traced Light'}
-              </span>
-            </button>
-            <button
-              aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-              className="icon-button"
-              onClick={onToggleTheme}
-              type="button"
-            >
-              {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
-            </button>
+            <details className="panel-menu appearance-menu">
+              <summary title="Change visual design and color theme">
+                <Palette size={14} />
+                <span className="top-action-label">Appearance</span>
+              </summary>
+              <div className="panel-menu-popover appearance-popover">
+                <button
+                  aria-pressed={designMode === 'traced'}
+                  className={`panel-menu-action design-toggle${
+                    designMode === 'traced' ? ' design-toggle-active' : ''
+                  }`}
+                  onClick={onToggleDesign}
+                  type="button"
+                >
+                  <Sparkles size={14} />
+                  <span>{designMode === 'traced' ? 'Classic design' : 'Traced Light'}</span>
+                </button>
+                <button className="panel-menu-action" onClick={onToggleTheme} type="button">
+                  {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+                  <span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
+                </button>
+              </div>
+            </details>
             <AccountMenu compact />
           </div>
         </div>

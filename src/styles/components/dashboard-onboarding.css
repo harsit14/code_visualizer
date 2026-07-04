@@ -1,0 +1,48 @@
+.dashboard-onboarding {
+  align-items: center;
+  background: color-mix(in srgb, var(--bg-raised) 92%, var(--bg));
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
+  border-radius: 9px;
+  display: flex;
+  flex-shrink: 0;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 7px 8px 7px 10px;
+}
+
+.dashboard-onboarding-cues {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.dashboard-onboarding-cue {
+  align-items: center;
+  color: var(--text-dim);
+  display: inline-flex;
+  font-size: 12px;
+  gap: 5px;
+  min-width: 0;
+}
+
+.dashboard-onboarding-cue svg {
+  color: var(--accent);
+  flex: 0 0 auto;
+}
+
+.dashboard-onboarding-cue strong {
+  color: var(--text);
+  font-size: 12px;
+}
+
+.dashboard-onboarding-dismiss {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 720px) {
+  .dashboard-onboarding {
+    align-items: flex-start;
+  }
+}

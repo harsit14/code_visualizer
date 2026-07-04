@@ -162,6 +162,8 @@ export class RuntimeClient {
         phase: 'interrupting',
         message: 'Execution timed out; interrupting',
         interruptSupported: true,
+        progress: 0.96,
+        stage: 'interrupting',
       });
 
       pending.fallbackTimeoutId = window.setTimeout(() => {
@@ -185,6 +187,8 @@ export class RuntimeClient {
       phase: 'restarting',
       message: 'Execution timed out; restarting Python worker',
       interruptSupported: Boolean(this.interruptBuffer),
+      progress: 0.98,
+      stage: 'restarting',
     });
     this.clearTimers();
     this.pending = null;

@@ -105,13 +105,20 @@ export function WatchPanel({
         <h2>
           <Activity size={14} /> Watch
         </h2>
-        <button className="panel-header-action" onClick={onClear} type="button">
+        <button
+          className="panel-header-action"
+          disabled={watchedVariables.length === 0}
+          onClick={onClear}
+          type="button"
+        >
           Clear
         </button>
       </header>
 
       {!frame ? (
-        <p className="panel-empty">Pinned variable history appears here after a run.</p>
+        <p className="panel-empty">Run code, then use the plus buttons in Variables to pin values here.</p>
+      ) : watchedVariables.length === 0 ? (
+        <p className="panel-empty">Use the plus buttons in Variables to pin values here.</p>
       ) : (
         <div className="panel-scroll watch-list">
           {watchedVariables.map((name) => {

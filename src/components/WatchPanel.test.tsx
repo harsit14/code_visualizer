@@ -41,6 +41,35 @@ const analysis: AnalysisInfo = {
 };
 
 describe('WatchPanel', () => {
+  it('explains how to add variables when the panel is visible but empty', () => {
+    const step: TraceStep = {
+      i: 0,
+      event: 'line',
+      line: 1,
+      func: 'solve',
+      stack: [{ id: 'frame-1', func: 'solve', line: 1, locals: { n: num(1) } }],
+      globals: {},
+      stdoutLen: 0,
+    };
+
+    const html = renderToStaticMarkup(
+      <WatchPanel
+        analysis={analysis}
+        currentStep={step}
+        frameIndex={null}
+        onClear={() => {}}
+        onJump={() => {}}
+        onRemoveVariable={() => {}}
+        step={0}
+        steps={[step]}
+        watchedVariables={[]}
+      />,
+    );
+
+    expect(html).toContain('Use the plus buttons in Variables to pin values here.');
+    expect(html).toContain('disabled=""');
+  });
+
   it('labels first parameter entries as test inputs', () => {
     const steps: TraceStep[] = [
       {
