@@ -63,6 +63,7 @@ export function InputsPanel({
 
   const functions = analysis.functions;
   const params = activeFunction?.params ?? [];
+  const caseSummary = formatCaseSummary(testCases);
 
   const literalFor = (name: string, index: number): string => {
     if (drafts?.[name] !== undefined) {
@@ -162,7 +163,7 @@ export function InputsPanel({
             <span>
               <ListChecks size={13} /> Cases
             </span>
-            <em>{testCases.length}</em>
+            <em>{caseSummary}</em>
           </summary>
 
           <div className="test-cases-body">
@@ -288,6 +289,38 @@ function statusLabel(status: PracticeTestCase['status']): string {
     default:
       return 'saved';
   }
+}
+
+function formatCaseSummary(testCases: PracticeTestCase[]): string {
+  if (testCases.length === 0) {
+    return '0';
+  }
+
+  const passCount = testCases.filter((testCase) => testCase.status === 'pass').length;
+  const failCount = testCases.filter((testCase) => testCase.status === 'fail').length;
+  const errorCount = testCases.filter((testCase) => testCase.status === 'error').length;
+  const ranCount = testCases.filter((testCase) => testCase.status === 'ran').length;
+  const scoredCount = passCount + failCount;
+
+  if (scoredCount > 0) {
+    return errorCount > 0
+      ? `${passCount}/${scoredCount} pass · ${errorCount} err`
+      : `${passCount}/${scoredCount} pass`;
+  }
+
+  if (errorCount > 0 && ranCount > 0) {
+    return `${ranCount} ran · ${errorCount} err`;
+  }
+
+  if (errorCount > 0) {
+    return `${errorCount} error`;
+  }
+
+  if (ranCount > 0) {
+    return ranCount === testCases.length ? `${ranCount} ran` : `${ranCount}/${testCases.length} ran`;
+  }
+
+  return String(testCases.length);
 }
 
 function formatCaseMetrics(runtimeMs: number | null, memoryMb: number | null): string {

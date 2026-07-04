@@ -45,6 +45,23 @@ const caseOne: PracticeTestCase = {
   status: 'pass',
 };
 
+const caseTwo: PracticeTestCase = {
+  ...caseOne,
+  actual: '[1, 0]',
+  id: 'case-2',
+  name: 'Case 2',
+  status: 'fail',
+};
+
+const exploratoryCase: PracticeTestCase = {
+  ...caseOne,
+  actual: '21',
+  expected: '',
+  id: 'case-3',
+  name: 'Edge single',
+  status: 'ran',
+};
+
 function renderInputsPanel(testCases: PracticeTestCase[] = []) {
   return renderToStaticMarkup(
     <InputsPanel
@@ -82,9 +99,15 @@ describe('InputsPanel', () => {
     const html = renderInputsPanel([caseOne]);
 
     expect(html).toContain('Cases');
+    expect(html).toContain('1/1 pass');
     expect(html).toContain('Case 1');
     expect(html).toContain('pass');
     expect(html).toContain('[0, 1]');
     expect(html).toContain('0.10 MB');
+  });
+
+  it('summarizes scored and exploratory practice runs in the folded header', () => {
+    expect(renderInputsPanel([caseOne, caseTwo])).toContain('1/2 pass');
+    expect(renderInputsPanel([exploratoryCase])).toContain('1 ran');
   });
 });
