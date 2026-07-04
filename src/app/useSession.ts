@@ -8,6 +8,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { runJavaScriptInWorker } from '../engine/jsRuntimeClient';
 import { RuntimeClient, TimeoutError } from '../engine/runtimeClient';
 import { firstExceptionStep } from '../engine/trace';
+import {
+  createPracticeTestCase,
+  summarizePracticeRun,
+  type PracticeTestCase,
+  type PracticeTestCaseUpdate,
+} from './practiceCases';
 import type {
   AnalysisInfo,
   ComplexityResult,
@@ -92,6 +98,8 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
     initialOptions.functionName ?? null,
   );
   const [inputDrafts, setInputDrafts] = useState<Record<string, string> | null>(null);
+  const [testCases, setTestCases] = useState<PracticeTestCase[]>([]);
+  const [testCasesBusy, setTestCasesBusy] = useState(false);
   const [pendingInitialInputs, setPendingInitialInputs] = useState<string[] | null>(
     initialOptions.inputs ?? null,
   );
@@ -115,7 +123,10 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
   useEffect(() => () => clientRef.current?.dispose(), []);
 
   const isBusy =
-    status.phase === 'loading' || status.phase === 'running' || status.phase === 'interrupting';
+    status.phase === 'loading' ||
+    status.phase === 'running' ||
+    status.phase === 'interrupting' ||
+    testCasesBusy;
 
   const steps = result?.run?.steps ?? [];
   const totalSteps = steps.length;
@@ -168,6 +179,7 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
       setSelectedFrameIndex(null);
       setFunctionOverrideState(null);
       setInputDrafts(null);
+      setTestCases([]);
       setPendingInitialInputs(null);
       scheduleAnalyze(nextCode);
     },
@@ -186,6 +198,7 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
       setSelectedFrameIndex(null);
       setFunctionOverrideState(null);
       setInputDrafts(null);
+      setTestCases([]);
       setPendingInitialInputs(null);
       scheduleAnalyze(codeRef.current, nextLanguage);
     },
@@ -211,6 +224,7 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
       setSelectedFrameIndex(null);
       setFunctionOverrideState(options.language === 'python' ? (options.functionName ?? null) : null);
       setInputDrafts(null);
+      setTestCases([]);
       setPendingInitialInputs(options.language === 'python' ? (options.inputs ?? null) : null);
       setSeed(options.language === 'python' ? (options.seed ?? null) : null);
       scheduleAnalyze(nextCode, options.language);
@@ -264,12 +278,13 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
     setPlaying(false);
     setSelectedFrameIndex(null);
     setInputDrafts(null);
+    setTestCases([]);
     setPendingInitialInputs(null);
   }, []);
 
   const run = useCallback(
-    async (overrides?: { freshInputs?: boolean; seed?: number }) => {
-      if (isBusy) {
+    async (overrides?: { freshInputs?: boolean; inputs?: string[]; seed?: number }) => {
+      if (isBusy || testCasesBusy) {
         return;
       }
       if (analyzeTimer.current) {
@@ -283,7 +298,7 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
       setSelectedFrameIndex(null);
 
       const useSeed = overrides?.seed ?? seed ?? undefined;
-      const useInputs = overrides?.freshInputs ? undefined : inputLiterals;
+      const useInputs = overrides?.inputs ?? (overrides?.freshInputs ? undefined : inputLiterals);
 
       try {
         let data: SessionResult;
@@ -355,7 +370,7 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
         }
       }
     },
-    [code, functionOverride, getClient, inputLiterals, isBusy, seed],
+    [code, functionOverride, getClient, inputLiterals, isBusy, seed, testCasesBusy],
   );
 
   const regenerateInputs = useCallback(() => {
@@ -364,6 +379,137 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
     setInputDrafts(null);
     void run({ freshInputs: true, seed: freshSeed });
   }, [run]);
+
+  const addTestCase = useCallback(() => {
+    if (!activeFunction) {
+      return;
+    }
+    setTestCases((current) => [
+      ...current,
+      createPracticeTestCase(activeFunction, inputLiterals, current.length),
+    ]);
+  }, [activeFunction, inputLiterals]);
+
+  const updateTestCase = useCallback((id: string, patch: PracticeTestCaseUpdate) => {
+    const shouldResetResult = patch.inputs !== undefined || patch.expected !== undefined;
+    setTestCases((current) =>
+      current.map((testCase) =>
+        testCase.id === id
+          ? {
+              ...testCase,
+              ...patch,
+              ...(shouldResetResult
+                ? {
+                    actual: null,
+                    error: null,
+                    memoryMb: null,
+                    runtimeMs: null,
+                    status: 'idle' as const,
+                  }
+                : null),
+            }
+          : testCase,
+      ),
+    );
+  }, []);
+
+  const removeTestCase = useCallback((id: string) => {
+    setTestCases((current) => current.filter((testCase) => testCase.id !== id));
+  }, []);
+
+  const traceTestCase = useCallback(
+    (id: string) => {
+      const testCase = testCases.find((candidate) => candidate.id === id);
+      if (!testCase || !activeFunction) {
+        return;
+      }
+      setInputDrafts(
+        Object.fromEntries(
+          activeFunction.params.map((param, index) => [param.name, testCase.inputs[index] ?? '']),
+        ),
+      );
+      void run({ inputs: testCase.inputs });
+    },
+    [activeFunction, run, testCases],
+  );
+
+  const runTestCases = useCallback(async () => {
+    if (
+      languageRef.current !== 'python' ||
+      isBusy ||
+      testCasesBusy ||
+      !activeFunction ||
+      testCases.length === 0
+    ) {
+      return;
+    }
+    if (analyzeTimer.current) {
+      window.clearTimeout(analyzeTimer.current);
+      analyzeTimer.current = null;
+    }
+
+    setTestCasesBusy(true);
+    try {
+      for (const testCase of testCases) {
+        setTestCases((current) =>
+          current.map((candidate) =>
+            candidate.id === testCase.id
+              ? { ...candidate, error: null, status: 'running' }
+              : candidate,
+          ),
+        );
+
+        try {
+          const data = (await getClient().request(
+            {
+              op: 'run',
+              source: code,
+              options: {
+                function: functionOverride ?? undefined,
+                inputs: testCase.inputs,
+                seed: seed ?? undefined,
+              },
+            },
+            { timeoutMs: RUN_TIMEOUT_MS },
+          )) as SessionResult;
+          const summary = summarizePracticeRun(data, testCase.expected);
+          setTestCases((current) =>
+            current.map((candidate) =>
+              candidate.id === testCase.id ? { ...candidate, ...summary } : candidate,
+            ),
+          );
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : 'Could not run this test case.';
+          setTestCases((current) =>
+            current.map((candidate) =>
+              candidate.id === testCase.id
+                ? {
+                    ...candidate,
+                    actual: null,
+                    error: message,
+                    memoryMb: null,
+                    runtimeMs: null,
+                    status: 'error',
+                  }
+                : candidate,
+            ),
+          );
+        }
+      }
+    } finally {
+      setTestCasesBusy(false);
+    }
+  }, [
+    activeFunction,
+    code,
+    functionOverride,
+    getClient,
+    isBusy,
+    seed,
+    testCases,
+    testCasesBusy,
+  ]);
 
   const measureComplexity = useCallback(async () => {
     if (languageRef.current !== 'python' || isBusy || complexityBusy) {
@@ -506,6 +652,13 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
     setSeed,
     run,
     regenerateInputs,
+    testCases,
+    testCasesBusy,
+    addTestCase,
+    updateTestCase,
+    removeTestCase,
+    runTestCases,
+    traceTestCase,
     complexity,
     complexityBusy,
     measureComplexity,

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { SessionResult, TraceStep } from '../engine/types';
+import type { EncodedValue, SessionResult, TraceStep } from '../engine/types';
 
 const { requestMock, runJavaScriptMock } = vi.hoisted(() => ({
   requestMock: vi.fn(),
@@ -30,6 +30,8 @@ vi.mock('../engine/jsRuntimeClient', () => ({
 
 import { TimeoutError } from '../engine/runtimeClient';
 import { useSession } from './useSession';
+
+const num = (value: number): EncodedValue => ({ k: 'num', t: 'int', v: String(value) });
 
 function scriptResult(
   stepCount: number,
@@ -70,6 +72,69 @@ function scriptResult(
       opCount: stepCount,
       runtimeMs: 1.2,
       memoryMb: 0.5,
+      truncated: false,
+      truncationReason: null,
+    },
+    error: null,
+    durationMs: 5,
+  };
+}
+
+function functionResult(returnValue: EncodedValue = num(21)): SessionResult {
+  const step: TraceStep = {
+    event: 'return',
+    func: 'solve',
+    globals: {},
+    i: 0,
+    line: 2,
+    stack: [{ id: 'frame-0', func: 'solve', line: 2, locals: {} }],
+    stdoutLen: 0,
+    ret: returnValue,
+  };
+  return {
+    status: 'ok',
+    mode: 'function',
+    analysis: {
+      mode: 'function',
+      functions: [
+        {
+          className: null,
+          docstring: null,
+          isGenerator: false,
+          line: 1,
+          name: 'solve',
+          params: [
+            {
+              annotation: null,
+              inferred: 'list[int]',
+              name: 'nums',
+              source: 'name',
+            },
+          ],
+          qualname: 'solve',
+          returns: null,
+        },
+      ],
+      defaultFunction: 'solve',
+      definesListNode: false,
+      definesTreeNode: false,
+      diagnostics: [],
+      referencesListNode: false,
+      referencesTreeNode: false,
+    },
+    run: {
+      exception: null,
+      functionName: 'solve',
+      inputs: [{ literal: '[1, 2, 3]', name: 'nums', type: 'list[int]' }],
+      memoryMb: 0.25,
+      opCount: 1,
+      returnValue,
+      runtimeMs: 3,
+      seed: 1,
+      setupError: null,
+      stderr: '',
+      stdout: '',
+      steps: [step],
       truncated: false,
       truncationReason: null,
     },
@@ -184,6 +249,43 @@ describe('useSession', () => {
     expect(requestMock).not.toHaveBeenCalled();
     expect(result.current.language).toBe('javascript');
     expect(result.current.totalSteps).toBe(2);
+    unmount();
+  });
+
+  it('runs saved practice cases without replacing the active trace', async () => {
+    const imported = functionResult();
+    const { result, unmount } = renderHook(() => useSession('def solve(nums):\n    return 21'));
+
+    act(() => result.current.importSession('def solve(nums):\n    return 21', imported, 0));
+    act(() => result.current.addTestCase());
+    act(() => {
+      const id = result.current.testCases[0].id;
+      result.current.updateTestCase(id, { expected: '21' });
+    });
+
+    requestMock.mockResolvedValueOnce(functionResult(num(21)));
+    await act(async () => {
+      await result.current.runTestCases();
+    });
+
+    expect(result.current.result).toBe(imported);
+    expect(result.current.testCases[0]).toMatchObject({
+      actual: '21',
+      error: null,
+      status: 'pass',
+    });
+    expect(requestMock).toHaveBeenCalledWith(
+      {
+        op: 'run',
+        source: 'def solve(nums):\n    return 21',
+        options: {
+          function: 'solve',
+          inputs: ['[1, 2, 3]'],
+          seed: 1,
+        },
+      },
+      { timeoutMs: 15000 },
+    );
     unmount();
   });
 });
