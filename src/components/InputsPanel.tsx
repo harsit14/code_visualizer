@@ -61,7 +61,7 @@ export function InputsPanel({
         <h2>
           <FlaskConical size={14} /> Test inputs
         </h2>
-        <span className="panel-hint">no entry point — inputs are generated</span>
+        <span className="panel-hint">inputs are generated</span>
       </header>
 
       <div className="inputs-body">

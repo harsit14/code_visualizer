@@ -75,7 +75,6 @@ export function ConsolePanel({
         <h2>
           <Terminal size={14} /> Console
         </h2>
-        {run ? <span className="panel-hint">{run.opCount} ops</span> : null}
       </header>
 
       <div className="panel-scroll console-body">

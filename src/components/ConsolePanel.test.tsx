@@ -61,6 +61,7 @@ describe('ConsolePanel', () => {
     expect(html).toContain('2.4 ms');
     expect(html).toContain('Memory');
     expect(html).toContain('1.25 MB');
+    expect(html).not.toContain('ops');
   });
 
   it('does not show the empty output state when a return value is visible', () => {

@@ -79,6 +79,7 @@ describe('ExplainerPanel', () => {
       />,
     );
 
+    expect(container.textContent).not.toContain('step 2');
     fireEvent.click(screen.getByRole('button', { name: /explain step/i }));
 
     await waitFor(() => expect(explainStepMock).toHaveBeenCalledTimes(1));

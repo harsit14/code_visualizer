@@ -38,7 +38,6 @@ export function ExplainerPanel({
   const [busy, setBusy] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const canExplain = Boolean(currentStep && result?.run);
-  const stepLabel = currentStep ? `step ${currentStep.i + 1}` : 'plain English';
   const contextKey = useMemo(
     () =>
       [
@@ -105,7 +104,6 @@ export function ExplainerPanel({
         <h2>
           <Sparkles size={14} /> Explainer
         </h2>
-        <span className="panel-hint">{stepLabel}</span>
       </header>
 
       <div className="panel-scroll explainer-body">
