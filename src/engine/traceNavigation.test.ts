@@ -5,6 +5,8 @@ import {
   nextBreakpointStep,
   nextStepOnLine,
   stepOverStep,
+  traceBreakpointStep,
+  traceStepOnLine,
 } from './traceNavigation';
 import type { FrameSnapshot, TraceStep } from './types';
 
@@ -53,6 +55,19 @@ describe('trace navigation', () => {
     expect(nextBreakpointStep(steps, 0, new Set([5]))).toBe(2);
     expect(nextBreakpointStep(steps, 0, new Set([6]))).toBe(1);
     expect(nextBreakpointStep(steps, 2, new Set([5, 6]))).toBeNull();
+  });
+
+  it('wraps cursor and breakpoint targets when the next match is behind the current step', () => {
+    const root = frame('root');
+    const steps = [
+      step(0, 3, [root]),
+      step(1, 4, [root]),
+      step(2, 5, [root]),
+    ];
+
+    expect(traceStepOnLine(steps, 2, 3)).toBe(0);
+    expect(traceBreakpointStep(steps, 2, new Set([4]))).toBe(1);
+    expect(traceStepOnLine(steps, 2, 9)).toBeNull();
   });
 
   it('steps over child frames until the current frame is active again', () => {

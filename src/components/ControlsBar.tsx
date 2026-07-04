@@ -2,6 +2,7 @@
  * Transport controls: run, play/pause, step back/forward, jump-to-step,
  * a scrubber over the whole trace, and a playback speed slider.
  */
+import type { ReactNode } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
@@ -48,6 +49,14 @@ function describeStep(step: TraceStep | undefined): string {
   return `${step.event} · line ${step.line} · ${where}`;
 }
 
+function ControlTip({ children, text }: { children: ReactNode; text: string }) {
+  return (
+    <span className="control-tip" title={text}>
+      {children}
+    </span>
+  );
+}
+
 export function ControlsBar({
   isBusy,
   onRun,
@@ -71,99 +80,133 @@ export function ControlsBar({
   currentStep,
 }: ControlsBarProps) {
   const hasTrace = totalSteps > 0;
+  const runTitle = isBusy ? 'Runtime is working' : 'Run the current code with the current inputs';
+  const startTitle = hasTrace ? 'Jump to the first recorded step' : 'Run code first';
+  const backTitle = hasTrace ? 'Move one recorded step backward' : 'Run code first';
+  const playTitle = playing
+    ? 'Pause automatic playback'
+    : hasTrace
+      ? 'Play the trace automatically'
+      : 'Run code first';
+  const forwardTitle = hasTrace ? 'Move one recorded step forward' : 'Run code first';
+  const endTitle = hasTrace ? 'Jump to the final recorded step' : 'Run code first';
+  const stepOverTitle = canStepOver
+    ? 'Step over nested calls and stop at the next step in this frame'
+    : hasTrace
+      ? 'No later step is available to step over'
+      : 'Run code first';
+  const breakpointTitle =
+    breakpointCount === 0
+      ? 'Set a breakpoint in the editor gutter first'
+      : !hasTrace
+        ? 'Run code first'
+      : canRunToBreakpoint
+        ? `Jump to a breakpoint step (${breakpointCount} set)`
+        : 'No breakpoint line appears elsewhere in this trace';
+  const cursorTitle =
+    cursorLine === null
+      ? 'Click a code line first'
+      : !hasTrace
+        ? 'Run code first'
+      : canRunToCursor
+        ? `Jump to an execution step on line ${cursorLine}`
+        : `Line ${cursorLine} does not appear elsewhere in this trace`;
+  const scrubberTitle = hasTrace ? 'Drag to jump through recorded steps' : 'Run code first';
+  const stepJumpTitle = hasTrace ? 'Type a recorded step number to jump there' : 'Run code first';
+  const speedTitle = `Playback speed: ${speed} steps per second`;
+  const resetTitle = hasTrace ? 'Reset the trace to the first step' : 'Run code first';
 
   return (
     <footer className="controls-bar" aria-label="Playback controls">
-      <button className="run-button" disabled={isBusy} onClick={onRun} type="button">
-        <Play size={14} />
-        {isBusy ? 'Working…' : 'Run'}
-      </button>
+      <ControlTip text={runTitle}>
+        <button className="run-button" disabled={isBusy} onClick={onRun} type="button">
+          <Play size={14} />
+          {isBusy ? 'Working…' : 'Run'}
+        </button>
+      </ControlTip>
 
       <div className="transport" role="group" aria-label="Step navigation">
-        <button
-          disabled={!hasTrace || step === 0}
-          onClick={() => onJump(0)}
-          title="Jump to start (Home)"
-          type="button"
-        >
-          <SkipBack size={15} />
-        </button>
-        <button
-          disabled={!hasTrace || step === 0}
-          onClick={onStepBack}
-          title="Step back (←)"
-          type="button"
-        >
-          <ChevronLeft size={16} />
-        </button>
-        <button
-          className="play-toggle"
-          disabled={totalSteps <= 1}
-          onClick={onTogglePlay}
-          title={playing ? 'Pause (Space)' : 'Play (Space)'}
-          type="button"
-        >
-          {playing ? <Pause size={16} /> : <Play size={16} />}
-        </button>
-        <button
-          disabled={!hasTrace || step >= totalSteps - 1}
-          onClick={onStepForward}
-          title="Step forward (→)"
-          type="button"
-        >
-          <ChevronRight size={16} />
-        </button>
-        <button
-          disabled={!hasTrace || step >= totalSteps - 1}
-          onClick={() => onJump(totalSteps - 1)}
-          title="Jump to end (End)"
-          type="button"
-        >
-          <SkipForward size={15} />
-        </button>
-        <button
-          aria-label="Step over"
-          className="debug-nav-button"
-          disabled={!canStepOver}
-          onClick={onStepOver}
-          title="Step over"
-          type="button"
-        >
-          <CornerDownRight size={15} />
-        </button>
-        <button
-          aria-label="Run to next breakpoint"
-          className="debug-nav-button"
-          disabled={!canRunToBreakpoint}
-          onClick={onRunToBreakpoint}
-          title={
-            breakpointCount > 0
-              ? `Run to next breakpoint (${breakpointCount} set)`
-              : 'Run to next breakpoint'
-          }
-          type="button"
-        >
-          <CircleDot size={15} />
-        </button>
-        <button
-          aria-label="Run to cursor"
-          className="debug-nav-button"
-          disabled={!canRunToCursor}
-          onClick={onRunToCursor}
-          title={cursorLine ? `Run to cursor line ${cursorLine}` : 'Run to cursor'}
-          type="button"
-        >
-          <Crosshair size={15} />
-        </button>
+        <ControlTip text={startTitle}>
+          <button disabled={!hasTrace || step === 0} onClick={() => onJump(0)} type="button">
+            <SkipBack size={15} />
+          </button>
+        </ControlTip>
+        <ControlTip text={backTitle}>
+          <button disabled={!hasTrace || step === 0} onClick={onStepBack} type="button">
+            <ChevronLeft size={16} />
+          </button>
+        </ControlTip>
+        <ControlTip text={playTitle}>
+          <button
+            className="play-toggle"
+            disabled={totalSteps <= 1}
+            onClick={onTogglePlay}
+            type="button"
+          >
+            {playing ? <Pause size={16} /> : <Play size={16} />}
+          </button>
+        </ControlTip>
+        <ControlTip text={forwardTitle}>
+          <button
+            disabled={!hasTrace || step >= totalSteps - 1}
+            onClick={onStepForward}
+            type="button"
+          >
+            <ChevronRight size={16} />
+          </button>
+        </ControlTip>
+        <ControlTip text={endTitle}>
+          <button
+            disabled={!hasTrace || step >= totalSteps - 1}
+            onClick={() => onJump(totalSteps - 1)}
+            type="button"
+          >
+            <SkipForward size={15} />
+          </button>
+        </ControlTip>
+        <ControlTip text={stepOverTitle}>
+          <button
+            aria-label="Step over"
+            className="debug-nav-button"
+            disabled={!canStepOver}
+            onClick={onStepOver}
+            type="button"
+          >
+            <CornerDownRight size={15} />
+          </button>
+        </ControlTip>
+        <ControlTip text={breakpointTitle}>
+          <button
+            aria-label="Run to breakpoint"
+            className="debug-nav-button"
+            disabled={!canRunToBreakpoint}
+            onClick={onRunToBreakpoint}
+            type="button"
+          >
+            <CircleDot size={15} />
+          </button>
+        </ControlTip>
+        <ControlTip text={cursorTitle}>
+          <button
+            aria-label="Run to cursor"
+            className="debug-nav-button"
+            disabled={!canRunToCursor}
+            onClick={onRunToCursor}
+            type="button"
+          >
+            <Crosshair size={15} />
+          </button>
+        </ControlTip>
       </div>
 
-      <div className="scrubber">
+      <div className="scrubber" title={scrubberTitle}>
         <input
           aria-label="Trace position"
           disabled={!hasTrace}
           max={Math.max(totalSteps - 1, 0)}
           min={0}
           onChange={(event) => onJump(Number(event.target.value))}
+          title={scrubberTitle}
           type="range"
           value={step}
         />
@@ -177,6 +220,7 @@ export function ControlsBar({
               max={Math.max(totalSteps - 1, 0)}
               min={0}
               onChange={(event) => onJump(Number(event.target.value))}
+              title={stepJumpTitle}
               type="number"
               value={hasTrace ? step : 0}
             />
@@ -185,7 +229,7 @@ export function ControlsBar({
         </div>
       </div>
 
-      <div className="speed-control" title={`${speed} steps/second`}>
+      <div className="speed-control" title={speedTitle}>
         <Gauge size={14} />
         <input
           aria-label="Playback speed"
@@ -193,21 +237,23 @@ export function ControlsBar({
           min={0.5}
           onChange={(event) => onSpeedChange(Number(event.target.value))}
           step={0.5}
+          title={speedTitle}
           type="range"
           value={speed}
         />
         <span>{speed}×</span>
       </div>
 
-      <button
-        className="ghost-button"
-        disabled={!hasTrace}
-        onClick={() => onJump(0)}
-        title="Reset to first step"
-        type="button"
-      >
-        <RotateCcw size={14} />
-      </button>
+      <ControlTip text={resetTitle}>
+        <button
+          className="ghost-button"
+          disabled={!hasTrace}
+          onClick={() => onJump(0)}
+          type="button"
+        >
+          <RotateCcw size={14} />
+        </button>
+      </ControlTip>
     </footer>
   );
 }

@@ -18,7 +18,12 @@ import { TopBar } from '../components/TopBar';
 import { VariablesPanel } from '../components/VariablesPanel';
 import { WatchPanel } from '../components/WatchPanel';
 import { lineExecutionCounts } from '../engine/traceMetrics';
-import { nextBreakpointStep, nextStepOnLine, stepOverStep } from '../engine/traceNavigation';
+import {
+  nextStepOnLine,
+  stepOverStep,
+  traceBreakpointStep,
+  traceStepOnLine,
+} from '../engine/traceNavigation';
 import type { Language, SessionResult } from '../engine/types';
 import { DEFAULT_EXAMPLE_ID, getExample } from '../examples/examples';
 import {
@@ -259,11 +264,11 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
   const executionCounts = useMemo(() => lineExecutionCounts(steps), [steps]);
   const breakpointLines = useMemo(() => [...breakpoints].sort((a, b) => a - b), [breakpoints]);
   const nextBreakpointTarget = useMemo(
-    () => nextBreakpointStep(steps, step, breakpoints),
+    () => traceBreakpointStep(steps, step, breakpoints),
     [breakpoints, step, steps],
   );
   const cursorTarget = useMemo(
-    () => nextStepOnLine(steps, step, cursorLine),
+    () => traceStepOnLine(steps, step, cursorLine),
     [cursorLine, step, steps],
   );
   const stepOverTarget = useMemo(

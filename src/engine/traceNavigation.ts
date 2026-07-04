@@ -35,6 +35,19 @@ export function nextStepOnLine(
   return null;
 }
 
+export function traceStepOnLine(
+  steps: readonly TraceStep[],
+  currentIndex: number,
+  line: number | null,
+): number | null {
+  const next = nextStepOnLine(steps, currentIndex, line);
+  if (next !== null || line === null) {
+    return next;
+  }
+  const wrapped = steps.findIndex((step, index) => index !== currentIndex && step.line === line);
+  return wrapped >= 0 ? wrapped : null;
+}
+
 export function nextBreakpointStep(
   steps: readonly TraceStep[],
   currentIndex: number,
@@ -49,6 +62,21 @@ export function nextBreakpointStep(
     }
   }
   return null;
+}
+
+export function traceBreakpointStep(
+  steps: readonly TraceStep[],
+  currentIndex: number,
+  breakpoints: ReadonlySet<number>,
+): number | null {
+  const next = nextBreakpointStep(steps, currentIndex, breakpoints);
+  if (next !== null || breakpoints.size === 0) {
+    return next;
+  }
+  const wrapped = steps.findIndex(
+    (step, index) => index !== currentIndex && breakpoints.has(step.line),
+  );
+  return wrapped >= 0 ? wrapped : null;
 }
 
 export function stepOverStep(
