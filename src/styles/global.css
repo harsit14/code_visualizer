@@ -264,6 +264,15 @@ input[type='password'] {
   }
 
   .top-actions {
+    align-items: stretch;
+    justify-content: flex-start;
+  }
+
+  .top-action-row {
+    justify-content: flex-start;
+  }
+
+  .top-action-group {
     justify-content: flex-start;
   }
 
@@ -389,16 +398,18 @@ input[type='password'] {
 /* ----------------------------------------------------------- top bar */
 
 .top-bar {
-  align-items: center;
+  align-items: stretch;
   display: flex;
   flex-shrink: 0;
-  gap: 12px;
+  gap: 14px;
   justify-content: space-between;
 }
 
 .brand {
   align-items: center;
+  align-self: center;
   display: flex;
+  flex: 0 0 auto;
   gap: 9px;
   min-width: 0;
 }
@@ -444,11 +455,56 @@ input[type='password'] {
 }
 
 .top-actions {
+  align-items: flex-end;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 6px;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.top-action-row {
   align-items: center;
   display: flex;
   flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+  min-width: 0;
+  width: 100%;
+}
+
+.top-action-group {
+  align-items: center;
+  display: inline-flex;
+  flex-wrap: wrap;
   gap: 7px;
   justify-content: flex-end;
+  min-width: 0;
+}
+
+.top-action-context {
+  flex: 1 1 420px;
+  justify-content: flex-start;
+}
+
+.top-action-appearance {
+  flex-wrap: nowrap;
+}
+
+.example-select {
+  min-width: 230px;
+  width: min(282px, 28vw);
+}
+
+.language-select {
+  min-width: 122px;
+}
+
+.top-actions select,
+.top-actions button,
+.account-menu summary {
+  min-height: 34px;
 }
 
 .icon-button {
@@ -470,8 +526,42 @@ input[type='password'] {
   font-size: 12.5px;
   gap: 6px;
   list-style: none;
+  min-height: 34px;
   padding: 5px 10px;
   user-select: none;
+}
+
+@media (max-width: 900px) {
+  .top-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .brand {
+    justify-content: flex-start;
+  }
+
+  .top-actions {
+    align-items: stretch;
+  }
+
+  .top-action-row,
+  .top-action-group {
+    justify-content: flex-start;
+  }
+
+  .top-action-context {
+    flex: 1 1 auto;
+  }
+
+  .top-action-appearance {
+    flex-wrap: wrap;
+  }
+
+  .example-select {
+    flex: 1 1 230px;
+    width: auto;
+  }
 }
 
 .panel-menu summary::-webkit-details-marker {

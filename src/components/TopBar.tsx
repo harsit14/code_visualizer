@@ -107,107 +107,147 @@ export function TopBar({
       </div>
 
       <div className="top-actions">
-        <button onClick={onOpenLanding} title="Back to the landing page" type="button">
-          <ArrowLeft size={14} />
-          Landing
-        </button>
+        <div className="top-action-row top-action-row-primary">
+          <div className="top-action-group top-action-context" aria-label="Workspace context">
+            <button onClick={onOpenLanding} title="Back to the landing page" type="button">
+              <ArrowLeft size={14} />
+              Landing
+            </button>
 
-        <select
-          aria-label="Load example"
-          onChange={(event) => onExampleChange(event.target.value)}
-          value={exampleId ?? CUSTOM_ID}
-        >
-          <option disabled value={CUSTOM_ID}>
-            Custom code
-          </option>
-          {categories.map((category) => (
-            <optgroup key={category} label={category}>
-              {examples
-                .filter((example) => example.category === category)
-                .map((example) => (
-                  <option key={example.id} value={example.id}>
-                    {example.title}
-                  </option>
-                ))}
-            </optgroup>
-          ))}
-        </select>
+            <select
+              aria-label="Load example"
+              className="example-select"
+              onChange={(event) => onExampleChange(event.target.value)}
+              value={exampleId ?? CUSTOM_ID}
+            >
+              <option disabled value={CUSTOM_ID}>
+                Custom code
+              </option>
+              {categories.map((category) => (
+                <optgroup key={category} label={category}>
+                  {examples
+                    .filter((example) => example.category === category)
+                    .map((example) => (
+                      <option key={example.id} value={example.id}>
+                        {example.title}
+                      </option>
+                    ))}
+                </optgroup>
+              ))}
+            </select>
 
-        <select
-          aria-label="Language"
-          onChange={(event) => onLanguageChange(event.target.value as Language)}
-          value={language}
-        >
-          <option value="python">Python</option>
-          <option value="javascript">JavaScript</option>
-          <option value="typescript">TypeScript</option>
-        </select>
-
-        <button onClick={onShare} title="Copy a shareable link" type="button">
-          <Link2 size={14} />
-          {shareLabel}
-        </button>
-        <button onClick={onEmbed} title="Copy iframe embed code" type="button">
-          <Code2 size={14} />
-          {embedLabel}
-        </button>
-        <button disabled={!canExport} onClick={onExport} title="Export trace JSON" type="button">
-          <Download size={14} />
-          Export
-        </button>
-        <button
-          disabled={!canExport}
-          onClick={onExportSvg}
-          title="Export animated trace SVG"
-          type="button"
-        >
-          <FileImage size={14} />
-          SVG
-        </button>
-        <button onClick={() => fileInputRef.current?.click()} title={importTitle} type="button">
-          <Upload size={14} />
-          {importLabel}
-        </button>
-        <HistoryMenu onOpen={onOpenHistoryItem} refreshToken={historyRefreshToken} />
-        <details className="panel-menu shortcuts-menu">
-          <summary title="Show keyboard and editor shortcuts">
-            <HelpCircle size={14} />
-            Shortcuts
-          </summary>
-          <div className="panel-menu-popover shortcuts-popover">
-            {SHORTCUTS.map((shortcut) => (
-              <div className="shortcut-row" key={shortcut.label}>
-                <span className="shortcut-keys">
-                  {shortcut.keys.map((key) => (
-                    <kbd key={key}>{key}</kbd>
-                  ))}
-                </span>
-                <span>{shortcut.label}</span>
-              </div>
-            ))}
+            <select
+              aria-label="Language"
+              className="language-select"
+              onChange={(event) => onLanguageChange(event.target.value as Language)}
+              value={language}
+            >
+              <option value="python">Python</option>
+              <option value="javascript">JavaScript</option>
+              <option value="typescript">TypeScript</option>
+            </select>
           </div>
-        </details>
-        <details className="panel-menu">
-          <summary title="Show, hide, and reset panels">
-            <Columns3 size={14} />
-            Panels
-          </summary>
-          <div className="panel-menu-popover">
-            {panelControls.map((panel) => (
-              <label className="panel-menu-item" key={panel.id}>
-                <input
-                  checked={panel.visible}
-                  onChange={(event) => onTogglePanel(panel.id, event.target.checked)}
-                  type="checkbox"
-                />
-                <span>{panel.label}</span>
-              </label>
-            ))}
-            <button className="panel-menu-reset" onClick={onResetLayout} type="button">
-              Reset layout
+
+          <div className="top-action-group" aria-label="Share and file actions">
+            <button onClick={onShare} title="Copy a shareable link" type="button">
+              <Link2 size={14} />
+              {shareLabel}
+            </button>
+            <button onClick={onEmbed} title="Copy iframe embed code" type="button">
+              <Code2 size={14} />
+              {embedLabel}
+            </button>
+            <button disabled={!canExport} onClick={onExport} title="Export trace JSON" type="button">
+              <Download size={14} />
+              Export
+            </button>
+            <button
+              disabled={!canExport}
+              onClick={onExportSvg}
+              title="Export animated trace SVG"
+              type="button"
+            >
+              <FileImage size={14} />
+              SVG
+            </button>
+            <button onClick={() => fileInputRef.current?.click()} title={importTitle} type="button">
+              <Upload size={14} />
+              {importLabel}
             </button>
           </div>
-        </details>
+        </div>
+
+        <div className="top-action-row top-action-row-secondary">
+          <div className="top-action-group" aria-label="Workspace tools">
+            <HistoryMenu onOpen={onOpenHistoryItem} refreshToken={historyRefreshToken} />
+            <details className="panel-menu shortcuts-menu">
+              <summary title="Show keyboard and editor shortcuts">
+                <HelpCircle size={14} />
+                Shortcuts
+              </summary>
+              <div className="panel-menu-popover shortcuts-popover">
+                {SHORTCUTS.map((shortcut) => (
+                  <div className="shortcut-row" key={shortcut.label}>
+                    <span className="shortcut-keys">
+                      {shortcut.keys.map((key) => (
+                        <kbd key={key}>{key}</kbd>
+                      ))}
+                    </span>
+                    <span>{shortcut.label}</span>
+                  </div>
+                ))}
+              </div>
+            </details>
+            <details className="panel-menu">
+              <summary title="Show, hide, and reset panels">
+                <Columns3 size={14} />
+                Panels
+              </summary>
+              <div className="panel-menu-popover">
+                {panelControls.map((panel) => (
+                  <label className="panel-menu-item" key={panel.id}>
+                    <input
+                      checked={panel.visible}
+                      onChange={(event) => onTogglePanel(panel.id, event.target.checked)}
+                      type="checkbox"
+                    />
+                    <span>{panel.label}</span>
+                  </label>
+                ))}
+                <button className="panel-menu-reset" onClick={onResetLayout} type="button">
+                  Reset layout
+                </button>
+              </div>
+            </details>
+          </div>
+
+          <div className="top-action-group top-action-appearance" aria-label="Appearance and account">
+            <button
+              aria-pressed={designMode === 'traced'}
+              className={`design-toggle${designMode === 'traced' ? ' design-toggle-active' : ''}`}
+              onClick={onToggleDesign}
+              title={
+                designMode === 'traced'
+                  ? 'Switch back to the Classic design'
+                  : 'Switch to the Traced Light design'
+              }
+              type="button"
+            >
+              <Sparkles size={14} />
+              {designMode === 'traced' ? 'Classic' : 'Traced Light'}
+            </button>
+            <button
+              aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+              className="icon-button"
+              onClick={onToggleTheme}
+              type="button"
+            >
+              {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+            </button>
+            <AccountMenu compact />
+          </div>
+        </div>
+
         <input
           accept="application/json"
           hidden
@@ -221,29 +261,6 @@ export function TopBar({
           ref={fileInputRef}
           type="file"
         />
-        <button
-          aria-pressed={designMode === 'traced'}
-          className={`design-toggle${designMode === 'traced' ? ' design-toggle-active' : ''}`}
-          onClick={onToggleDesign}
-          title={
-            designMode === 'traced'
-              ? 'Switch back to the Classic design'
-              : 'Switch to the Traced Light design'
-          }
-          type="button"
-        >
-          <Sparkles size={14} />
-          {designMode === 'traced' ? 'Classic' : 'Traced Light'}
-        </button>
-        <button
-          aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-          className="icon-button"
-          onClick={onToggleTheme}
-          type="button"
-        >
-          {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
-        </button>
-        <AccountMenu compact />
       </div>
     </header>
   );
