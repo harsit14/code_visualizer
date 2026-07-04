@@ -68,6 +68,8 @@ function scriptResult(
       stdout: '',
       stderr: '',
       opCount: stepCount,
+      runtimeMs: 1.2,
+      memoryMb: 0.5,
       truncated: false,
       truncationReason: null,
     },

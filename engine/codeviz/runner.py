@@ -9,7 +9,9 @@ function at several input sizes and counting operations.
 from __future__ import annotations
 
 import io
+import time
 import traceback
+import tracemalloc
 from contextlib import redirect_stderr, redirect_stdout
 from typing import Any, Optional
 
@@ -20,6 +22,7 @@ from .structures import ListNode, TreeNode, build_linked_list, build_tree
 from .tracer import DEFAULT_MAX_STEPS, TraceLimitError, Tracer
 
 USER_FILENAME = "<user_code>"
+BYTES_PER_MB = 1024 * 1024
 
 
 def _base_globals(analysis: Analysis) -> dict[str, Any]:
@@ -38,6 +41,34 @@ def _error_payload(exc: BaseException) -> dict[str, Any]:
         "msg": str(exc),
         "traceback": traceback.format_exc(limit=20),
     }
+
+
+def _start_run_metrics() -> tuple[float, bool]:
+    """Start measuring just the user execution window.
+
+    ``tracemalloc`` is process-global, so remember whether something else
+    had it enabled and restore that state after the run.
+    """
+    was_tracing = tracemalloc.is_tracing()
+    if was_tracing:
+        tracemalloc.reset_peak()
+    else:
+        tracemalloc.start()
+    return time.perf_counter(), was_tracing
+
+
+def _finish_run_metrics(
+    run: dict[str, Any], started_at: float, tracemalloc_was_tracing: bool
+) -> None:
+    run["runtimeMs"] = max(0.0, (time.perf_counter() - started_at) * 1000)
+    try:
+        _, peak_bytes = tracemalloc.get_traced_memory()
+        run["memoryMb"] = peak_bytes / BYTES_PER_MB
+    except RuntimeError:
+        run["memoryMb"] = None
+    finally:
+        if not tracemalloc_was_tracing:
+            tracemalloc.stop()
 
 
 def _resolve_callable(
@@ -97,6 +128,7 @@ def run_session(
                 "exception": {...} | None,
                 "stdout": str, "stderr": str,
                 "opCount": int,
+                "runtimeMs": float, "memoryMb": float | None,
                 "truncated": bool, "truncationReason": str | None,
               } | None,
               "error": {...} | None,
@@ -168,13 +200,20 @@ def _run_script(
         "seed": None,
         "returnValue": None,
         "exception": None,
+        "runtimeMs": 0.0,
+        "memoryMb": 0.0,
+        "memoryIsEstimate": False,
     }
     env = _base_globals(analysis)
     code = compile(source, USER_FILENAME, "exec")
     try:
         with redirect_stdout(stdout), redirect_stderr(stderr):
             with tracer:
-                exec(code, env)
+                metric_started_at, tracemalloc_was_tracing = _start_run_metrics()
+                try:
+                    exec(code, env)
+                finally:
+                    _finish_run_metrics(run, metric_started_at, tracemalloc_was_tracing)
     except TraceLimitError:
         pass  # partial trace retained, truncation flags already set
     except BaseException as exc:
@@ -205,6 +244,9 @@ def _run_function(
         "truncationReason": None,
         "stdout": "",
         "stderr": "",
+        "runtimeMs": 0.0,
+        "memoryMb": 0.0,
+        "memoryIsEstimate": False,
     }
 
     target_name = function or analysis.default_function
@@ -261,9 +303,13 @@ def _run_function(
     try:
         with redirect_stdout(stdout), redirect_stderr(stderr):
             with tracer:
-                return_value = target(*arguments)
-                if info.is_generator and hasattr(return_value, "__iter__"):
-                    return_value = list(return_value)
+                metric_started_at, tracemalloc_was_tracing = _start_run_metrics()
+                try:
+                    return_value = target(*arguments)
+                    if info.is_generator and hasattr(return_value, "__iter__"):
+                        return_value = list(return_value)
+                finally:
+                    _finish_run_metrics(run, metric_started_at, tracemalloc_was_tracing)
         run["returnValue"] = snapshotter.snapshot(return_value)
     except TraceLimitError:
         pass

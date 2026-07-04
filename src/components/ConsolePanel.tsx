@@ -17,6 +17,34 @@ type ConsolePanelProps = {
   canMeasureComplexity: boolean;
 };
 
+function formatRuntime(ms: number | undefined): string | null {
+  if (typeof ms !== 'number' || !Number.isFinite(ms)) {
+    return null;
+  }
+  if (ms < 1) {
+    return `${ms.toFixed(2)} ms`;
+  }
+  if (ms < 10) {
+    return `${ms.toFixed(1)} ms`;
+  }
+  if (ms < 1000) {
+    return `${Math.round(ms)} ms`;
+  }
+  return `${(ms / 1000).toFixed(2)} s`;
+}
+
+function formatMemory(
+  mb: number | null | undefined,
+  isEstimate: boolean | undefined,
+): string | null {
+  if (typeof mb !== 'number' || !Number.isFinite(mb)) {
+    return null;
+  }
+  const amount =
+    mb < 0.01 ? '<0.01 MB' : `${mb < 10 ? mb.toFixed(2) : mb.toFixed(1)} MB`;
+  return isEstimate ? `~${amount}` : amount;
+}
+
 export function ConsolePanel({
   result,
   currentStep,
@@ -34,6 +62,8 @@ export function ConsolePanel({
   const growth =
     complexity && complexity.samples.length >= 3 ? fitGrowth(complexity.samples) : null;
   const maxOps = complexity ? Math.max(...complexity.samples.map((sample) => sample.ops), 1) : 1;
+  const runtimeText = run ? formatRuntime(run.runtimeMs) : null;
+  const memoryText = run ? formatMemory(run.memoryMb, run.memoryIsEstimate) : null;
 
   return (
     <section className="panel console-panel" aria-label="Output console">
@@ -41,11 +71,7 @@ export function ConsolePanel({
         <h2>
           <Terminal size={14} /> Console
         </h2>
-        {run ? (
-          <span className="panel-hint">
-            {run.opCount} ops · {Math.round(result?.durationMs ?? 0)}ms
-          </span>
-        ) : null}
+        {run ? <span className="panel-hint">{run.opCount} ops</span> : null}
       </header>
 
       <div className="panel-scroll console-body">
@@ -97,6 +123,23 @@ export function ConsolePanel({
 
         {run?.truncated ? <p className="console-note">{run.truncationReason}</p> : null}
         {run?.stderr ? <pre className="console-stderr">{run.stderr}</pre> : null}
+
+        {run && (runtimeText || memoryText) ? (
+          <dl className="console-metrics" aria-label="Execution metrics">
+            {runtimeText ? (
+              <div>
+                <dt>Runtime</dt>
+                <dd>{runtimeText}</dd>
+              </div>
+            ) : null}
+            {memoryText ? (
+              <div>
+                <dt>Memory</dt>
+                <dd>{memoryText}</dd>
+              </div>
+            ) : null}
+          </dl>
+        ) : null}
 
         <div className="complexity-block">
           <button

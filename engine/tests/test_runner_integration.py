@@ -119,6 +119,10 @@ def test_script_mode_runs_top_level():
     run = result["run"]
     assert run["stdout"] == "10\n"
     assert run["steps"]
+    assert run["runtimeMs"] >= 0
+    assert run["memoryMb"] is not None
+    assert run["memoryMb"] >= 0
+    assert run["memoryIsEstimate"] is False
 
 
 def test_script_exception_is_visualized_not_fatal():

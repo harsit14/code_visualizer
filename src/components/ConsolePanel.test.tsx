@@ -33,6 +33,8 @@ describe('ConsolePanel', () => {
         stdout: '',
         stderr: '',
         opCount: 1,
+        runtimeMs: 2.4,
+        memoryMb: 1.25,
         truncated: false,
         truncationReason: null,
       },
@@ -53,6 +55,10 @@ describe('ConsolePanel', () => {
     expect(html).toContain('IndexError: list index out of range');
     expect(html).toContain('An index went outside the sequence.');
     expect(html).toContain('Compare the index with the sequence length.');
+    expect(html).toContain('Runtime');
+    expect(html).toContain('2.4 ms');
+    expect(html).toContain('Memory');
+    expect(html).toContain('1.25 MB');
   });
 
   it('warns when complexity measurement stops early', () => {

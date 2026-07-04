@@ -142,6 +142,9 @@ export type RunInfo = {
   stdout: string;
   stderr: string;
   opCount: number;
+  runtimeMs: number;
+  memoryMb: number | null;
+  memoryIsEstimate?: boolean;
   truncated: boolean;
   truncationReason: string | null;
 };

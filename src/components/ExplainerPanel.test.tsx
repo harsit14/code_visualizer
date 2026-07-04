@@ -45,6 +45,8 @@ function result(currentStep: TraceStep): SessionResult {
       stderr: '',
       stdout: '',
       steps: [currentStep],
+      runtimeMs: 1.1,
+      memoryMb: 0.2,
       truncated: false,
       truncationReason: null,
     },

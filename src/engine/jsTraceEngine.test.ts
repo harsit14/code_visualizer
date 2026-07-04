@@ -16,6 +16,10 @@ console.log(total);
 
     expect(result.status).toBe('ok');
     expect(result.run?.stdout).toBe('3\n');
+    expect(result.run?.runtimeMs).toBeGreaterThanOrEqual(0);
+    expect(result.run?.memoryMb).not.toBeNull();
+    expect(result.run?.memoryMb ?? -1).toBeGreaterThanOrEqual(0);
+    expect(typeof result.run?.memoryIsEstimate).toBe('boolean');
     expect(result.run?.steps.length).toBeGreaterThan(3);
     const finalLocals = result.run?.steps.at(-1)?.stack[0].locals;
     expect(finalLocals?.total).toEqual({ k: 'num', t: 'number', v: '3' });

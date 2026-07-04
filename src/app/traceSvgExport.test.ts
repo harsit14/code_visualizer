@@ -39,6 +39,8 @@ const result: SessionResult = {
     stdout: 'ok\n',
     stderr: '',
     opCount: 1,
+    runtimeMs: 1.8,
+    memoryMb: 0.42,
     truncated: false,
     truncationReason: null,
   },

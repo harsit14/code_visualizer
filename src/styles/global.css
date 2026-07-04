@@ -1928,6 +1928,38 @@ input[type='password'] {
   color: var(--amber);
 }
 
+.console-metrics {
+  align-items: center;
+  background: var(--bg-inset);
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  border-radius: 7px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 7px 9px;
+}
+
+.console-metrics div {
+  align-items: baseline;
+  display: flex;
+  gap: 6px;
+}
+
+.console-metrics dt {
+  color: var(--text-faint);
+  font-size: 10.5px;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.console-metrics dd {
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  margin: 0;
+}
+
 .console-return {
   color: var(--green);
   font-family: var(--mono);

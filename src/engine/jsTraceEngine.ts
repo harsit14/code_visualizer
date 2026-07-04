@@ -6,6 +6,49 @@ const USER_FUNC = '__codeviz_user__';
 const MAX_ITEMS = 24;
 const MAX_STRING = 160;
 const MAX_DEPTH = 4;
+const BYTES_PER_MB = 1024 * 1024;
+
+type HeapPerformance = Performance & {
+  memory?: {
+    usedJSHeapSize?: number;
+  };
+};
+
+function nowMs(): number {
+  return globalThis.performance?.now?.() ?? Date.now();
+}
+
+function readHeapUsedBytes(): number | null {
+  const heapBytes = (globalThis.performance as HeapPerformance | undefined)?.memory
+    ?.usedJSHeapSize;
+  return Number.isFinite(heapBytes) ? (heapBytes as number) : null;
+}
+
+function serializedSizeMb(value: unknown): number {
+  return new TextEncoder().encode(JSON.stringify(value)).length / BYTES_PER_MB;
+}
+
+function applyMemoryMetric(
+  run: NonNullable<SessionResult['run']>,
+  heapStartBytes: number | null,
+  heapEndBytes: number | null,
+) {
+  if (heapStartBytes !== null && heapEndBytes !== null) {
+    run.memoryMb = Math.max(0, heapEndBytes - heapStartBytes) / BYTES_PER_MB;
+    run.memoryIsEstimate = false;
+    return run;
+  }
+
+  run.memoryMb = serializedSizeMb({
+    exception: run.exception,
+    returnValue: run.returnValue,
+    stderr: run.stderr,
+    stdout: run.stdout,
+    steps: run.steps,
+  });
+  run.memoryIsEstimate = true;
+  return run;
+}
 
 function emptyAnalysis(): AnalysisInfo {
   return {
@@ -221,12 +264,15 @@ function encodeLocals(snapshotter: Snapshotter, entries: [string, unknown][]) {
 }
 
 export function runJavaScriptTrace(source: string, language: JsLanguage): SessionResult {
-  const startedAt = Date.now();
+  const startedAt = nowMs();
   const analysis = emptyAnalysis();
   const snapshotter = new Snapshotter();
   const steps: TraceStep[] = [];
   let stdout = '';
   let opCount = 0;
+  let runtimeMs = 0;
+  let heapStartBytes: number | null = null;
+  let heapEndBytes: number | null = null;
 
   const trace = (line: number, entries: [string, unknown][]) => {
     const locals = encodeLocals(snapshotter, entries);
@@ -258,12 +304,17 @@ export function runJavaScriptTrace(source: string, language: JsLanguage): Sessio
 
   try {
     const code = instrumentJavaScript(source, language);
-    new Function('__trace', '__console', code)(trace, consoleShim);
-    return {
-      status: 'ok',
-      mode: 'script',
-      analysis,
-      run: {
+    const userProgram = new Function('__trace', '__console', code);
+    heapStartBytes = readHeapUsedBytes();
+    const executionStartedAt = nowMs();
+    try {
+      userProgram(trace, consoleShim);
+    } finally {
+      runtimeMs = Math.max(0, nowMs() - executionStartedAt);
+      heapEndBytes = readHeapUsedBytes();
+    }
+    const run = applyMemoryMetric(
+      {
         functionName: null,
         inputs: [],
         seed: null,
@@ -274,13 +325,25 @@ export function runJavaScriptTrace(source: string, language: JsLanguage): Sessio
         stdout,
         stderr: '',
         opCount,
+        runtimeMs,
+        memoryMb: null,
+        memoryIsEstimate: true,
         truncated: false,
         truncationReason: null,
       },
+      heapStartBytes,
+      heapEndBytes,
+    );
+    return {
+      status: 'ok',
+      mode: 'script',
+      analysis,
+      run,
       error: null,
-      durationMs: Date.now() - startedAt,
+      durationMs: nowMs() - startedAt,
     };
   } catch (error) {
+    heapEndBytes ??= readHeapUsedBytes();
     const payload = errorPayload(error);
     const line = steps.at(-1)?.line ?? 1;
     const exceptionStep: TraceStep = {
@@ -302,11 +365,8 @@ export function runJavaScriptTrace(source: string, language: JsLanguage): Sessio
       exc: { type: payload.type, msg: payload.msg },
     };
     steps.push(exceptionStep);
-    return {
-      status: 'error',
-      mode: 'script',
-      analysis,
-      run: {
+    const run = applyMemoryMetric(
+      {
         functionName: null,
         inputs: [],
         seed: null,
@@ -317,11 +377,22 @@ export function runJavaScriptTrace(source: string, language: JsLanguage): Sessio
         stdout,
         stderr: '',
         opCount,
+        runtimeMs,
+        memoryMb: null,
+        memoryIsEstimate: true,
         truncated: false,
         truncationReason: null,
       },
+      heapStartBytes,
+      heapEndBytes,
+    );
+    return {
+      status: 'error',
+      mode: 'script',
+      analysis,
+      run,
       error: payload,
-      durationMs: Date.now() - startedAt,
+      durationMs: nowMs() - startedAt,
     };
   }
 }
