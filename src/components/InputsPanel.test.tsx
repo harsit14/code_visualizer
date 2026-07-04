@@ -53,6 +53,7 @@ function renderInputsPanel(testCases: PracticeTestCase[] = []) {
       drafts={null}
       isBusy={false}
       lastInputs={null}
+      onAddEdgeTestCases={() => {}}
       onAddTestCase={() => {}}
       onDraftsChange={() => {}}
       onFunctionChange={() => {}}

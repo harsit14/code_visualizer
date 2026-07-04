@@ -9,6 +9,7 @@ import { runJavaScriptInWorker } from '../engine/jsRuntimeClient';
 import { RuntimeClient, TimeoutError } from '../engine/runtimeClient';
 import { firstExceptionStep } from '../engine/trace';
 import {
+  createEdgePracticeCases,
   createPracticeTestCase,
   summarizePracticeRun,
   type PracticeTestCase,
@@ -390,6 +391,16 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
     ]);
   }, [activeFunction, inputLiterals]);
 
+  const addEdgeTestCases = useCallback(() => {
+    if (!activeFunction) {
+      return;
+    }
+    setTestCases((current) => [
+      ...current,
+      ...createEdgePracticeCases(activeFunction, current.length),
+    ]);
+  }, [activeFunction]);
+
   const updateTestCase = useCallback((id: string, patch: PracticeTestCaseUpdate) => {
     const shouldResetResult = patch.inputs !== undefined || patch.expected !== undefined;
     setTestCases((current) =>
@@ -655,6 +666,7 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
     testCases,
     testCasesBusy,
     addTestCase,
+    addEdgeTestCases,
     updateTestCase,
     removeTestCase,
     runTestCases,

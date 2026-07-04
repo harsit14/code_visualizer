@@ -23,6 +23,7 @@ type InputsPanelProps = {
   testCases: PracticeTestCase[];
   testCasesBusy: boolean;
   onAddTestCase: () => void;
+  onAddEdgeTestCases: () => void;
   onUpdateTestCase: (id: string, patch: PracticeTestCaseUpdate) => void;
   onRemoveTestCase: (id: string) => void;
   onRunTestCases: () => void;
@@ -50,6 +51,7 @@ export function InputsPanel({
   testCases,
   testCasesBusy,
   onAddTestCase,
+  onAddEdgeTestCases,
   onUpdateTestCase,
   onRemoveTestCase,
   onRunTestCases,
@@ -168,6 +170,14 @@ export function InputsPanel({
               <button disabled={!activeFunction || isBusy} onClick={onAddTestCase} type="button">
                 <Plus size={13} />
                 Add current
+              </button>
+              <button
+                disabled={!activeFunction || isBusy}
+                onClick={onAddEdgeTestCases}
+                type="button"
+              >
+                <Dices size={13} />
+                Add edges
               </button>
               <button
                 disabled={testCases.length === 0 || isBusy || testCasesBusy}

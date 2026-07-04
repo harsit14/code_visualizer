@@ -40,6 +40,26 @@ export function createPracticeTestCase(
   };
 }
 
+export function createEdgePracticeCases(
+  activeFunction: FunctionInfo,
+  startIndex: number,
+): PracticeTestCase[] {
+  const profiles = [
+    { key: 'empty', label: 'Edge empty' },
+    { key: 'single', label: 'Edge single' },
+    { key: 'mixed', label: 'Edge mixed' },
+  ] as const;
+
+  return profiles.map((profile, profileIndex) => ({
+    ...createPracticeTestCase(
+      activeFunction,
+      activeFunction.params.map((param) => literalForProfile(param, profile.key)),
+      startIndex + profileIndex,
+    ),
+    name: profile.label,
+  }));
+}
+
 export function summarizePracticeRun(
   result: SessionResult,
   expected: string,
@@ -82,4 +102,54 @@ function normalizeComparable(value: string): string {
 
 function formatEngineError(error: EngineError): string {
   return `${error.type}: ${error.msg}`;
+}
+
+function literalForProfile(
+  param: FunctionInfo['params'][number],
+  profile: 'empty' | 'mixed' | 'single',
+): string {
+  const inferred = param.inferred.toLowerCase();
+  const name = param.name.toLowerCase();
+
+  if (inferred.includes('tree') || name.includes('root')) {
+    return profile === 'empty'
+      ? 'tree([])'
+      : profile === 'single'
+        ? 'tree([1])'
+        : 'tree([2, 1, 3])';
+  }
+
+  if (inferred.includes('listnode') || name.includes('head')) {
+    return profile === 'empty'
+      ? 'linked([])'
+      : profile === 'single'
+        ? 'linked([1])'
+        : 'linked([1, 2, 3])';
+  }
+
+  if (inferred.includes('str') || name === 's' || name.includes('string')) {
+    return profile === 'empty' ? "''" : profile === 'single' ? "'a'" : "'abba'";
+  }
+
+  if (inferred.includes('list') || name.endsWith('s') || name.includes('nums')) {
+    return profile === 'empty' ? '[]' : profile === 'single' ? '[1]' : '[1, 1, 2, -3]';
+  }
+
+  if (inferred.includes('bool') || name.startsWith('is_')) {
+    return profile === 'mixed' ? 'False' : 'True';
+  }
+
+  if (inferred.includes('float')) {
+    return profile === 'empty' ? '0.0' : profile === 'single' ? '1.0' : '-1.5';
+  }
+
+  if (name === 'target') {
+    return profile === 'empty' ? '0' : profile === 'single' ? '1' : '2';
+  }
+
+  if (name === 'k') {
+    return profile === 'empty' ? '0' : '1';
+  }
+
+  return profile === 'empty' ? '0' : profile === 'single' ? '1' : '-1';
 }
