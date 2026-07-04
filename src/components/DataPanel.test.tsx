@@ -277,7 +277,7 @@ describe('DataPanel', () => {
     expect(html).not.toContain('&lt;Solution object&gt;');
   });
 
-  it('renders a heap memory map for referenced objects', () => {
+  it('renders a readable reference map for shared objects', () => {
     const shared: EncodedValue = {
       k: 'seq',
       t: 'list',
@@ -325,11 +325,86 @@ describe('DataPanel', () => {
       />,
     );
 
-    expect(html).toContain('memory map');
+    expect(html).toContain('reference map');
     expect(html).toContain('shared');
     expect(html).toContain('matrix');
     expect(html).toContain('row');
-    expect(html).toContain('→ #5');
-    expect(html).toContain('[0]');
+    expect(html).toContain('shared / row');
+    expect(html).toContain('row 0');
+    expect(html).toContain('row 1');
+    expect(html).not.toContain('→ #');
+    expect(html).not.toContain('>#');
+  });
+
+  it('shows matrix rows in the reference map without object ids or truncated values', () => {
+    const row0: EncodedValue = {
+      k: 'seq',
+      t: 'list',
+      id: 3,
+      items: [num(1), num(3), num(5), num(7)],
+      len: 4,
+      truncated: false,
+    };
+    const row1: EncodedValue = {
+      k: 'seq',
+      t: 'list',
+      id: 4,
+      items: [num(10), num(11), num(16), num(20)],
+      len: 4,
+      truncated: false,
+    };
+    const row2: EncodedValue = {
+      k: 'seq',
+      t: 'list',
+      id: 5,
+      items: [num(23), num(30), num(34), num(60)],
+      len: 4,
+      truncated: false,
+    };
+    const currentStep: TraceStep = {
+      i: 0,
+      event: 'line',
+      line: 1,
+      func: 'f',
+      stack: [
+        {
+          id: 'frame-1',
+          func: 'f',
+          qualname: 'f',
+          line: 1,
+          locals: {
+            matrix: {
+              k: 'seq',
+              t: 'list',
+              id: 2,
+              items: [row0, row1, row2],
+              len: 3,
+              truncated: false,
+            },
+          },
+        },
+      ],
+      globals: {},
+      stdoutLen: 0,
+    };
+
+    const html = renderToStaticMarkup(
+      <DataPanel
+        analysis={analysis}
+        atLastStep={false}
+        currentStep={currentStep}
+        frameIndex={null}
+        returnValue={null}
+      />,
+    );
+
+    expect(html).toContain('reference map');
+    expect(html).toContain('3 rows x 4 cols');
+    expect(html).toContain('row 0');
+    expect(html).toContain('matrix[0]');
+    expect(html).toContain('[23, 30, 34, 60]');
+    expect(html).not.toContain('#2');
+    expect(html).not.toContain('#3');
+    expect(html).not.toContain('…');
   });
 });

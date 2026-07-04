@@ -1118,6 +1118,7 @@ input[type='password'] {
   color: var(--text-dim);
   font-family: var(--mono);
   font-size: 11px;
+  gap: 8px;
   justify-content: space-between;
   max-width: 100%;
   min-width: 0;
@@ -1159,7 +1160,7 @@ input[type='password'] {
   border: 0;
   display: grid;
   gap: 6px;
-  grid-template-columns: auto auto minmax(0, 1fr);
+  grid-template-columns: minmax(6rem, auto) auto minmax(0, 1fr);
   justify-content: stretch;
   padding: 0;
   text-align: left;
@@ -1170,14 +1171,16 @@ input[type='password'] {
   border-color: transparent;
 }
 
-.heap-node-id,
+.heap-node-label,
 .heap-node-kind {
   font-family: var(--mono);
   font-size: 11px;
 }
 
-.heap-node-id {
+.heap-node-label {
   color: var(--accent);
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .heap-node-kind {
@@ -1188,10 +1191,10 @@ input[type='password'] {
   color: var(--text-dim);
   font-family: var(--mono);
   font-size: 11px;
+  line-height: 1.4;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .heap-node-roots {
