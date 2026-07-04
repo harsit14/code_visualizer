@@ -29,6 +29,10 @@ or understanding how state mutates one line at a time.
 - Visualize arrays, strings, dictionaries, binary trees, linked lists, object
   references, aliases, and heap state.
 - Generate editable Python function inputs for LeetCode-style snippets.
+- Save compact practice cases, add generated edge cases, run all cases, rerun
+  only failed cases, and promote trusted actual output into expected output.
+- Keep a local practice notebook with pattern tags, review status, and notes for
+  each code/function pair.
 - Track pointer variables such as `i`, `left`, `right`, `lo`, `hi`, `prev`,
   `curr`, and `nxt`.
 - Inspect recursive execution with a persistent call tree.
@@ -49,7 +53,9 @@ call stack, console, and explainer close together so you can compare what the
 code says with what the program actually did. The landing page includes a live
 demo, preset algorithms, and structure previews for variables, arrays, linked
 lists, trees, heap references, call stack frames, console output, and complexity
-hints.
+hints. For interview practice, the test inputs panel also keeps saved cases,
+edge-case generation, failure reruns, and a local notebook close to the trace
+without opening a separate workspace.
 
 ## Languages
 
@@ -65,6 +71,7 @@ JavaScript and TypeScript run in a separate browser worker.
 ## Privacy Model
 
 - User code execution and trace generation happen in the browser.
+- Practice cases and notebook notes are stored locally in your browser.
 - AI explanations use only the selected trace step and surrounding code context.
 - Signed-in history is stored for your account so traces can be reopened later.
 
@@ -79,13 +86,16 @@ Open the printed local URL, choose an example, or paste your own snippet.
 
 For Python function-only snippets, Code Visualizer fills the test inputs panel
 with generated literals. You can edit those inputs, change the seed, regenerate,
-and run again.
+and run again. The folded Cases section can save inputs, generate edge cases,
+compare optional expected output, rerun failures, and load any case back into
+the trace. The folded Notebook section stores pattern tags, review status, and
+notes locally for that exact snippet.
 
 ## Examples To Try
 
 | Example                       | What to watch                                                                |
 | ----------------------------- | ---------------------------------------------------------------------------- |
-| Two Sum                       | Dictionary updates, generated `nums` and `target`, and moving array markers. |
+| Two Sum                       | Dictionary updates, generated `nums` and `target`, saved cases, and edge cases. |
 | Reverse Linked List           | `prev`, `curr`, and `nxt` aliases as each `next` link flips.                 |
 | Binary Tree Inorder Traversal | Recursive frames opening and closing around a rendered tree.                 |
 | Binary Search                 | `lo`, `mid`, and `hi` converging on the answer.                              |

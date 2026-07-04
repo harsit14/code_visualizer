@@ -11,9 +11,11 @@ import {
   Layers,
   LayoutGrid,
   Link2,
+  ListChecks,
   Menu,
   Moon,
   Network,
+  NotebookPen,
   Play,
   Presentation,
   Share2,
@@ -67,6 +69,16 @@ const traceHighlights = [
     body: 'Ask for a plain-English explanation of any confusing step in the trace.',
     icon: Sparkles,
     title: 'Explain the moment',
+  },
+  {
+    body: 'Save practice cases, add generated edge cases, rerun only failures, and promote actual output into expected output.',
+    icon: ListChecks,
+    title: 'Practice with cases',
+  },
+  {
+    body: 'Keep local pattern tags, review status, and notes beside the exact snippet you are studying.',
+    icon: NotebookPen,
+    title: 'Remember the pattern',
   },
   {
     body: 'Share a runnable link or embed the trace directly in a lesson, note, or post.',
@@ -138,7 +150,7 @@ const audiences = [
     title: 'Educators',
   },
   {
-    body: 'Practice algorithm traces, pointer movement, and state changes before the whiteboard.',
+    body: 'Practice algorithm traces, edge cases, pointer movement, and state changes before the whiteboard.',
     icon: Users,
     title: 'Interview prep',
   },
