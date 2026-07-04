@@ -863,6 +863,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
               lastInputs={run?.inputs ?? null}
               onAddEdgeTestCases={session.addEdgeTestCases}
               onAddTestCase={session.addTestCase}
+              onAcceptTestCaseActual={session.acceptTestCaseActual}
               onDraftsChange={session.setInputDrafts}
               onFunctionChange={session.setFunctionOverride}
               onPracticeNotebookChange={session.updatePracticeNotebook}

@@ -1151,7 +1151,7 @@ input[type='password'] {
   align-items: center;
   display: grid;
   gap: 6px;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
 }
 
 .test-case-result code {
@@ -1169,6 +1169,11 @@ input[type='password'] {
   font-family: var(--mono);
   font-size: 10.5px;
   font-style: normal;
+}
+
+.test-case-accept-button {
+  font-size: 11px;
+  padding: 3px 6px;
 }
 
 /* --------------------------------------------------------- variables */

@@ -6,6 +6,7 @@
  * `linked([...])` builders for TreeNode / ListNode arguments.
  */
 import {
+  Check,
   Dices,
   FlaskConical,
   ListChecks,
@@ -33,6 +34,7 @@ type InputsPanelProps = {
   isBusy: boolean;
   testCases: PracticeTestCase[];
   testCasesBusy: boolean;
+  onAcceptTestCaseActual: (id: string) => void;
   onAddTestCase: () => void;
   onAddEdgeTestCases: () => void;
   onUpdateTestCase: (id: string, patch: PracticeTestCaseUpdate) => void;
@@ -64,6 +66,7 @@ export function InputsPanel({
   isBusy,
   testCases,
   testCasesBusy,
+  onAcceptTestCaseActual,
   onAddTestCase,
   onAddEdgeTestCases,
   onUpdateTestCase,
@@ -291,6 +294,18 @@ export function InputsPanel({
                         {testCase.runtimeMs !== null || testCase.memoryMb !== null ? (
                           <em>{formatCaseMetrics(testCase.runtimeMs, testCase.memoryMb)}</em>
                         ) : null}
+                        {canAcceptActual(testCase) ? (
+                          <button
+                            className="test-case-accept-button"
+                            disabled={isBusy}
+                            onClick={() => onAcceptTestCaseActual(testCase.id)}
+                            title="Use actual output as expected"
+                            type="button"
+                          >
+                            <Check size={12} />
+                            Use actual
+                          </button>
+                        ) : null}
                       </div>
                     ) : null}
                   </article>
@@ -420,6 +435,14 @@ function formatNotebookSummary(notebook: PracticeNotebook): string {
     return 'notes';
   }
   return 'empty';
+}
+
+function canAcceptActual(testCase: PracticeTestCase): boolean {
+  return (
+    testCase.actual !== null &&
+    !testCase.error &&
+    testCase.expected.trim() !== testCase.actual.trim()
+  );
 }
 
 function formatCaseMetrics(runtimeMs: number | null, memoryMb: number | null): string {

@@ -514,6 +514,20 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
     setTestCases((current) => current.filter((testCase) => testCase.id !== id));
   }, []);
 
+  const acceptTestCaseActual = useCallback((id: string) => {
+    setTestCases((current) =>
+      current.map((testCase) =>
+        testCase.id === id && testCase.actual !== null && !testCase.error
+          ? {
+              ...testCase,
+              expected: testCase.actual,
+              status: 'pass' as const,
+            }
+          : testCase,
+      ),
+    );
+  }, []);
+
   const updatePracticeNotebook = useCallback((patch: PracticeNotebookUpdate) => {
     setPracticeNotebook((current) => ({
       ...current,
@@ -772,6 +786,7 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
     addEdgeTestCases,
     updateTestCase,
     removeTestCase,
+    acceptTestCaseActual,
     practiceNotebook,
     updatePracticeNotebook,
     runTestCases,

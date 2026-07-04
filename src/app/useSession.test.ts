@@ -411,4 +411,34 @@ describe('useSession', () => {
     expect(result.current.testCases.map((testCase) => testCase.status)).toEqual(['pass', 'pass']);
     unmount();
   });
+
+  it('uses a case actual value as its expected output', async () => {
+    const code = 'def solve(nums):\n    return 21';
+    const imported = functionResult();
+    const { result, unmount } = renderHook(() => useSession(code));
+
+    act(() => result.current.importSession(code, imported, 0));
+    act(() => result.current.addTestCase());
+
+    requestMock.mockResolvedValueOnce(functionResult(num(21)));
+    await act(async () => {
+      await result.current.runTestCases();
+    });
+    expect(result.current.testCases[0]).toMatchObject({
+      actual: '21',
+      expected: '',
+      status: 'ran',
+    });
+
+    act(() => {
+      result.current.acceptTestCaseActual(result.current.testCases[0].id);
+    });
+
+    expect(result.current.testCases[0]).toMatchObject({
+      actual: '21',
+      expected: '21',
+      status: 'pass',
+    });
+    unmount();
+  });
 });

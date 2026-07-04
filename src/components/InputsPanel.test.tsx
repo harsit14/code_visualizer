@@ -78,6 +78,7 @@ function renderInputsPanel(testCases: PracticeTestCase[] = []) {
       drafts={null}
       isBusy={false}
       lastInputs={null}
+      onAcceptTestCaseActual={() => {}}
       onAddEdgeTestCases={() => {}}
       onAddTestCase={() => {}}
       onDraftsChange={() => {}}
@@ -133,5 +134,10 @@ describe('InputsPanel', () => {
   it('shows the rerun-failed action only when a case failed', () => {
     expect(renderInputsPanel([caseOne])).not.toContain('Run failed');
     expect(renderInputsPanel([caseOne, caseTwo])).toContain('Run failed');
+  });
+
+  it('offers to use actual output as expected when they differ', () => {
+    expect(renderInputsPanel([caseOne])).not.toContain('Use actual');
+    expect(renderInputsPanel([exploratoryCase])).toContain('Use actual');
   });
 });
