@@ -111,7 +111,7 @@ export function TopBar({
           <div className="top-action-group top-action-context" aria-label="Workspace context">
             <button onClick={onOpenLanding} title="Back to the landing page" type="button">
               <ArrowLeft size={14} />
-              Landing
+              <span className="top-action-label">Landing</span>
             </button>
 
             <select
@@ -151,15 +151,20 @@ export function TopBar({
           <div className="top-action-group" aria-label="Share and file actions">
             <button onClick={onShare} title="Copy a shareable link" type="button">
               <Link2 size={14} />
-              {shareLabel}
+              <span className="top-action-label">{shareLabel}</span>
             </button>
             <button onClick={onEmbed} title="Copy iframe embed code" type="button">
               <Code2 size={14} />
-              {embedLabel}
+              <span className="top-action-label">{embedLabel}</span>
             </button>
-            <button disabled={!canExport} onClick={onExport} title="Export trace JSON" type="button">
+            <button
+              disabled={!canExport}
+              onClick={onExport}
+              title="Export trace JSON"
+              type="button"
+            >
               <Download size={14} />
-              Export
+              <span className="top-action-label">Export</span>
             </button>
             <button
               disabled={!canExport}
@@ -168,11 +173,11 @@ export function TopBar({
               type="button"
             >
               <FileImage size={14} />
-              SVG
+              <span className="top-action-label">SVG</span>
             </button>
             <button onClick={() => fileInputRef.current?.click()} title={importTitle} type="button">
               <Upload size={14} />
-              {importLabel}
+              <span className="top-action-label">{importLabel}</span>
             </button>
           </div>
         </div>
@@ -183,7 +188,7 @@ export function TopBar({
             <details className="panel-menu shortcuts-menu">
               <summary title="Show keyboard and editor shortcuts">
                 <HelpCircle size={14} />
-                Shortcuts
+                <span className="top-action-label">Shortcuts</span>
               </summary>
               <div className="panel-menu-popover shortcuts-popover">
                 {SHORTCUTS.map((shortcut) => (
@@ -201,7 +206,7 @@ export function TopBar({
             <details className="panel-menu">
               <summary title="Show, hide, and reset panels">
                 <Columns3 size={14} />
-                Panels
+                <span className="top-action-label">Panels</span>
               </summary>
               <div className="panel-menu-popover">
                 {panelControls.map((panel) => (
@@ -221,7 +226,10 @@ export function TopBar({
             </details>
           </div>
 
-          <div className="top-action-group top-action-appearance" aria-label="Appearance and account">
+          <div
+            className="top-action-group top-action-appearance"
+            aria-label="Appearance and account"
+          >
             <button
               aria-pressed={designMode === 'traced'}
               className={`design-toggle${designMode === 'traced' ? ' design-toggle-active' : ''}`}
@@ -234,7 +242,9 @@ export function TopBar({
               type="button"
             >
               <Sparkles size={14} />
-              {designMode === 'traced' ? 'Classic' : 'Traced Light'}
+              <span className="top-action-label">
+                {designMode === 'traced' ? 'Classic' : 'Traced Light'}
+              </span>
             </button>
             <button
               aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}

@@ -398,19 +398,20 @@ input[type='password'] {
 /* ----------------------------------------------------------- top bar */
 
 .top-bar {
-  align-items: stretch;
+  align-items: center;
   display: flex;
   flex-shrink: 0;
-  gap: 14px;
+  gap: 10px;
   justify-content: space-between;
+  min-width: 0;
 }
 
 .brand {
   align-items: center;
   align-self: center;
   display: flex;
-  flex: 0 0 auto;
-  gap: 9px;
+  flex: 0 1 auto;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -455,60 +456,71 @@ input[type='password'] {
 }
 
 .top-actions {
-  align-items: flex-end;
+  align-items: center;
   display: flex;
   flex: 1 1 auto;
-  flex-direction: column;
-  gap: 6px;
-  justify-content: flex-end;
-  min-width: 0;
-}
-
-.top-action-row {
-  align-items: center;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: flex-end;
-  min-width: 0;
-  width: 100%;
-}
-
-.top-action-group {
-  align-items: center;
-  display: inline-flex;
-  flex-wrap: wrap;
+  flex-flow: row nowrap;
   gap: 7px;
   justify-content: flex-end;
   min-width: 0;
 }
 
+.top-action-row {
+  display: contents;
+}
+
+.top-action-group {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  gap: 5px;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
 .top-action-context {
-  flex: 1 1 420px;
+  flex: 1 1 auto;
   justify-content: flex-start;
 }
 
 .top-action-appearance {
-  flex-wrap: nowrap;
+  flex: 0 0 auto;
 }
 
 .example-select {
-  min-width: 230px;
-  width: min(282px, 28vw);
+  flex: 0 1 220px;
+  min-width: 170px;
+  width: clamp(170px, 15vw, 220px);
 }
 
 .language-select {
-  min-width: 122px;
+  min-width: 104px;
+  width: 104px;
 }
 
-.top-actions select,
-.top-actions button,
-.account-menu summary {
-  min-height: 34px;
+.top-action-group > select,
+.top-action-group > button,
+.top-action-group > .panel-menu > summary,
+.top-action-group > .account-menu > summary {
+  flex-shrink: 0;
+  font-size: 12px;
+  gap: 5px;
+  min-height: 30px;
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+
+.top-action-group > button > svg,
+.top-action-group > .panel-menu > summary > svg,
+.top-action-group > .account-menu > summary > svg {
+  flex: 0 0 auto;
 }
 
 .icon-button {
-  padding: 6px 7px;
+  justify-content: center;
+  padding: 4px 7px;
+  width: 30px;
 }
 
 .panel-menu {
@@ -523,18 +535,68 @@ input[type='password'] {
   color: var(--text);
   cursor: pointer;
   display: inline-flex;
-  font-size: 12.5px;
-  gap: 6px;
+  font-size: 12px;
+  gap: 5px;
   list-style: none;
-  min-height: 34px;
-  padding: 5px 10px;
+  min-height: 30px;
+  padding: 4px 8px;
   user-select: none;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1600px) {
+  .brand {
+    gap: 7px;
+  }
+
+  .brand h1 {
+    font-size: 14.5px;
+  }
+
+  .status-pill {
+    padding: 2px 8px;
+  }
+
+  .top-actions {
+    gap: 5px;
+  }
+
+  .top-action-group {
+    gap: 4px;
+  }
+
+  .top-action-group > button,
+  .top-action-group > .panel-menu > summary,
+  .top-action-group > .account-menu > summary {
+    gap: 0;
+    justify-content: center;
+    min-width: 30px;
+    padding-inline: 0;
+    width: 30px;
+  }
+
+  .top-action-group > button .top-action-label,
+  .top-action-group > .panel-menu > summary .top-action-label,
+  .top-action-group > .account-menu > summary .account-summary-label {
+    display: none;
+  }
+
+  .example-select {
+    flex-basis: 180px;
+    min-width: 160px;
+    width: clamp(160px, 16vw, 190px);
+  }
+
+  .language-select {
+    min-width: 96px;
+    width: 96px;
+  }
+}
+
+@media (max-width: 720px) {
   .top-bar {
     align-items: stretch;
     flex-direction: column;
+    gap: 8px;
   }
 
   .brand {
@@ -542,24 +604,18 @@ input[type='password'] {
   }
 
   .top-actions {
-    align-items: stretch;
-  }
-
-  .top-action-row,
-  .top-action-group {
+    align-items: flex-start;
+    flex-wrap: wrap;
     justify-content: flex-start;
   }
 
-  .top-action-context {
-    flex: 1 1 auto;
-  }
-
-  .top-action-appearance {
+  .top-action-group {
     flex-wrap: wrap;
+    justify-content: flex-start;
   }
 
   .example-select {
-    flex: 1 1 230px;
+    flex: 1 1 180px;
     width: auto;
   }
 }

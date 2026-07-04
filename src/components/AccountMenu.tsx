@@ -55,6 +55,20 @@ export function AccountMenu({ compact = false }: AccountMenuProps) {
     }
     return 'Free account';
   }, [account]);
+  const compactPlanLabel = useMemo(() => {
+    if (!account.user) {
+      return 'Account';
+    }
+    if (account.usage?.plan === 'admin') {
+      return 'Admin';
+    }
+    if (account.usage?.plan === 'pro') {
+      return 'Pro';
+    }
+    return 'Free';
+  }, [account]);
+  const summaryLabel = compact ? compactPlanLabel : account.user ? planLabel : 'Account';
+  const summaryTitle = account.user ? planLabel : 'Account';
 
   const submitAuth = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
@@ -97,9 +111,9 @@ export function AccountMenu({ compact = false }: AccountMenuProps) {
 
   return (
     <details className={`account-menu${compact ? ' account-menu-compact' : ''}`}>
-      <summary title="Account">
+      <summary title={summaryTitle}>
         <UserRound size={14} />
-        {account.user ? planLabel : 'Account'}
+        <span className="account-summary-label">{summaryLabel}</span>
       </summary>
       <div className="account-popover">
         <header className="account-popover-header">

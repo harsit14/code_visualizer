@@ -67,7 +67,7 @@ export function HistoryMenu({ onOpen, refreshToken }: HistoryMenuProps) {
     <details className="panel-menu history-menu" onToggle={handleToggle} ref={detailsRef}>
       <summary title="Open saved code history">
         <History size={14} />
-        History
+        <span className="top-action-label">History</span>
       </summary>
       <div className="panel-menu-popover history-popover">
         <header className="history-popover-header">
@@ -177,4 +177,3 @@ function formatDate(value: string): string {
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'History request failed.';
 }
-
