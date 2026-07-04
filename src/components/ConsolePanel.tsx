@@ -64,6 +64,10 @@ export function ConsolePanel({
   const maxOps = complexity ? Math.max(...complexity.samples.map((sample) => sample.ops), 1) : 1;
   const runtimeText = run ? formatRuntime(run.runtimeMs) : null;
   const memoryText = run ? formatMemory(run.memoryMb, run.memoryIsEstimate) : null;
+  const showReturnValue = Boolean(atLastStep && run?.returnValue);
+  const showEmptyOutput = Boolean(
+    run && !stdout && !showReturnValue && !run.stderr && !exception && !error,
+  );
 
   return (
     <section className="panel console-panel" aria-label="Output console">
@@ -76,11 +80,9 @@ export function ConsolePanel({
 
       <div className="panel-scroll console-body">
         {stdout ? <pre className="console-stdout">{stdout}</pre> : null}
-        {!stdout && run && !exception && !error ? (
-          <p className="panel-empty">No output yet at this step.</p>
-        ) : null}
+        {showEmptyOutput ? <p className="panel-empty">No output yet at this step.</p> : null}
 
-        {atLastStep && run?.returnValue ? (
+        {showReturnValue && run?.returnValue ? (
           <p className="console-return">
             <span>returned</span> {formatValue(run.returnValue)}
           </p>
