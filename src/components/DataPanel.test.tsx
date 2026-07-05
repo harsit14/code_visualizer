@@ -18,7 +18,7 @@ const analysis: AnalysisInfo = {
       isGenerator: false,
       docstring: null,
       returns: null,
-      pointerHints: { s: ['hi'], nums: ['hi'] },
+      pointerHints: { s: ['hi'], nums: ['hi'], matrix: ['row'] },
     },
   ],
   defaultFunction: 'f',
@@ -273,7 +273,8 @@ describe('DataPanel', () => {
     );
 
     expect(html).toContain('<h3>self.memo</h3>');
-    expect(html).toContain('<td>1</td><td>2</td>');
+    expect(html).toContain('<td>1</td>');
+    expect(html).toContain('<span class="data-cell-value">2</span>');
     expect(html).not.toContain('&lt;Solution object&gt;');
   });
 
@@ -406,5 +407,112 @@ describe('DataPanel', () => {
     expect(html).not.toContain('#2');
     expect(html).not.toContain('#3');
     expect(html).not.toContain('…');
+  });
+
+  it('highlights changed matrix cells and active row-column pointers', () => {
+    const previousMatrix: EncodedValue = {
+      k: 'seq',
+      t: 'list',
+      id: 2,
+      items: [
+        {
+          k: 'seq',
+          t: 'list',
+          id: 3,
+          items: [num(1), num(3), num(5)],
+          len: 3,
+          truncated: false,
+        },
+        {
+          k: 'seq',
+          t: 'list',
+          id: 4,
+          items: [num(10), num(11), num(16)],
+          len: 3,
+          truncated: false,
+        },
+      ],
+      len: 2,
+      truncated: false,
+    };
+    const currentMatrix: EncodedValue = {
+      k: 'seq',
+      t: 'list',
+      id: 2,
+      items: [
+        {
+          k: 'seq',
+          t: 'list',
+          id: 3,
+          items: [num(1), num(3), num(5)],
+          len: 3,
+          truncated: false,
+        },
+        {
+          k: 'seq',
+          t: 'list',
+          id: 4,
+          items: [num(10), num(11), num(99)],
+          len: 3,
+          truncated: false,
+        },
+      ],
+      len: 2,
+      truncated: false,
+    };
+    const previousStep: TraceStep = {
+      i: 0,
+      event: 'line',
+      line: 1,
+      func: 'f',
+      stack: [
+        {
+          id: 'frame-1',
+          func: 'f',
+          qualname: 'f',
+          line: 1,
+          locals: {
+            matrix: previousMatrix,
+            row: num(1),
+            col: num(2),
+          },
+        },
+      ],
+      globals: {},
+      stdoutLen: 0,
+    };
+    const currentStep: TraceStep = {
+      ...previousStep,
+      i: 1,
+      stack: [
+        {
+          id: 'frame-1',
+          func: 'f',
+          qualname: 'f',
+          line: 2,
+          locals: {
+            matrix: currentMatrix,
+            row: num(1),
+            col: num(2),
+          },
+        },
+      ],
+    };
+
+    const html = renderToStaticMarkup(
+      <DataPanel
+        analysis={analysis}
+        atLastStep={false}
+        currentStep={currentStep}
+        frameIndex={null}
+        previousStep={previousStep}
+        returnValue={null}
+      />,
+    );
+
+    expect(html).toContain('title="matrix[1][2] (row, col)"');
+    expect(html).toContain('class="is-changed has-trace-pointer"');
+    expect(html).toContain('<span class="data-cell-value">99</span>');
+    expect(html).toContain('<span class="trace-badge">row, col</span>');
   });
 });

@@ -935,6 +935,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
               atLastStep={atLastStep}
               currentStep={session.currentStep}
               frameIndex={session.selectedFrameIndex}
+              previousStep={previousStep}
               returnValue={run?.returnValue ?? null}
             />
           </ErrorBoundary>,

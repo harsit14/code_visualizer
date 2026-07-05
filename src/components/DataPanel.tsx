@@ -58,12 +58,317 @@ type HeapGraph = {
   rootEdges: { name: string; targetId: number }[];
   truncated: boolean;
 };
+type TraceOverlay = {
+  changedPaths: Set<string>;
+  newPaths: Set<string>;
+  pointerLabels: Map<string, string[]>;
+  changedObjectIds: Set<number>;
+};
 
 const HEAP_NODE_LIMIT = 24;
 
+const EMPTY_TRACE_OVERLAY: TraceOverlay = {
+  changedPaths: new Set(),
+  newPaths: new Set(),
+  pointerLabels: new Map(),
+  changedObjectIds: new Set(),
+};
+
+const MATRIX_INDEX_PAIRS: [string, string][] = [
+  ['row', 'col'],
+  ['row', 'column'],
+  ['r', 'c'],
+  ['i', 'j'],
+  ['x', 'y'],
+];
+
+function pathForIndex(basePath: string, index: number): string {
+  return `${basePath}[${index}]`;
+}
+
+function pathForAttr(basePath: string, attr: string): string {
+  return `${basePath}.${attr}`;
+}
+
+function pathForDictKey(basePath: string, key: EncodedValue): string {
+  return `${basePath}[${formatValue(key)}]`;
+}
+
+function addTraceLabel(labels: Map<string, string[]>, path: string, label: string) {
+  const existing = labels.get(path) ?? [];
+  if (!existing.includes(label)) {
+    labels.set(path, [...existing, label]);
+  }
+}
+
+function objectIdForTrace(value: EncodedValue | null | undefined): number | null {
+  if (!value) {
+    return null;
+  }
+  switch (value.k) {
+    case 'seq':
+    case 'dict':
+    case 'obj':
+    case 'tree':
+    case 'listnode':
+    case 'ref':
+      return value.id;
+    case 'repr':
+      return value.id ?? null;
+    default:
+      return null;
+  }
+}
+
+function markChanged(overlay: TraceOverlay, path: string, value: EncodedValue) {
+  overlay.changedPaths.add(path);
+  const id = objectIdForTrace(value);
+  if (id !== null) {
+    overlay.changedObjectIds.add(id);
+  }
+}
+
+function markNew(overlay: TraceOverlay, path: string, value: EncodedValue) {
+  overlay.newPaths.add(path);
+  const id = objectIdForTrace(value);
+  if (id !== null) {
+    overlay.changedObjectIds.add(id);
+  }
+}
+
+function compareTraceValues(
+  current: EncodedValue,
+  previous: EncodedValue | undefined,
+  path: string,
+  overlay: TraceOverlay,
+  depth = 0,
+) {
+  if (!previous) {
+    markNew(overlay, path, current);
+    return;
+  }
+  if (current.k !== previous.k) {
+    markChanged(overlay, path, current);
+    return;
+  }
+  if (depth > 5) {
+    if (formatValue(current) !== formatValue(previous)) {
+      markChanged(overlay, path, current);
+    }
+    return;
+  }
+
+  if (current.k === 'seq' && previous.k === 'seq') {
+    if (current.len !== previous.len || current.truncated !== previous.truncated) {
+      markChanged(overlay, path, current);
+    }
+    current.items.forEach((item, index) => {
+      compareTraceValues(
+        item,
+        previous.items[index],
+        pathForIndex(path, index),
+        overlay,
+        depth + 1,
+      );
+    });
+    return;
+  }
+
+  if (current.k === 'dict' && previous.k === 'dict') {
+    if (current.len !== previous.len || current.truncated !== previous.truncated) {
+      markChanged(overlay, path, current);
+    }
+    const previousEntries = new Map(
+      previous.entries.map(([key, item]) => [formatValue(key), item]),
+    );
+    current.entries.forEach(([key, item]) => {
+      compareTraceValues(
+        item,
+        previousEntries.get(formatValue(key)),
+        pathForDictKey(path, key),
+        overlay,
+        depth + 1,
+      );
+    });
+    return;
+  }
+
+  if (current.k === 'obj' && previous.k === 'obj') {
+    for (const [attr, value] of Object.entries(current.attrs)) {
+      compareTraceValues(value, previous.attrs[attr], pathForAttr(path, attr), overlay, depth + 1);
+    }
+    if (Object.keys(current.attrs).length !== Object.keys(previous.attrs).length) {
+      markChanged(overlay, path, current);
+    }
+    return;
+  }
+
+  if (current.k === 'tree' && previous.k === 'tree') {
+    if (formatValue(current.val) !== formatValue(previous.val)) {
+      markChanged(overlay, `${path}.val`, current);
+    }
+    compareNullableTraceNode(current.left, previous.left, `${path}.left`, overlay, depth + 1);
+    compareNullableTraceNode(current.right, previous.right, `${path}.right`, overlay, depth + 1);
+    return;
+  }
+
+  if (current.k === 'listnode' && previous.k === 'listnode') {
+    if (current.nodes.length !== previous.nodes.length || current.cyclic !== previous.cyclic) {
+      markChanged(overlay, path, current);
+    }
+    current.nodes.forEach((node, index) => {
+      const previousNode = previous.nodes[index];
+      if (!previousNode || formatValue(node.val) !== formatValue(previousNode.val)) {
+        overlay.changedObjectIds.add(node.id);
+      }
+    });
+    return;
+  }
+
+  if (formatValue(current) !== formatValue(previous)) {
+    markChanged(overlay, path, current);
+  }
+}
+
+function compareNullableTraceNode(
+  current: EncodedValue | null,
+  previous: EncodedValue | null | undefined,
+  path: string,
+  overlay: TraceOverlay,
+  depth: number,
+) {
+  if (!current) {
+    return;
+  }
+  compareTraceValues(current, previous ?? undefined, path, overlay, depth);
+}
+
+function intLocals(locals: Record<string, EncodedValue>): Map<string, number> {
+  const values = new Map<string, number>();
+  for (const [name, value] of Object.entries(locals)) {
+    if (value.k !== 'num' || value.t !== 'int') {
+      continue;
+    }
+    const parsed = Number(value.v);
+    if (Number.isFinite(parsed)) {
+      values.set(name, parsed);
+    }
+  }
+  return values;
+}
+
+function isMatrixLike(value: EncodedValue): value is SeqValue {
+  return (
+    value.k === 'seq' && value.items.length > 0 && value.items.every((item) => item.k === 'seq')
+  );
+}
+
+function findPairedColumnName(rowName: string, ints: Map<string, number>): string | null {
+  const direct = MATRIX_INDEX_PAIRS.find(([row]) => row === rowName)?.[1];
+  if (direct && ints.has(direct)) {
+    return direct;
+  }
+  return MATRIX_INDEX_PAIRS.find(([, col]) => ints.has(col))?.[1] ?? null;
+}
+
+function addMatrixPointerLabels(
+  locals: Record<string, EncodedValue>,
+  pointerHints: ArrayPointerHints | null | undefined,
+  labels: Map<string, string[]>,
+) {
+  const ints = intLocals(locals);
+  for (const [name, value] of Object.entries(locals)) {
+    if (!isMatrixLike(value)) {
+      continue;
+    }
+    const hintedRows = pointerHints?.[name] ?? [];
+    const rowNames =
+      hintedRows.length > 0
+        ? hintedRows
+        : MATRIX_INDEX_PAIRS.map(([row]) => row).filter((row) => ints.has(row));
+    for (const rowName of rowNames) {
+      const rowIndex = ints.get(rowName);
+      if (rowIndex === undefined || rowIndex < 0 || rowIndex >= value.items.length) {
+        continue;
+      }
+      const rowPath = pathForIndex(name, rowIndex);
+      const row = value.items[rowIndex];
+      const colName = findPairedColumnName(rowName, ints);
+      const colIndex = colName ? ints.get(colName) : undefined;
+      if (
+        row.k === 'seq' &&
+        colName &&
+        colIndex !== undefined &&
+        colIndex >= 0 &&
+        colIndex < row.items.length
+      ) {
+        addTraceLabel(labels, pathForIndex(rowPath, colIndex), `${rowName}, ${colName}`);
+      } else {
+        addTraceLabel(labels, rowPath, rowName);
+      }
+    }
+  }
+}
+
+function buildTraceOverlay(
+  locals: Record<string, EncodedValue>,
+  previousLocals: Record<string, EncodedValue> | undefined,
+  pointerHints: ArrayPointerHints | null | undefined,
+): TraceOverlay {
+  const overlay: TraceOverlay = {
+    changedPaths: new Set(),
+    newPaths: new Set(),
+    pointerLabels: new Map(),
+    changedObjectIds: new Set(),
+  };
+  for (const [name, value] of Object.entries(locals)) {
+    if (name === 'self') {
+      continue;
+    }
+    compareTraceValues(value, previousLocals?.[name], name, overlay);
+  }
+  addMatrixPointerLabels(locals, pointerHints, overlay.pointerLabels);
+  return overlay;
+}
+
+function traceClasses(path: string, overlay: TraceOverlay): string {
+  return [
+    overlay.changedPaths.has(path) ? 'is-changed' : '',
+    overlay.newPaths.has(path) ? 'is-new' : '',
+    overlay.pointerLabels.has(path) ? 'has-trace-pointer' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
+function traceTitle(path: string, overlay: TraceOverlay): string {
+  const labels = overlay.pointerLabels.get(path);
+  if (!labels || labels.length === 0) {
+    return path;
+  }
+  return `${path} (${labels.join(', ')})`;
+}
+
+function TraceBadges({ labels }: { labels: string[] | undefined }) {
+  if (!labels || labels.length === 0) {
+    return null;
+  }
+  return <span className="trace-badge">{labels.join(', ')}</span>;
+}
+
 // ---------------------------------------------------------------- arrays
 
-function ArrayBoxes({ value, pointers }: { value: SeqValue; pointers: ArrayPointer[] }) {
+function ArrayBoxes({
+  value,
+  pointers,
+  basePath,
+  overlay = EMPTY_TRACE_OVERLAY,
+}: {
+  value: SeqValue;
+  pointers: ArrayPointer[];
+  basePath: string;
+  overlay?: TraceOverlay;
+}) {
   const visibleEnd = value.items.length;
   const labels = new Map<number, string[]>();
   for (const pointer of pointers) {
@@ -88,15 +393,31 @@ function ArrayBoxes({ value, pointers }: { value: SeqValue; pointers: ArrayPoint
         {cells.map((cell) => (
           <div className="array-cell-wrap" key={cell.index}>
             <span className="array-index">{cell.index}</span>
-            <span
-              className={`array-cell${labels.has(cell.index) ? ' has-pointer' : ''}`}
-              title={`index ${cell.index}`}
-            >
-              {cell.text}
-            </span>
-            {labels.has(cell.index) ? (
-              <span className="array-pointer">▲ {labels.get(cell.index)!.join(', ')}</span>
-            ) : null}
+            {(() => {
+              const path = pathForIndex(basePath, cell.index);
+              const pointerLabels = [
+                ...(labels.get(cell.index) ?? []),
+                ...(overlay.pointerLabels.get(path) ?? []),
+              ];
+              const classes = [
+                'array-cell',
+                pointerLabels.length > 0 ? 'has-pointer' : '',
+                traceClasses(path, overlay),
+              ]
+                .filter(Boolean)
+                .join(' ');
+              return (
+                <>
+                  <span className={classes} title={traceTitle(path, overlay)}>
+                    {cell.text}
+                    <TraceBadges labels={overlay.pointerLabels.get(path)} />
+                  </span>
+                  {pointerLabels.length > 0 ? (
+                    <span className="array-pointer">▲ {pointerLabels.join(', ')}</span>
+                  ) : null}
+                </>
+              );
+            })()}
           </div>
         ))}
         {value.truncated ? (
@@ -121,7 +442,17 @@ function ArrayBoxes({ value, pointers }: { value: SeqValue; pointers: ArrayPoint
   );
 }
 
-function StringBoxes({ value, pointers }: { value: StringValue; pointers: ArrayPointer[] }) {
+function StringBoxes({
+  value,
+  pointers,
+  basePath,
+  overlay = EMPTY_TRACE_OVERLAY,
+}: {
+  value: StringValue;
+  pointers: ArrayPointer[];
+  basePath: string;
+  overlay?: TraceOverlay;
+}) {
   const chars = [...value.v];
   const visibleEnd = chars.length;
   const labels = new Map<number, string[]>();
@@ -139,10 +470,33 @@ function StringBoxes({ value, pointers }: { value: StringValue; pointers: ArrayP
         {chars.map((char, index) => (
           <div className="array-cell-wrap" key={index}>
             <span className="array-index">{index}</span>
-            <span className={`array-cell${labels.has(index) ? ' has-pointer' : ''}`}>{char}</span>
-            {labels.has(index) ? (
-              <span className="array-pointer">▲ {labels.get(index)!.join(', ')}</span>
-            ) : null}
+            {(() => {
+              const path = pathForIndex(basePath, index);
+              const pointerLabels = [
+                ...(labels.get(index) ?? []),
+                ...(overlay.pointerLabels.get(path) ?? []),
+              ];
+              return (
+                <>
+                  <span
+                    className={[
+                      'array-cell',
+                      pointerLabels.length > 0 ? 'has-pointer' : '',
+                      traceClasses(path, overlay),
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
+                    title={traceTitle(path, overlay)}
+                  >
+                    {char}
+                    <TraceBadges labels={overlay.pointerLabels.get(path)} />
+                  </span>
+                  {pointerLabels.length > 0 ? (
+                    <span className="array-pointer">▲ {pointerLabels.join(', ')}</span>
+                  ) : null}
+                </>
+              );
+            })()}
           </div>
         ))}
         {value.truncated ? (
@@ -169,20 +523,49 @@ function StringBoxes({ value, pointers }: { value: StringValue; pointers: ArrayP
 
 // ----------------------------------------------------------------- grids
 
-function GridBoxes({ value }: { value: SeqValue }) {
+function GridBoxes({
+  value,
+  basePath,
+  overlay = EMPTY_TRACE_OVERLAY,
+}: {
+  value: SeqValue;
+  basePath: string;
+  overlay?: TraceOverlay;
+}) {
   return (
     <table className="grid-render">
       <tbody>
-        {value.items.map((row, rowIndex) => (
-          <tr key={rowIndex}>
-            <th>{rowIndex}</th>
-            {row.k === 'seq' ? (
-              row.items.map((cell, colIndex) => <td key={colIndex}>{formatValue(cell)}</td>)
-            ) : (
-              <td>{formatValue(row)}</td>
-            )}
-          </tr>
-        ))}
+        {value.items.map((row, rowIndex) => {
+          const rowPath = pathForIndex(basePath, rowIndex);
+          return (
+            <tr className={traceClasses(rowPath, overlay)} key={rowIndex}>
+              <th title={traceTitle(rowPath, overlay)}>
+                {rowIndex}
+                <TraceBadges labels={overlay.pointerLabels.get(rowPath)} />
+              </th>
+              {row.k === 'seq' ? (
+                row.items.map((cell, colIndex) => {
+                  const cellPath = pathForIndex(rowPath, colIndex);
+                  return (
+                    <td
+                      className={traceClasses(cellPath, overlay)}
+                      key={colIndex}
+                      title={traceTitle(cellPath, overlay)}
+                    >
+                      <span className="data-cell-value">{formatValue(cell)}</span>
+                      <TraceBadges labels={overlay.pointerLabels.get(cellPath)} />
+                    </td>
+                  );
+                })
+              ) : (
+                <td className={traceClasses(rowPath, overlay)} title={traceTitle(rowPath, overlay)}>
+                  <span className="data-cell-value">{formatValue(row)}</span>
+                  <TraceBadges labels={overlay.pointerLabels.get(rowPath)} />
+                </td>
+              )}
+            </tr>
+          );
+        })}
       </tbody>
     </table>
   );
@@ -190,7 +573,15 @@ function GridBoxes({ value }: { value: SeqValue }) {
 
 // ----------------------------------------------------------------- dicts
 
-function DictTable({ value }: { value: DictValue }) {
+function DictTable({
+  value,
+  basePath,
+  overlay = EMPTY_TRACE_OVERLAY,
+}: {
+  value: DictValue;
+  basePath: string;
+  overlay?: TraceOverlay;
+}) {
   return (
     <table className="dict-render">
       <thead>
@@ -200,12 +591,18 @@ function DictTable({ value }: { value: DictValue }) {
         </tr>
       </thead>
       <tbody>
-        {value.entries.map(([key, item], index) => (
-          <tr key={index}>
-            <td>{formatValue(key)}</td>
-            <td>{formatValue(item)}</td>
-          </tr>
-        ))}
+        {value.entries.map(([key, item], index) => {
+          const path = pathForDictKey(basePath, key);
+          return (
+            <tr className={traceClasses(path, overlay)} key={index}>
+              <td>{formatValue(key)}</td>
+              <td title={traceTitle(path, overlay)}>
+                <span className="data-cell-value">{formatValue(item)}</span>
+                <TraceBadges labels={overlay.pointerLabels.get(path)} />
+              </td>
+            </tr>
+          );
+        })}
         {value.truncated ? (
           <tr>
             <td colSpan={2}>… {value.len - value.entries.length} more</td>
@@ -266,7 +663,15 @@ const TREE_X = 52;
 const TREE_Y = 58;
 const TREE_R = 17;
 
-function TreeDiagram({ value, highlightId }: { value: TreeValue; highlightId?: number }) {
+function TreeDiagram({
+  value,
+  highlightId,
+  changedIds = EMPTY_TRACE_OVERLAY.changedObjectIds,
+}: {
+  value: TreeValue;
+  highlightId?: number;
+  changedIds?: Set<number>;
+}) {
   const { nodes, edges } = layoutTree(value);
   const width = (Math.max(...nodes.map((node) => node.x)) + 1) * TREE_X;
   const height = (Math.max(...nodes.map((node) => node.y)) + 1) * TREE_Y;
@@ -294,16 +699,25 @@ function TreeDiagram({ value, highlightId }: { value: TreeValue; highlightId?: n
       ))}
       {nodes.map((node, index) => {
         const isCurrent = highlightId !== undefined && node.id === highlightId;
+        const isChanged = changedIds.has(node.id);
         return (
           <g key={index}>
             <circle
-              className={`tree-node${isCurrent ? ' is-current' : ''}`}
+              className={['tree-node', isCurrent ? 'is-current' : '', isChanged ? 'is-changed' : '']
+                .filter(Boolean)
+                .join(' ')}
               cx={cx(node)}
               cy={cy(node)}
               r={TREE_R}
             />
             <text
-              className={`tree-label${isCurrent ? ' is-current' : ''}`}
+              className={[
+                'tree-label',
+                isCurrent ? 'is-current' : '',
+                isChanged ? 'is-changed' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
               x={cx(node)}
               y={cy(node) + 4}
             >
@@ -322,10 +736,12 @@ function ChainDiagram({
   value,
   pointerLabels,
   highlightId,
+  changedIds = EMPTY_TRACE_OVERLAY.changedObjectIds,
 }: {
   value: ChainValue;
   pointerLabels: Map<number, string[]>;
   highlightId?: number;
+  changedIds?: Set<number>;
 }) {
   return (
     <div className="chain-render">
@@ -336,7 +752,15 @@ function ChainDiagram({
           ) : (
             <span className="chain-pointer chain-pointer-empty" />
           )}
-          <div className={`chain-node${node.id === highlightId ? ' is-current' : ''}`}>
+          <div
+            className={[
+              'chain-node',
+              node.id === highlightId ? 'is-current' : '',
+              changedIds.has(node.id) ? 'is-changed' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+          >
             <span className="chain-val">{formatValue(node.val)}</span>
             <span className="chain-next">next</span>
           </div>
@@ -653,6 +1077,7 @@ function HeapGraphView({
 type DataPanelProps = {
   analysis: AnalysisInfo | null;
   currentStep: TraceStep | undefined;
+  previousStep?: TraceStep;
   frameIndex: number | null;
   returnValue: EncodedValue | null;
   atLastStep: boolean;
@@ -698,6 +1123,7 @@ function buildCards(
   locals: Record<string, EncodedValue>,
   pointerHints: ArrayPointerHints | null | undefined,
   structures: { trees: TreeValue[]; chains: ChainValue[] },
+  overlay: TraceOverlay,
 ): Card[] {
   const arrayPointers = findArrayPointers(locals, pointerHints);
 
@@ -718,6 +1144,7 @@ function buildCards(
       value: whole.value,
       render: (
         <ChainDiagram
+          changedIds={overlay.changedObjectIds}
           highlightId={whole.highlightId}
           pointerLabels={group.labels}
           value={whole.value}
@@ -742,26 +1169,44 @@ function buildCards(
       const isGrid = value.items.length > 0 && value.items.every((item) => item.k === 'seq');
       wide = isGrid || value.items.length > 8;
       render = isGrid ? (
-        <GridBoxes value={value} />
+        <GridBoxes basePath={name} overlay={overlay} value={value} />
       ) : (
-        <ArrayBoxes pointers={arrayPointers.get(name) ?? []} value={value} />
+        <ArrayBoxes
+          basePath={name}
+          overlay={overlay}
+          pointers={arrayPointers.get(name) ?? []}
+          value={value}
+        />
       );
     } else if (value.k === 'dict') {
       identity = `dict-${value.id}`;
-      render = <DictTable value={value} />;
+      render = <DictTable basePath={name} overlay={overlay} value={value} />;
     } else if (value.k === 'tree') {
       // In recursive traversals the frame's local is one subtree; show the
       // whole tree with this node highlighted ("you are here").
       const whole = largestContainingTree(value, structures.trees);
       identity = `tree-${whole.value.id}-${whole.highlightId}`;
       wide = true;
-      render = <TreeDiagram highlightId={whole.highlightId} value={whole.value} />;
+      render = (
+        <TreeDiagram
+          changedIds={overlay.changedObjectIds}
+          highlightId={whole.highlightId}
+          value={whole.value}
+        />
+      );
     } else if (value.k === 'listnode') {
       continue; // handled by groupChains above
     } else if (value.k === 'str' && (arrayPointers.get(name)?.length ?? 0) > 0) {
       identity = `str-${name}`;
       wide = [...value.v].length > 8;
-      render = <StringBoxes pointers={arrayPointers.get(name) ?? []} value={value} />;
+      render = (
+        <StringBoxes
+          basePath={name}
+          overlay={overlay}
+          pointers={arrayPointers.get(name) ?? []}
+          value={value}
+        />
+      );
     } else if (value.k === 'obj') {
       identity = `obj-${value.id}`;
       const attrs = Object.entries(value.attrs);
@@ -769,12 +1214,18 @@ function buildCards(
         attrs.length > 0 ? (
           <table className="dict-render">
             <tbody>
-              {attrs.map(([attr, attrValue]) => (
-                <tr key={attr}>
-                  <td>.{attr}</td>
-                  <td>{formatValue(attrValue)}</td>
-                </tr>
-              ))}
+              {attrs.map(([attr, attrValue]) => {
+                const path = pathForAttr(name, attr);
+                return (
+                  <tr className={traceClasses(path, overlay)} key={attr}>
+                    <td>.{attr}</td>
+                    <td title={traceTitle(path, overlay)}>
+                      <span className="data-cell-value">{formatValue(attrValue)}</span>
+                      <TraceBadges labels={overlay.pointerLabels.get(path)} />
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         ) : (
@@ -800,18 +1251,27 @@ function buildCards(
 export function DataPanel({
   analysis,
   currentStep,
+  previousStep,
   frameIndex,
   returnValue,
   atLastStep,
 }: DataPanelProps) {
   const [selectedHeapId, setSelectedHeapId] = useState<number | null>(null);
   const frame = effectiveFrame(currentStep, frameIndex);
+  const previousFrame = previousStep?.stack.find((candidate) => candidate.id === frame?.id);
   const functionInfo = findFunctionInfo(analysis, frame);
   const pointerHints = pointerHintsForFrame(analysis, frame);
   const frameLocals = frame ? expandSelf(frame.locals) : {};
+  const previousFrameLocals = previousFrame ? expandSelf(previousFrame.locals) : undefined;
   const locals = { ...(currentStep?.globals ?? {}), ...frameLocals };
+  const previousLocals = previousFrame
+    ? { ...(previousStep?.globals ?? {}), ...previousFrameLocals }
+    : undefined;
   const structures = collectStructures(currentStep);
-  const cards = frame ? buildCards(locals, pointerHints, structures) : [];
+  const traceOverlay = frame
+    ? buildTraceOverlay(locals, previousLocals, pointerHints)
+    : EMPTY_TRACE_OVERLAY;
+  const cards = frame ? buildCards(locals, pointerHints, structures, traceOverlay) : [];
   const sharedRefs = frame ? findSharedReferences(locals) : [];
   const heapGraph = frame ? buildHeapGraph(locals) : null;
 
@@ -874,9 +1334,9 @@ export function DataPanel({
                   value={returnValue}
                 />
               ) : returnValue.k === 'seq' ? (
-                <ArrayBoxes pointers={[]} value={returnValue} />
+                <ArrayBoxes basePath="return" pointers={[]} value={returnValue} />
               ) : returnValue.k === 'dict' ? (
-                <DictTable value={returnValue} />
+                <DictTable basePath="return" value={returnValue} />
               ) : (
                 <p className="return-preview">{formatValue(returnValue)}</p>
               )}

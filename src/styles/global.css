@@ -1339,6 +1339,30 @@ input[type='password'] {
   box-shadow: 0 0 0 1px var(--accent);
 }
 
+.array-cell.is-changed,
+.grid-render td.is-changed,
+.dict-render tr.is-changed td,
+.chain-node.is-changed {
+  background: var(--green-soft);
+  border-color: var(--green);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--green) 54%, transparent);
+}
+
+.array-cell.is-new,
+.grid-render td.is-new,
+.dict-render tr.is-new td {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.grid-render td.has-trace-pointer,
+.array-cell.has-trace-pointer {
+  border-color: var(--accent);
+  box-shadow:
+    inset 0 -2px 0 color-mix(in srgb, var(--accent) 42%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--accent) 50%, transparent);
+}
+
 .array-cell.is-ellipsis {
   border-style: dashed;
   color: var(--text-faint);
@@ -1373,6 +1397,23 @@ input[type='password'] {
   min-width: 32px;
   padding: 4px 7px;
   text-align: center;
+}
+
+.data-cell-value {
+  display: inline-block;
+}
+
+.trace-badge {
+  background: var(--accent);
+  border-radius: 4px;
+  color: #fff;
+  display: block;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  line-height: 1.15;
+  margin-top: 3px;
+  padding: 1px 4px;
+  white-space: nowrap;
 }
 
 /* dicts */
@@ -1439,6 +1480,17 @@ input[type='password'] {
   stroke-width: 2.5;
 }
 
+.tree-node.is-changed {
+  fill: var(--green-soft);
+  stroke: var(--green);
+  stroke-width: 2.5;
+}
+
+.tree-node.is-current.is-changed {
+  fill: var(--green);
+  stroke: var(--green);
+}
+
 .tree-label {
   fill: var(--text);
   font-family: var(--mono);
@@ -1449,6 +1501,10 @@ input[type='password'] {
 .tree-label.is-current {
   fill: #fff;
   font-weight: 600;
+}
+
+.tree-label.is-changed {
+  font-weight: 700;
 }
 
 /* linked lists */
