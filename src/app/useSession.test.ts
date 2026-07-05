@@ -256,6 +256,46 @@ describe('useSession', () => {
     unmount();
   });
 
+  it('keeps current inputs, cases, and notebook notes while editing a function body', async () => {
+    const code = 'def solve(nums):\n    return 21';
+    const editedCode = 'def solve(nums):\n    total = 21\n    return total';
+    const imported = functionResult();
+    const { result, unmount } = renderHook(() => useSession(code));
+
+    act(() => result.current.importSession(code, imported, 0));
+    await act(async () => {});
+    act(() => result.current.addTestCase());
+    act(() => {
+      result.current.updateTestCase(result.current.testCases[0].id, { expected: '21' });
+      result.current.updatePracticeNotebook({
+        notes: 'Keep this edge case.',
+        patterns: 'loop invariant',
+        status: 'practicing',
+      });
+    });
+    await act(async () => {});
+
+    act(() => result.current.setCode(editedCode));
+    await act(async () => {});
+
+    expect(result.current.result).toBeNull();
+    expect(result.current.code).toBe(editedCode);
+    expect(result.current.inputLiterals).toEqual(['[1, 2, 3]']);
+    expect(result.current.testCases).toHaveLength(1);
+    expect(result.current.testCases[0]).toMatchObject({
+      expected: '21',
+      inputs: ['[1, 2, 3]'],
+      name: 'Case 1',
+    });
+    expect(result.current.practiceNotebook).toMatchObject({
+      notes: 'Keep this edge case.',
+      patterns: 'loop invariant',
+      status: 'practicing',
+    });
+
+    unmount();
+  });
+
   it('runs JavaScript sessions through the JavaScript worker path', async () => {
     runJavaScriptMock.mockResolvedValueOnce(scriptResult(2));
     const { result, unmount } = renderHook(() =>

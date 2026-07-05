@@ -31,6 +31,7 @@ import {
 import type {
   AnalysisInfo,
   ComplexityResult,
+  FunctionInfo,
   Language,
   RuntimeStatus,
   SessionResult,
@@ -94,6 +95,14 @@ function timeoutResult(message: string): SessionResult {
   };
 }
 
+function hasPracticeNotebookContent(notebook: PracticeNotebook): boolean {
+  return (
+    notebook.notes.trim().length > 0 ||
+    notebook.patterns.trim().length > 0 ||
+    notebook.status !== 'new'
+  );
+}
+
 export function useSession(initialCode: string, initialOptions: InitialSessionOptions = {}) {
   const [code, setCodeState] = useState(initialCode);
   const [language, setLanguageState] = useState<Language>(initialOptions.language ?? 'python');
@@ -131,10 +140,14 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
   const analyzeSerial = useRef(0);
   const codeRef = useRef(initialCode);
   const languageRef = useRef<Language>(initialOptions.language ?? 'python');
+  const activeFunctionRef = useRef<FunctionInfo | null>(null);
+  const inputLiteralsRef = useRef<string[] | undefined>(undefined);
   const practiceCasesStorageKeyRef = useRef<string | null>(null);
   const skipPracticeCaseSaveRef = useRef(false);
+  const preservePracticeCasesOnNextKeyRef = useRef(false);
   const practiceNotebookStorageKeyRef = useRef<string | null>(null);
   const skipPracticeNotebookSaveRef = useRef(false);
+  const preservePracticeNotebookOnNextKeyRef = useRef(false);
 
   const getClient = useCallback(() => {
     if (!clientRef.current) {
@@ -201,10 +214,20 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
       setStep(0);
       setPlaying(false);
       setSelectedFrameIndex(null);
-      setFunctionOverrideState(null);
-      setInputDrafts(null);
-      setPracticeNotebook(EMPTY_PRACTICE_NOTEBOOK);
-      setTestCases([]);
+      const currentFunction = activeFunctionRef.current;
+      const currentLiterals = inputLiteralsRef.current;
+      if (currentFunction && currentLiterals) {
+        setInputDrafts(
+          Object.fromEntries(
+            currentFunction.params.map((param, index) => [
+              param.name,
+              currentLiterals[index] ?? '',
+            ]),
+          ),
+        );
+      }
+      preservePracticeCasesOnNextKeyRef.current = true;
+      preservePracticeNotebookOnNextKeyRef.current = true;
       setPendingInitialInputs(null);
       scheduleAnalyze(nextCode);
     },
@@ -263,6 +286,7 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
     const name = functionOverride ?? analysis?.defaultFunction ?? null;
     return analysis?.functions.find((fn) => fn.qualname === name) ?? null;
   }, [analysis, functionOverride]);
+  activeFunctionRef.current = activeFunction;
 
   const practiceCasesStorageKey = useMemo(() => {
     if (language !== 'python' || !activeFunction) {
@@ -282,14 +306,25 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
     if (practiceCasesStorageKey === practiceCasesStorageKeyRef.current) {
       return;
     }
+    const shouldPreserveCases =
+      preservePracticeCasesOnNextKeyRef.current &&
+      !!activeFunction &&
+      testCases.length > 0 &&
+      testCases.every((testCase) => testCase.inputs.length === activeFunction.params.length);
+    preservePracticeCasesOnNextKeyRef.current = false;
     practiceCasesStorageKeyRef.current = practiceCasesStorageKey;
-    skipPracticeCaseSaveRef.current = true;
+    skipPracticeCaseSaveRef.current = !shouldPreserveCases;
     if (!practiceCasesStorageKey || !activeFunction) {
-      setTestCases([]);
+      if (!shouldPreserveCases) {
+        setTestCases([]);
+      }
+      return;
+    }
+    if (shouldPreserveCases) {
       return;
     }
     setTestCases(loadStoredPracticeCases(practiceCasesStorageKey, activeFunction.params.length));
-  }, [activeFunction, practiceCasesStorageKey]);
+  }, [activeFunction, practiceCasesStorageKey, testCases]);
 
   useEffect(() => {
     if (!practiceCasesStorageKey) {
@@ -306,14 +341,22 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
     if (practiceNotebookStorageKey === practiceNotebookStorageKeyRef.current) {
       return;
     }
+    const shouldPreserveNotebook =
+      preservePracticeNotebookOnNextKeyRef.current && hasPracticeNotebookContent(practiceNotebook);
+    preservePracticeNotebookOnNextKeyRef.current = false;
     practiceNotebookStorageKeyRef.current = practiceNotebookStorageKey;
-    skipPracticeNotebookSaveRef.current = true;
+    skipPracticeNotebookSaveRef.current = !shouldPreserveNotebook;
     if (!practiceNotebookStorageKey) {
-      setPracticeNotebook(EMPTY_PRACTICE_NOTEBOOK);
+      if (!shouldPreserveNotebook) {
+        setPracticeNotebook(EMPTY_PRACTICE_NOTEBOOK);
+      }
+      return;
+    }
+    if (shouldPreserveNotebook) {
       return;
     }
     setPracticeNotebook(loadStoredPracticeNotebook(practiceNotebookStorageKey));
-  }, [practiceNotebookStorageKey]);
+  }, [practiceNotebook, practiceNotebookStorageKey]);
 
   useEffect(() => {
     if (!practiceNotebookStorageKey) {
@@ -358,6 +401,7 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
     });
     return literals.every((literal) => literal !== null) ? (literals as string[]) : undefined;
   }, [activeFunction, inputDrafts, result]);
+  inputLiteralsRef.current = inputLiterals;
 
   const setFunctionOverride = useCallback((nextFunction: string | null) => {
     setFunctionOverrideState(nextFunction);
