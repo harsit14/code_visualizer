@@ -27,13 +27,12 @@ import {
   X,
 } from 'lucide-react';
 import { encodeShareState } from '../app/shareState';
+import { applyTheme, initialTheme, type Theme } from '../app/theme';
 import { AccountMenu } from './AccountMenu';
 import { useMenuDismiss } from './useMenuDismiss';
 import { LandingInteractiveDemo } from './LandingInteractiveDemo';
 import { LandingStructurePreview } from './LandingStructurePreview';
 import { LogoMark } from './LogoMark';
-
-type Theme = 'light' | 'dark';
 
 const languageBadges = ['Python', 'JavaScript', 'TypeScript'];
 
@@ -203,14 +202,6 @@ const snippetPresets = [
   },
 ];
 
-function initialTheme(): Theme {
-  const stored = window.localStorage.getItem('cv-theme');
-  if (stored === 'light' || stored === 'dark') {
-    return stored;
-  }
-  return window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
-}
-
 export function LandingPage() {
   const [activePreview, setActivePreview] = useState('Variables');
   const [activeSnippetId, setActiveSnippetId] = useState(snippetPresets[0].id);
@@ -239,8 +230,7 @@ export function LandingPage() {
   }, []);
 
   useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    window.localStorage.setItem('cv-theme', theme);
+    applyTheme(theme);
   }, [theme]);
 
   useEffect(() => {
@@ -323,7 +313,6 @@ export function LandingPage() {
       <main>
         <section className="landing-hero reveal">
           <div className="landing-hero-copy">
-            <p className="tour-kicker">Live trace demo</p>
             <h1>See your code run, line by line.</h1>
             <p className="landing-hero-lede">
               Watch every variable, pointer, call, and output update as the program moves through
@@ -348,6 +337,7 @@ export function LandingPage() {
             </div>
           </div>
           <div className="landing-hero-demo">
+            <p className="tour-kicker">Live trace demo</p>
             <LandingInteractiveDemo />
           </div>
         </section>

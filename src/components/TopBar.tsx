@@ -188,8 +188,13 @@ export function TopBar({
               </summary>
               <div className="panel-menu-popover">
                 <div className="panel-menu-presets" aria-label="Panel layout presets">
-                  <button className="panel-menu-action" onClick={onResetLayout} type="button">
-                    Beginner
+                  <button
+                    className="panel-menu-action"
+                    onClick={onResetLayout}
+                    title="Restore the default panels and sizes"
+                    type="button"
+                  >
+                    Default layout
                   </button>
                   <button className="panel-menu-action" onClick={onShowAllPanels} type="button">
                     Show all

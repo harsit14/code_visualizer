@@ -44,15 +44,13 @@ import {
 } from './layoutState';
 import { saveCodeHistory, type CodeHistoryItem } from './historyClient';
 import { buildIframeEmbedCode, decodeShareHash, encodeShareState } from './shareState';
+import { applyTheme, initialTheme, type Theme } from './theme';
 import { buildTraceSvgExport } from './traceSvgExport';
 import { useSession } from './useSession';
-
-type Theme = 'light' | 'dark';
 
 const EXPORT_VERSION = 2;
 const DEFAULT_IMPORT_LABEL = 'Import';
 const DEFAULT_IMPORT_TITLE = 'Import a previously exported trace';
-const THEME_STORAGE_KEY = 'cv-theme';
 const PANEL_VISIBILITY_STORAGE_KEY = 'cv-panel-visibility-v1';
 const COLUMN_WEIGHTS_STORAGE_KEY = 'cv-column-weights-v1';
 const PANEL_WEIGHTS_STORAGE_KEY = 'cv-panel-weights-v1';
@@ -89,14 +87,6 @@ function panelSlot(id: PanelId, content: ReactNode): PanelSlotConfig {
 
 function isPanelSlot(slot: PanelSlotConfig | null): slot is PanelSlotConfig {
   return slot !== null;
-}
-
-function initialTheme(): Theme {
-  const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
-  if (stored === 'light' || stored === 'dark') {
-    return stored;
-  }
-  return 'light';
 }
 
 function initialShare() {
@@ -150,6 +140,30 @@ function saveStoredValue(key: string, value: unknown) {
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
+
+/* Snapshot rendered sizes so a resize only redistributes space between the
+   two adjacent tracks while every other track keeps its pixel size. */
+function measuredColumnWidths(
+  refs: Record<ColumnId, HTMLDivElement | null>,
+): Partial<ColumnWeights> {
+  return Object.fromEntries(
+    Object.entries(refs)
+      .map(([columnId, node]) => [columnId, node?.getBoundingClientRect().width])
+      .filter((entry): entry is [ColumnId, number] => typeof entry[1] === 'number'),
+  ) as Partial<ColumnWeights>;
+}
+
+function measuredPanelHeights(
+  refs: Partial<Record<PanelId, HTMLDivElement | null>>,
+): Partial<PanelWeights> {
+  return Object.fromEntries(
+    Object.entries(refs)
+      .map(([panelId, node]) => [panelId, node?.getBoundingClientRect().height])
+      .filter((entry): entry is [PanelId, number] => typeof entry[1] === 'number'),
+  ) as Partial<PanelWeights>;
+}
+
+const KEYBOARD_RESIZE_STEP = 24;
 
 function historyTitle(exampleId: string | null, functionName: string | null, code: string): string {
   const exampleTitle = exampleId ? getExample(exampleId)?.title : null;
@@ -343,8 +357,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
   }, [jumpToStep, stepOverTarget]);
 
   useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+    applyTheme(theme);
   }, [theme]);
 
   useEffect(() => {
@@ -769,11 +782,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
       const startX = event.clientX;
       const startBefore = beforeNode.getBoundingClientRect().width;
       const startAfter = afterNode.getBoundingClientRect().width;
-      const startWidths = Object.fromEntries(
-        Object.entries(columnRefs.current)
-          .map(([columnId, node]) => [columnId, node?.getBoundingClientRect().width])
-          .filter((entry): entry is [ColumnId, number] => typeof entry[1] === 'number'),
-      ) as Partial<ColumnWeights>;
+      const startWidths = measuredColumnWidths(columnRefs.current);
       const total = startBefore + startAfter;
       const beforeMin = Math.min(COLUMN_MIN_WIDTHS[beforeColumn], total / 2);
       const afterMin = Math.min(COLUMN_MIN_WIDTHS[afterColumn], total / 2);
@@ -801,10 +810,13 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
         document.body.style.cursor = previousCursor;
         document.body.style.userSelect = previousUserSelect;
         window.removeEventListener('pointermove', handleMove);
+        window.removeEventListener('pointerup', stopResize);
+        window.removeEventListener('pointercancel', stopResize);
       };
 
       window.addEventListener('pointermove', handleMove);
-      window.addEventListener('pointerup', stopResize, { once: true });
+      window.addEventListener('pointerup', stopResize);
+      window.addEventListener('pointercancel', stopResize);
     },
     [],
   );
@@ -824,11 +836,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
       const startY = event.clientY;
       const startBefore = beforeNode.getBoundingClientRect().height;
       const startAfter = afterNode.getBoundingClientRect().height;
-      const startHeights = Object.fromEntries(
-        Object.entries(panelSlotRefs.current)
-          .map(([panelId, node]) => [panelId, node?.getBoundingClientRect().height])
-          .filter((entry): entry is [PanelId, number] => typeof entry[1] === 'number'),
-      ) as Partial<PanelWeights>;
+      const startHeights = measuredPanelHeights(panelSlotRefs.current);
       const total = startBefore + startAfter;
       const minHeight = Math.min(PANEL_MIN_HEIGHT, total / 2);
       const previousCursor = document.body.style.cursor;
@@ -855,10 +863,62 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
         document.body.style.cursor = previousCursor;
         document.body.style.userSelect = previousUserSelect;
         window.removeEventListener('pointermove', handleMove);
+        window.removeEventListener('pointerup', stopResize);
+        window.removeEventListener('pointercancel', stopResize);
       };
 
       window.addEventListener('pointermove', handleMove);
-      window.addEventListener('pointerup', stopResize, { once: true });
+      window.addEventListener('pointerup', stopResize);
+      window.addEventListener('pointercancel', stopResize);
+    },
+    [],
+  );
+
+  // Keyboard equivalents of the drag resizers (arrow keys on the focused
+  // separator): shift space between the two adjacent tracks in fixed steps.
+  const adjustColumnPair = useCallback(
+    (beforeColumn: ColumnId, afterColumn: ColumnId, delta: number) => {
+      const beforeNode = columnRefs.current[beforeColumn];
+      const afterNode = columnRefs.current[afterColumn];
+      if (!beforeNode || !afterNode) {
+        return;
+      }
+      const startBefore = beforeNode.getBoundingClientRect().width;
+      const startAfter = afterNode.getBoundingClientRect().width;
+      const startWidths = measuredColumnWidths(columnRefs.current);
+      const total = startBefore + startAfter;
+      const beforeMin = Math.min(COLUMN_MIN_WIDTHS[beforeColumn], total / 2);
+      const afterMin = Math.min(COLUMN_MIN_WIDTHS[afterColumn], total / 2);
+      const beforeWidth = clamp(startBefore + delta, beforeMin, total - afterMin);
+      setColumnWeights((current) => ({
+        ...current,
+        ...startWidths,
+        [beforeColumn]: beforeWidth,
+        [afterColumn]: total - beforeWidth,
+      }));
+    },
+    [],
+  );
+
+  const adjustPanelPair = useCallback(
+    (beforePanel: PanelId, afterPanel: PanelId, delta: number) => {
+      const beforeNode = panelSlotRefs.current[beforePanel];
+      const afterNode = panelSlotRefs.current[afterPanel];
+      if (!beforeNode || !afterNode) {
+        return;
+      }
+      const startBefore = beforeNode.getBoundingClientRect().height;
+      const startAfter = afterNode.getBoundingClientRect().height;
+      const startHeights = measuredPanelHeights(panelSlotRefs.current);
+      const total = startBefore + startAfter;
+      const minHeight = Math.min(PANEL_MIN_HEIGHT, total / 2);
+      const beforeHeight = clamp(startBefore + delta, minHeight, total - minHeight);
+      setPanelWeights((current) => ({
+        ...current,
+        ...startHeights,
+        [beforePanel]: beforeHeight,
+        [afterPanel]: total - beforeHeight,
+      }));
     },
     [],
   );
@@ -1100,8 +1160,21 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
               aria-label={`Resize ${slot.id} and ${slots[index + 1].id}`}
               aria-orientation="horizontal"
               className="stack-resizer"
+              onKeyDown={(event) => {
+                if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') {
+                  return;
+                }
+                event.preventDefault();
+                event.stopPropagation();
+                adjustPanelPair(
+                  slot.id,
+                  slots[index + 1].id,
+                  event.key === 'ArrowUp' ? -KEYBOARD_RESIZE_STEP : KEYBOARD_RESIZE_STEP,
+                );
+              }}
               onPointerDown={(event) => startPanelResize(slot.id, slots[index + 1].id, event)}
               role="separator"
+              tabIndex={0}
             />
           ) : null}
         </Fragment>
@@ -1168,10 +1241,23 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
                     aria-label={`Resize ${columnId} and ${visibleColumns[index + 1]} columns`}
                     aria-orientation="vertical"
                     className="column-resizer"
+                    onKeyDown={(event) => {
+                      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') {
+                        return;
+                      }
+                      event.preventDefault();
+                      event.stopPropagation();
+                      adjustColumnPair(
+                        columnId,
+                        visibleColumns[index + 1],
+                        event.key === 'ArrowLeft' ? -KEYBOARD_RESIZE_STEP : KEYBOARD_RESIZE_STEP,
+                      );
+                    }}
                     onPointerDown={(event) =>
                       startColumnResize(columnId, visibleColumns[index + 1], event)
                     }
                     role="separator"
+                    tabIndex={0}
                   />
                 ) : null}
               </Fragment>

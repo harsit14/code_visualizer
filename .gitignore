@@ -13,6 +13,10 @@ PROGRESS.md
 plan.md
 notes/
 
+# Local scratch output (generated assets, one-off exports)
+tmp/
+output/
+
 .DS_Store
 .env
 .env.local
