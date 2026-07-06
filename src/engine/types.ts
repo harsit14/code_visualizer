@@ -208,6 +208,7 @@ export type RuntimeStatus = {
 
 export type WorkerInbound =
   | { type: 'setInterruptBuffer'; interruptBuffer: Uint8Array }
+  | { type: 'prewarm' }
   | { type: 'request'; requestId: string; request: EngineRequest };
 
 export type WorkerOutbound =

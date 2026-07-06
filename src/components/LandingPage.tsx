@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { encodeShareState } from '../app/shareState';
 import { useTheme } from '../app/theme';
+import { prewarmPythonRuntime } from '../engine/pythonRuntime';
 import { AccountMenu } from './AccountMenu';
 import { useMenuDismiss } from './useMenuDismiss';
 import { LandingInteractiveDemo } from './LandingInteractiveDemo';
@@ -227,6 +228,17 @@ export function LandingPage() {
     return () => {
       document.documentElement.classList.remove('landing-document');
     };
+  }, []);
+
+  useEffect(() => {
+    const prewarm = () => prewarmPythonRuntime();
+    const requestIdle = window.requestIdleCallback;
+    if (typeof requestIdle === 'function') {
+      const idleId = requestIdle(prewarm, { timeout: 1600 });
+      return () => window.cancelIdleCallback(idleId);
+    }
+    const timeoutId = globalThis.setTimeout(prewarm, 900);
+    return () => globalThis.clearTimeout(timeoutId);
   }, []);
 
   useEffect(() => {

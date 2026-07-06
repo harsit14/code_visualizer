@@ -5,7 +5,7 @@ import type { RuntimeStatus, TraceStep } from '../engine/types';
 
 const idleStatus: RuntimeStatus = {
   interruptSupported: false,
-  message: 'Python loads on first run',
+  message: 'Preparing Python in the background',
   phase: 'idle',
   progress: 0,
   stage: 'idle',

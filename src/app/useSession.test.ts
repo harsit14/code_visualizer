@@ -3,9 +3,11 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { EncodedValue, SessionResult, TraceStep } from '../engine/types';
 
-const { requestMock, runJavaScriptMock } = vi.hoisted(() => ({
+const { prewarmMock, requestMock, runJavaScriptMock, setStatusHandlerMock } = vi.hoisted(() => ({
+  prewarmMock: vi.fn(),
   requestMock: vi.fn(),
   runJavaScriptMock: vi.fn(),
+  setStatusHandlerMock: vi.fn(),
 }));
 
 // Replace the Pyodide worker client with a controllable stub so the hook's
@@ -18,7 +20,9 @@ vi.mock('../engine/runtimeClient', () => {
     }
   }
   class RuntimeClient {
+    prewarm = prewarmMock;
     request = requestMock;
+    setStatusHandler = setStatusHandlerMock;
     dispose = vi.fn();
   }
   return { RuntimeClient, TimeoutError };
@@ -165,7 +169,9 @@ beforeEach(() => {
     value: localStorageMock,
   });
   requestMock.mockReset();
+  prewarmMock.mockReset();
   runJavaScriptMock.mockReset();
+  setStatusHandlerMock.mockReset();
 });
 
 afterEach(() => {
@@ -179,6 +185,7 @@ describe('useSession', () => {
     expect(result.current.totalSteps).toBe(0);
     expect(result.current.step).toBe(0);
     expect(result.current.isBusy).toBe(false);
+    expect(prewarmMock).toHaveBeenCalled();
     unmount();
   });
 

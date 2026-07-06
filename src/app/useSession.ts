@@ -6,7 +6,11 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { runJavaScriptInWorker } from '../engine/jsRuntimeClient';
-import { RuntimeClient, TimeoutError } from '../engine/runtimeClient';
+import {
+  clearPythonRuntimeStatusHandler,
+  getPythonRuntimeClient,
+} from '../engine/pythonRuntime';
+import { TimeoutError, type RuntimeClient } from '../engine/runtimeClient';
 import { firstExceptionStep } from '../engine/trace';
 import {
   buildPracticeCaseStorageKey,
@@ -77,7 +81,7 @@ function idleStatus(language: Language): RuntimeStatus {
     phase: 'idle',
     message:
       language === 'python'
-        ? 'Python loads on first run'
+        ? 'Preparing Python in the background'
         : `${language === 'typescript' ? 'TypeScript' : 'JavaScript'} runs in a browser worker`,
     interruptSupported: false,
     progress: 0,
@@ -148,12 +152,20 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
 
   const getClient = useCallback(() => {
     if (!clientRef.current) {
-      clientRef.current = new RuntimeClient({ onStatus: setStatus });
+      clientRef.current = getPythonRuntimeClient(setStatus);
+    } else {
+      clientRef.current.setStatusHandler(setStatus, true);
     }
     return clientRef.current;
   }, []);
 
-  useEffect(() => () => clientRef.current?.dispose(), []);
+  useEffect(() => () => clearPythonRuntimeStatusHandler(clientRef.current), []);
+
+  useEffect(() => {
+    if (language === 'python') {
+      getClient().prewarm();
+    }
+  }, [getClient, language]);
 
   const isBusy =
     status.phase === 'loading' ||

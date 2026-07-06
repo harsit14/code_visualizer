@@ -81,7 +81,7 @@ async function ensurePyodide(): Promise<PyodideAPI> {
         ].join('\n'),
       );
 
-      emitStatus('ready', 'Ready', { progress: 1, stage: 'ready' });
+      emitStatus('ready', 'Python ready', { progress: 1, stage: 'ready' });
       return pyodide;
     });
   }
@@ -129,7 +129,7 @@ async function handleRequest(requestId: string, request: EngineRequest) {
       data,
       durationMs: performance.now() - startedAt,
     });
-    emitStatus('ready', 'Ready', { progress: 1, stage: 'ready' });
+    emitStatus('ready', 'Python ready', { progress: 1, stage: 'ready' });
   } catch (error) {
     // handle_request never throws for Python-level errors, so anything here
     // is a worker/runtime failure (including interrupt during dispatch).
@@ -146,7 +146,7 @@ async function handleRequest(requestId: string, request: EngineRequest) {
       },
       durationMs: performance.now() - startedAt,
     });
-    emitStatus('ready', 'Ready', { progress: 1, stage: 'ready' });
+    emitStatus('ready', 'Python ready', { progress: 1, stage: 'ready' });
   }
 }
 
@@ -158,6 +158,11 @@ self.addEventListener('message', (event: MessageEvent<WorkerInbound>) => {
     if (pyodidePromise) {
       void pyodidePromise.then((pyodide) => pyodide.setInterruptBuffer(message.interruptBuffer));
     }
+    return;
+  }
+
+  if (message.type === 'prewarm') {
+    void ensurePyodide();
     return;
   }
 

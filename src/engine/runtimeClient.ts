@@ -44,8 +44,12 @@ export class RuntimeClient {
   private worker: Worker | null = null;
   private interruptBuffer: Uint8Array | null = null;
   private pending: PendingRequest | null = null;
+  private currentStatus: RuntimeStatus | null = null;
+  private onStatus: RuntimeClientOptions['onStatus'];
 
-  constructor(private readonly options: RuntimeClientOptions = {}) {}
+  constructor(options: RuntimeClientOptions = {}) {
+    this.onStatus = options.onStatus;
+  }
 
   get interruptMode(): InterruptMode {
     return this.interruptBuffer ? 'shared-array-buffer' : 'worker-terminate';
@@ -77,12 +81,25 @@ export class RuntimeClient {
     });
   }
 
+  prewarm() {
+    const worker = this.ensureWorker();
+    worker.postMessage({ type: 'prewarm' } satisfies WorkerInbound);
+  }
+
+  setStatusHandler(onStatus: RuntimeClientOptions['onStatus'], emitCurrent = false) {
+    this.onStatus = onStatus;
+    if (emitCurrent && this.currentStatus) {
+      onStatus?.(this.currentStatus);
+    }
+  }
+
   dispose() {
     this.clearTimers();
     this.pending = null;
     this.worker?.terminate();
     this.worker = null;
     this.interruptBuffer = null;
+    this.currentStatus = null;
   }
 
   private ensureWorker(): Worker {
@@ -118,7 +135,8 @@ export class RuntimeClient {
 
   private handleMessage(message: WorkerOutbound) {
     if (message.type === 'status') {
-      this.options.onStatus?.(message.status);
+      this.currentStatus = message.status;
+      this.onStatus?.(message.status);
       if (message.status.phase === 'running') {
         this.armTimeout();
       }
@@ -158,7 +176,7 @@ export class RuntimeClient {
       // 2 == SIGINT; Pyodide raises KeyboardInterrupt inside Python, which
       // the engine reports as a normal error payload.
       this.interruptBuffer[0] = 2;
-      this.options.onStatus?.({
+      this.onStatus?.({
         phase: 'interrupting',
         message: 'Execution timed out; interrupting',
         interruptSupported: true,
@@ -183,7 +201,7 @@ export class RuntimeClient {
       return;
     }
 
-    this.options.onStatus?.({
+    this.onStatus?.({
       phase: 'restarting',
       message: 'Execution timed out; restarting Python worker',
       interruptSupported: Boolean(this.interruptBuffer),
