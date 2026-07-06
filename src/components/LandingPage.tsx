@@ -331,7 +331,6 @@ export function LandingPage() {
             </div>
           </div>
           <div className="landing-hero-demo">
-            <p className="tour-kicker">Live trace demo</p>
             <LandingInteractiveDemo />
           </div>
         </section>

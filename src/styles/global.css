@@ -2668,12 +2668,17 @@ input[type='password'] {
 
 /* Interactive Demo Panel */
 .interactive-demo-card {
-  background: rgba(14, 17, 23, 0.7);
+  --demo-card-bg: rgba(14, 17, 23, 0.7);
+  background:
+    linear-gradient(var(--demo-card-bg), var(--demo-card-bg)) padding-box,
+    linear-gradient(135deg, var(--green), var(--accent), var(--purple)) border-box;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--border-strong);
+  border: 1px solid transparent;
   border-radius: 12px;
-  box-shadow: var(--shadow);
+  box-shadow:
+    var(--shadow),
+    0 0 34px color-mix(in srgb, var(--accent) 16%, transparent);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -2681,8 +2686,10 @@ input[type='password'] {
 }
 
 [data-theme='light'] .interactive-demo-card {
-  background: rgba(255, 255, 255, 0.85);
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+  --demo-card-bg: rgba(255, 255, 255, 0.85);
+  box-shadow:
+    0 10px 40px rgba(0, 0, 0, 0.08),
+    0 0 26px color-mix(in srgb, var(--accent) 14%, transparent);
 }
 
 .demo-window-header {
@@ -2821,8 +2828,10 @@ input[type='password'] {
 }
 
 .demo-array-container {
-  background: var(--bg-inset);
-  border: 1px solid var(--border);
+  background:
+    linear-gradient(var(--bg-inset), var(--bg-inset)) padding-box,
+    linear-gradient(120deg, var(--green), var(--accent)) border-box;
+  border: 1px solid transparent;
   border-radius: 8px;
   padding: 16px 8px;
   overflow-x: auto;
@@ -2969,7 +2978,7 @@ input[type='password'] {
 
 .demo-console {
   background: var(--bg-inset);
-  border: 1px solid var(--border);
+  border: 1px solid color-mix(in srgb, var(--purple) 56%, var(--border));
   border-radius: 8px;
   flex: 1;
   font-family: var(--mono);
@@ -3258,17 +3267,6 @@ input[type='password'] {
 .landing-hero-demo {
   position: relative;
   width: 100%;
-}
-
-.landing-hero-demo::before {
-  background: linear-gradient(90deg, var(--green), var(--amber), var(--purple));
-  content: '';
-  height: 3px;
-  left: 0;
-  position: absolute;
-  right: 0;
-  top: -1px;
-  z-index: 2;
 }
 
 .landing-section {
@@ -3614,7 +3612,7 @@ input[type='password'] {
 }
 
 .interactive-demo-card {
-  background: color-mix(in srgb, var(--bg-raised) 92%, transparent);
+  --demo-card-bg: color-mix(in srgb, var(--bg-raised) 92%, transparent);
   backdrop-filter: none;
   border-radius: 8px;
   -webkit-backdrop-filter: none;
@@ -3699,7 +3697,7 @@ input[type='password'] {
 
 .demo-map {
   background: var(--bg-inset);
-  border: 1px solid var(--border);
+  border: 1px solid color-mix(in srgb, var(--amber) 58%, var(--border));
   border-radius: 8px;
   display: grid;
   gap: 8px;
