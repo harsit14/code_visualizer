@@ -16,7 +16,7 @@ import {
   SkipBack,
   SkipForward,
 } from 'lucide-react';
-import { examples } from '../examples/examples';
+import { CUSTOM_CODE_ID, examples } from '../examples/examples';
 import type { RuntimeStatus, TraceStep } from '../engine/types';
 
 type ControlsBarProps = {
@@ -44,8 +44,6 @@ type ControlsBarProps = {
   currentStep: TraceStep | undefined;
   status: RuntimeStatus;
 };
-
-const CUSTOM_ID = '__custom__';
 
 function describeStep(step: TraceStep | undefined): string {
   if (!step) {
@@ -179,9 +177,9 @@ export function ControlsBar({
             aria-label="Load example"
             className="pretrace-example-select"
             onChange={(event) => onExampleChange(event.target.value)}
-            value={exampleId ?? CUSTOM_ID}
+            value={exampleId ?? CUSTOM_CODE_ID}
           >
-            <option disabled value={CUSTOM_ID}>
+            <option disabled value={CUSTOM_CODE_ID}>
               Load an example
             </option>
             {categories.map((category) => (

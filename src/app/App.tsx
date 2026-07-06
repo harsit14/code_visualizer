@@ -26,7 +26,8 @@ import {
   traceStepOnLine,
 } from '../engine/traceNavigation';
 import type { Language, SessionResult } from '../engine/types';
-import { DEFAULT_EXAMPLE_ID, getExample } from '../examples/examples';
+import { CUSTOM_CODE_ID, DEFAULT_EXAMPLE_ID, getExample } from '../examples/examples';
+import { loadStoredCodeDraft, saveStoredCodeDraft } from './codeDraft';
 import {
   DEFAULT_COLUMN_WEIGHTS,
   DEFAULT_PANEL_VISIBILITY,
@@ -47,13 +48,11 @@ import { buildTraceSvgExport } from './traceSvgExport';
 import { useSession } from './useSession';
 
 type Theme = 'light' | 'dark';
-type DesignMode = 'classic' | 'traced';
 
 const EXPORT_VERSION = 2;
 const DEFAULT_IMPORT_LABEL = 'Import';
 const DEFAULT_IMPORT_TITLE = 'Import a previously exported trace';
 const THEME_STORAGE_KEY = 'cv-theme';
-const DESIGN_STORAGE_KEY = 'cv-design-v2';
 const PANEL_VISIBILITY_STORAGE_KEY = 'cv-panel-visibility-v1';
 const COLUMN_WEIGHTS_STORAGE_KEY = 'cv-column-weights-v1';
 const PANEL_WEIGHTS_STORAGE_KEY = 'cv-panel-weights-v1';
@@ -98,11 +97,6 @@ function initialTheme(): Theme {
     return stored;
   }
   return 'light';
-}
-
-function initialDesign(): DesignMode {
-  const stored = window.localStorage.getItem(DESIGN_STORAGE_KEY);
-  return stored === 'classic' || stored === 'traced' ? stored : 'traced';
 }
 
 function initialShare() {
@@ -217,23 +211,30 @@ type DashboardAppProps = {
 
 function DashboardApp({ onOpenLanding }: DashboardAppProps) {
   const [shared] = useState(initialShare);
-  const [exampleId, setExampleId] = useState<string | null>(
-    shared ? (shared.exampleId ?? null) : DEFAULT_EXAMPLE_ID,
+  // Restore the local draft on boot unless a share link or embed supplies code.
+  const [bootDraft] = useState(() =>
+    shared || initialEmbedMode() ? null : loadStoredCodeDraft(),
   );
-  const initialCode = shared?.code ?? getExample(exampleId ?? DEFAULT_EXAMPLE_ID)?.code ?? '';
-  const initialSessionLanguage = initialLanguage(exampleId, shared?.language);
+  const [exampleId, setExampleId] = useState<string | null>(
+    shared ? (shared.exampleId ?? null) : bootDraft ? null : DEFAULT_EXAMPLE_ID,
+  );
+  const initialCode =
+    shared?.code ?? bootDraft?.code ?? getExample(exampleId ?? DEFAULT_EXAMPLE_ID)?.code ?? '';
+  const initialSessionLanguage = initialLanguage(
+    exampleId,
+    shared?.language ?? bootDraft?.language,
+  );
   const [theme, setTheme] = useState<Theme>(initialTheme);
-  const [designMode, setDesignMode] = useState<DesignMode>(initialDesign);
   const [shareLabel, setShareLabel] = useState('Share');
   const [embedLabel, setEmbedLabel] = useState('Embed');
   const [embedMode] = useState(initialEmbedMode);
   const [showDashboardOnboarding, setShowDashboardOnboarding] = useState(() =>
     initialDashboardOnboarding(embedMode),
   );
-  const isTracedDesign = !embedMode && designMode === 'traced';
   const [importLabel, setImportLabel] = useState(DEFAULT_IMPORT_LABEL);
   const [importTitle, setImportTitle] = useState(DEFAULT_IMPORT_TITLE);
   const [watchedVariables, setWatchedVariables] = useState<string[]>([]);
+  const [draftAvailable, setDraftAvailable] = useState(() => loadStoredCodeDraft() !== null);
   const [historyRefreshToken, setHistoryRefreshToken] = useState(0);
   const [breakpoints, setBreakpoints] = useState<Set<number>>(() => new Set());
   const [cursorLine, setCursorLine] = useState<number | null>(null);
@@ -268,6 +269,9 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
   const panelSlotRefs = useRef<Partial<Record<PanelId, HTMLDivElement | null>>>({});
   const importStatusTimeoutRef = useRef<number | null>(null);
   const currentHistoryIdRef = useRef<string | null>(null);
+  // Only actual typing produces a draft; programmatic loads (examples,
+  // history, imports, the restore itself) must not overwrite it.
+  const userEditedRef = useRef(false);
 
   const session = useSession(initialCode, {
     language: initialSessionLanguage,
@@ -344,10 +348,6 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
   }, [theme]);
 
   useEffect(() => {
-    window.localStorage.setItem(DESIGN_STORAGE_KEY, designMode);
-  }, [designMode]);
-
-  useEffect(() => {
     if (!embedMode) {
       saveStoredValue(PANEL_VISIBILITY_STORAGE_KEY, panelVisibility);
     }
@@ -379,6 +379,19 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
     session.scheduleAnalyze(session.code);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Autosave custom code as a local draft so switching examples or
+  // languages, or reloading the page, never loses typed work.
+  useEffect(() => {
+    if (embedMode || exampleId !== null || !userEditedRef.current) {
+      return;
+    }
+    const timeout = window.setTimeout(() => {
+      saveStoredCodeDraft(session.code, session.language);
+      setDraftAvailable(session.code.trim().length > 0);
+    }, 600);
+    return () => window.clearTimeout(timeout);
+  }, [embedMode, exampleId, session.code, session.language]);
 
   useEffect(() => {
     if (embedMode || session.result?.status !== 'ok' || !session.result.run) {
@@ -476,6 +489,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
   const handleCodeChange = useCallback(
     (code: string) => {
       currentHistoryIdRef.current = null;
+      userEditedRef.current = true;
       setExampleId(null);
       setWatchedVariables([]);
       resetTraceNavigation();
@@ -486,6 +500,19 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
 
   const handleExampleChange = useCallback(
     (id: string) => {
+      if (id === CUSTOM_CODE_ID) {
+        const draft = loadStoredCodeDraft();
+        if (!draft) {
+          return;
+        }
+        currentHistoryIdRef.current = null;
+        userEditedRef.current = false;
+        setExampleId(null);
+        setWatchedVariables([]);
+        resetTraceNavigation();
+        session.loadSource(draft.code, { language: draft.language });
+        return;
+      }
       const example = getExample(id);
       if (!example) {
         return;
@@ -497,7 +524,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
       setLanguage(example.language);
       setCode(example.code);
     },
-    [resetTraceNavigation, setCode, setLanguage],
+    [resetTraceNavigation, session, setCode, setLanguage],
   );
 
   const handleLanguageChange = useCallback(
@@ -644,6 +671,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
                   ? payload.language
                   : 'python';
               currentHistoryIdRef.current = null;
+              userEditedRef.current = false;
               setExampleId(null);
               setWatchedVariables([]);
               resetTraceNavigation();
@@ -664,6 +692,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
   const handleOpenHistoryItem = useCallback(
     (item: CodeHistoryItem) => {
       currentHistoryIdRef.current = item.id;
+      userEditedRef.current = false;
       setExampleId(item.exampleId);
       setWatchedVariables([]);
       resetTraceNavigation();
@@ -1081,11 +1110,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
   );
 
   return (
-    <div
-      className={`app-shell${embedMode ? ' app-shell-embed' : ''}${
-        isTracedDesign ? ' design-traced' : ''
-      }`}
-    >
+    <div className={`app-shell design-traced${embedMode ? ' app-shell-embed' : ''}`}>
       <section className="dashboard-stage" aria-label="Code Visualizer dashboard">
         {embedMode ? (
           <header className="embed-bar">
@@ -1102,6 +1127,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
             canExport={Boolean(session.result?.run)}
             embedLabel={embedLabel}
             exampleId={exampleId}
+            hasDraft={draftAvailable}
             importLabel={importLabel}
             importTitle={importTitle}
             language={session.language}
@@ -1118,10 +1144,6 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
             onShowAllPanels={showAllPanels}
             onTogglePanel={togglePanelVisibility}
             onToggleTheme={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))}
-            designMode={designMode}
-            onToggleDesign={() =>
-              setDesignMode((current) => (current === 'traced' ? 'classic' : 'traced'))
-            }
             historyRefreshToken={historyRefreshToken}
             panelControls={panelControls}
             shareLabel={shareLabel}

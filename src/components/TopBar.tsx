@@ -12,8 +12,6 @@ import {
   Link2,
   MoreHorizontal,
   Moon,
-  Palette,
-  Sparkles,
   Sun,
   Upload,
 } from 'lucide-react';
@@ -21,8 +19,9 @@ import { useRef } from 'react';
 import { AccountMenu } from './AccountMenu';
 import { HistoryMenu } from './HistoryMenu';
 import { LogoMark } from './LogoMark';
+import { useMenuDismiss } from './useMenuDismiss';
 import type { CodeHistoryItem } from '../app/historyClient';
-import { examples } from '../examples/examples';
+import { CUSTOM_CODE_ID, examples } from '../examples/examples';
 import type { Language, RuntimeStatus } from '../engine/types';
 
 type PanelControl = {
@@ -33,13 +32,12 @@ type PanelControl = {
 
 type TopBarProps = {
   exampleId: string | null;
+  hasDraft: boolean;
   onExampleChange: (id: string) => void;
   language: Language;
   onLanguageChange: (language: Language) => void;
   theme: 'light' | 'dark';
   onToggleTheme: () => void;
-  designMode: 'classic' | 'traced';
-  onToggleDesign: () => void;
   onShare: () => void;
   shareLabel: string;
   onEmbed: () => void;
@@ -60,7 +58,6 @@ type TopBarProps = {
   onOpenLanding: () => void;
 };
 
-const CUSTOM_ID = '__custom__';
 const SHORTCUTS = [
   { keys: ['Cmd/Ctrl', 'Enter'], label: 'Run code' },
   { keys: ['←'], label: 'Step back' },
@@ -74,13 +71,12 @@ const SHORTCUTS = [
 
 export function TopBar({
   exampleId,
+  hasDraft,
   onExampleChange,
   language,
   onLanguageChange,
   theme,
   onToggleTheme,
-  designMode,
-  onToggleDesign,
   onShare,
   shareLabel,
   onEmbed,
@@ -102,6 +98,7 @@ export function TopBar({
 }: TopBarProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const categories = [...new Set(examples.map((example) => example.category))];
+  useMenuDismiss();
 
   return (
     <header className="top-bar">
@@ -123,10 +120,10 @@ export function TopBar({
               aria-label="Load example"
               className="example-select"
               onChange={(event) => onExampleChange(event.target.value)}
-              value={exampleId ?? CUSTOM_ID}
+              value={exampleId ?? CUSTOM_CODE_ID}
             >
-              <option disabled value={CUSTOM_ID}>
-                Custom code
+              <option disabled={!hasDraft} value={CUSTOM_CODE_ID}>
+                {hasDraft ? 'Your code (draft)' : 'Custom code'}
               </option>
               {categories.map((category) => (
                 <optgroup key={category} label={category}>
@@ -156,6 +153,15 @@ export function TopBar({
 
         <div className="top-action-row top-action-row-secondary">
           <div className="top-action-group" aria-label="Workspace tools">
+            <button
+              className="top-share-button"
+              onClick={onShare}
+              title="Copy a runnable link to this code"
+              type="button"
+            >
+              <Link2 size={14} />
+              <span className="top-action-label">{shareLabel}</span>
+            </button>
             <HistoryMenu onOpen={onOpenHistoryItem} refreshToken={historyRefreshToken} />
             <details className="panel-menu shortcuts-menu">
               <summary title="Show keyboard and editor shortcuts">
@@ -202,15 +208,11 @@ export function TopBar({
               </div>
             </details>
             <details className="panel-menu trace-actions-menu">
-              <summary title="Share, import, and export traces">
+              <summary title="Embed, import, and export traces">
                 <MoreHorizontal size={14} />
                 <span className="top-action-label">Actions</span>
               </summary>
               <div className="panel-menu-popover action-popover">
-                <button className="panel-menu-action" onClick={onShare} type="button">
-                  <Link2 size={14} />
-                  <span>{shareLabel}</span>
-                </button>
                 <button className="panel-menu-action" onClick={onEmbed} type="button">
                   <Code2 size={14} />
                   <span>{embedLabel}</span>
@@ -250,29 +252,14 @@ export function TopBar({
             className="top-action-group top-action-appearance"
             aria-label="Appearance and account"
           >
-            <details className="panel-menu appearance-menu">
-              <summary title="Change visual design and color theme">
-                <Palette size={14} />
-                <span className="top-action-label">Appearance</span>
-              </summary>
-              <div className="panel-menu-popover appearance-popover">
-                <button
-                  aria-pressed={designMode === 'traced'}
-                  className={`panel-menu-action design-toggle${
-                    designMode === 'traced' ? ' design-toggle-active' : ''
-                  }`}
-                  onClick={onToggleDesign}
-                  type="button"
-                >
-                  <Sparkles size={14} />
-                  <span>{designMode === 'traced' ? 'Classic design' : 'Traced Light'}</span>
-                </button>
-                <button className="panel-menu-action" onClick={onToggleTheme} type="button">
-                  {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
-                  <span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
-                </button>
-              </div>
-            </details>
+            <button
+              onClick={onToggleTheme}
+              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              type="button"
+            >
+              {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+              <span className="top-action-label">{theme === 'dark' ? 'Light' : 'Dark'}</span>
+            </button>
             <AccountMenu compact />
           </div>
         </div>

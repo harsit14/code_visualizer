@@ -173,6 +173,9 @@ console.log(total);
 
 export const DEFAULT_EXAMPLE_ID = 'two-sum';
 
+/** Sentinel id used by example pickers for "not an example" (custom code). */
+export const CUSTOM_CODE_ID = '__custom__';
+
 export function getExample(id: string): Example | undefined {
   return examples.find((example) => example.id === id);
 }

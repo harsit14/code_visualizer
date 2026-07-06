@@ -168,7 +168,9 @@
     gap: 4px;
   }
 
-  .top-action-group > button,
+  /* Share keeps its label at every width: it is the primary top-bar action
+     and its text doubles as copy feedback ("Copied!"). */
+  .top-action-group > button:not(.top-share-button),
   .top-action-group > .panel-menu > summary,
   .top-action-group > .account-menu > summary {
     gap: 0;
@@ -178,7 +180,7 @@
     width: 30px;
   }
 
-  .top-action-group > button .top-action-label,
+  .top-action-group > button:not(.top-share-button) .top-action-label,
   .top-action-group > .panel-menu > summary .top-action-label,
   .top-action-group > .account-menu > summary .account-summary-label {
     display: none;
@@ -227,6 +229,16 @@
     flex: 1 1 180px;
     width: auto;
   }
+}
+
+.top-action-group > .top-share-button {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  color: var(--accent);
+}
+
+.top-action-group > .top-share-button:hover:not(:disabled) {
+  background: var(--accent-soft);
+  border-color: var(--accent);
 }
 
 .panel-menu summary::-webkit-details-marker {
@@ -332,13 +344,8 @@
   flex: 0 0 auto;
 }
 
-.action-popover,
-.appearance-popover {
+.action-popover {
   min-width: 190px;
-}
-
-.appearance-popover .design-toggle {
-  min-width: 0;
 }
 
 .panel-menu-reset {

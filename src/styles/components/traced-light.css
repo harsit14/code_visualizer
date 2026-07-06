@@ -1,27 +1,12 @@
 /* ============================================================ *
- *  ALTERNATE DESIGN - "Traced Light" skin                       *
- *  Opt-in via the top-bar toggle (.app-shell.design-traced).    *
- *  Purely additive: classic styling above is left untouched.    *
+ *  "Traced Light" skin (.app-shell.design-traced)               *
+ *  The dashboard's one and only design; the class stays so the  *
+ *  rules keep their specificity over the base panel styling.    *
  *  The whole app is variable-driven, so re-declaring the tokens *
  *  on the shell recolors every panel; the rules below add the   *
  *  instrument-plate flourishes (ink ground, grid, glow, serif). *
+ *  Fonts are self-hosted via @fontsource imports in main.tsx.   *
  * ============================================================ */
-
-@font-face {
-  font-family: 'Italiana TL';
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url('../../assets/fonts/Italiana-Regular.ttf') format('truetype');
-}
-
-@font-face {
-  font-family: 'Geist Mono TL';
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url('../../assets/fonts/GeistMono-Regular.ttf') format('truetype');
-}
 
 .app-shell.design-traced {
   --bg: #0b0e14;
@@ -44,7 +29,6 @@
   --exec-line: rgba(79, 142, 247, 0.2);
   --error-line: rgba(229, 96, 79, 0.22);
   --shadow: 0 18px 52px rgba(0, 0, 0, 0.55);
-  --mono: 'Geist Mono TL', 'SF Mono', ui-monospace, 'Cascadia Code', Menlo, Consolas, monospace;
   --tl-grid: color-mix(in srgb, var(--border) 62%, transparent);
   background: var(--bg);
 }
@@ -101,7 +85,7 @@
    Keep the font-size/spacing close to classic so the top bar does not
    reflow when switching designs (the action cluster stays put). */
 .design-traced .brand h1 {
-  font-family: 'Italiana TL', var(--sans);
+  font-family: 'Italiana', var(--sans);
   font-weight: 400;
   letter-spacing: 0.03em;
 }
@@ -171,24 +155,4 @@
 
 .design-traced .run-button {
   box-shadow: 0 0 22px color-mix(in srgb, var(--green) 26%, transparent);
-}
-
-/* the opt-in control itself */
-/* Fixed width so the button occupies the same box whether it reads
-   "Traced Light" or "Classic" - the cursor lands on it either way. */
-.design-toggle {
-  align-items: center;
-  display: inline-flex;
-  gap: 6px;
-  justify-content: center;
-  min-width: 132px;
-}
-
-.design-toggle-active {
-  border-color: color-mix(in srgb, var(--accent) 60%, var(--border-strong)) !important;
-  color: var(--accent) !important;
-}
-
-.design-toggle-active svg {
-  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 55%, transparent));
 }

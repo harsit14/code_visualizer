@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { encodeShareState } from '../app/shareState';
 import { AccountMenu } from './AccountMenu';
+import { useMenuDismiss } from './useMenuDismiss';
 import { LandingInteractiveDemo } from './LandingInteractiveDemo';
 import { LandingStructurePreview } from './LandingStructurePreview';
 import { LogoMark } from './LogoMark';
@@ -215,6 +216,7 @@ export function LandingPage() {
   const [activeSnippetId, setActiveSnippetId] = useState(snippetPresets[0].id);
   const [theme, setTheme] = useState<Theme>(initialTheme);
   const [menuOpen, setMenuOpen] = useState(false);
+  useMenuDismiss();
   const activeSnippet =
     snippetPresets.find((snippet) => snippet.id === activeSnippetId) ?? snippetPresets[0];
 
