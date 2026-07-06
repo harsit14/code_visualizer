@@ -126,6 +126,13 @@ describe('InputsPanel', () => {
     expect(html).toContain('0.10 MB');
   });
 
+  it('labels sub-millisecond practice runs as less than one millisecond', () => {
+    const html = renderInputsPanel([{ ...caseOne, runtimeMs: 0.4 }]);
+
+    expect(html).toContain('&lt;1 ms');
+    expect(html).not.toContain('0.4 ms');
+  });
+
   it('summarizes scored and exploratory practice runs in the folded header', () => {
     expect(renderInputsPanel([caseOne, caseTwo])).toContain('1/2 pass');
     expect(renderInputsPanel([exploratoryCase])).toContain('1 ran');

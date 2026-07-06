@@ -453,6 +453,9 @@ function formatRuntime(ms: number | null): string | null {
   if (ms === null) {
     return null;
   }
+  if (ms < 1) {
+    return '<1 ms';
+  }
   return ms < 10 ? `${ms.toFixed(1)} ms` : `${Math.round(ms)} ms`;
 }
 

@@ -116,6 +116,57 @@ describe('ConsolePanel', () => {
     expect(html).toContain('21');
   });
 
+  it('labels sub-millisecond runs as less than one millisecond', () => {
+    const finalStep: TraceStep = {
+      i: 0,
+      event: 'return',
+      line: 2,
+      func: 'solve',
+      stack: [],
+      globals: {},
+      stdoutLen: 0,
+      ret: num(1),
+    };
+    const result: SessionResult = {
+      status: 'ok',
+      mode: 'function',
+      analysis: null,
+      durationMs: 1,
+      error: null,
+      run: {
+        functionName: 'solve',
+        inputs: [],
+        seed: null,
+        steps: [finalStep],
+        returnValue: num(1),
+        exception: null,
+        setupError: null,
+        stdout: '',
+        stderr: '',
+        opCount: 1,
+        runtimeMs: 0.4,
+        memoryMb: null,
+        truncated: false,
+        truncationReason: null,
+      },
+    };
+
+    const html = renderToStaticMarkup(
+      <ConsolePanel
+        atLastStep={true}
+        canMeasureComplexity={false}
+        complexity={null}
+        complexityBusy={false}
+        currentStep={finalStep}
+        onMeasureComplexity={() => {}}
+        result={result}
+      />,
+    );
+
+    expect(html).toContain('&lt;1 ms');
+    expect(html).not.toContain('0.40 ms');
+  });
+
   it('warns when complexity measurement stops early', () => {
     const html = renderToStaticMarkup(
       <ConsolePanel

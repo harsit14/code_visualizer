@@ -217,10 +217,13 @@ npm run smoke
 The smoke check verifies:
 
 - `dist/index.html` exists.
+- Social image metadata uses absolute URLs.
 - `dist/_headers` contains the required cross-origin isolation headers.
 - `dist/_routes.json` includes `/api/*` for the Pages deployment path.
 - Pyodide runtime assets are directly available under `dist/assets/pyodide/`.
 - Pyodide assets are not accidentally nested under `node_modules`.
+- Built HTML/CSS/JS do not reference Google Fonts endpoints blocked by the
+  production CSP.
 
 ## Manual Smoke Test
 

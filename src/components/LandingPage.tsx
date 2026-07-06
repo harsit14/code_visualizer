@@ -502,9 +502,19 @@ export function LandingPage() {
           <span>Code Visualizer</span>
         </button>
         <div className="landing-footer-links">
-          <a href="#how">How it works</a>
+          <a href="#how">About</a>
           <a href="#features">Features</a>
           <a href="#try">Try it</a>
+          <a
+            href="https://github.com/harsit14/code_visualizer#privacy-model"
+            rel="noreferrer"
+            target="_blank"
+          >
+            Privacy
+          </a>
+          <a href="https://github.com/harsit14/code_visualizer" rel="noreferrer" target="_blank">
+            GitHub
+          </a>
           <button onClick={toggleTheme} type="button">
             {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
             {theme === 'dark' ? 'Light' : 'Dark'}
