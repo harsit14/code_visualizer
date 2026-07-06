@@ -4,6 +4,8 @@
  * stored-value-then-system-preference logic before React loads to avoid a
  * flash of the wrong theme.
  */
+import { useCallback, useEffect, useState } from 'react';
+
 export type Theme = 'light' | 'dark';
 
 const THEME_STORAGE_KEY = 'cv-theme';
@@ -28,4 +30,18 @@ export function applyTheme(theme: Theme) {
   } catch {
     /* local storage unavailable */
   }
+}
+
+export function useTheme() {
+  const [theme, setTheme] = useState<Theme>(initialTheme);
+
+  useEffect(() => {
+    applyTheme(theme);
+  }, [theme]);
+
+  const toggleTheme = useCallback(() => {
+    setTheme((current) => (current === 'dark' ? 'light' : 'dark'));
+  }, []);
+
+  return { theme, setTheme, toggleTheme };
 }

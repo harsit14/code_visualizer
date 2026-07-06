@@ -28,6 +28,7 @@ import {
   type PracticeTestCase,
   type PracticeTestCaseUpdate,
 } from './practiceCases';
+import { useSessionPlayback, type PlaybackSpeed } from './useSessionPlayback';
 import type {
   AnalysisInfo,
   ComplexityResult,
@@ -40,7 +41,7 @@ import type {
 const RUN_TIMEOUT_MS = 15000;
 const ANALYZE_DEBOUNCE_MS = 700;
 
-export type PlaybackSpeed = number; // steps per second
+export type { PlaybackSpeed };
 
 export type Session = ReturnType<typeof useSession>;
 
@@ -115,10 +116,6 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
   const [result, setResult] = useState<SessionResult | null>(null);
   const [complexity, setComplexity] = useState<ComplexityResult | null>(null);
   const [complexityBusy, setComplexityBusy] = useState(false);
-  const [step, setStep] = useState(0);
-  const [playing, setPlaying] = useState(false);
-  const [speed, setSpeed] = useState<PlaybackSpeed>(2);
-  const [selectedFrameIndex, setSelectedFrameIndex] = useState<number | null>(null);
   const [functionOverride, setFunctionOverrideState] = useState<string | null>(
     initialOptions.functionName ?? null,
   );
@@ -167,6 +164,21 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
 
   const steps = result?.run?.steps ?? [];
   const totalSteps = steps.length;
+  const {
+    jumpToStep,
+    playing,
+    resetPlayback,
+    selectedFrameIndex,
+    setPlaying,
+    setSelectedFrameIndex,
+    setSpeed,
+    setStep,
+    speed,
+    step,
+    stepBack,
+    stepForward,
+    togglePlay,
+  } = useSessionPlayback(totalSteps);
   const currentStep = steps[step];
 
   /** Re-analyze (debounced) so the inputs panel reflects edits before a run. */
@@ -211,9 +223,7 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
       setCodeState(nextCode);
       setResult(null);
       setComplexity(null);
-      setStep(0);
-      setPlaying(false);
-      setSelectedFrameIndex(null);
+      resetPlayback();
       const currentFunction = activeFunctionRef.current;
       const currentLiterals = inputLiteralsRef.current;
       if (currentFunction && currentLiterals) {
@@ -231,7 +241,7 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
       setPendingInitialInputs(null);
       scheduleAnalyze(nextCode);
     },
-    [scheduleAnalyze],
+    [resetPlayback, scheduleAnalyze],
   );
 
   const setLanguage = useCallback(
@@ -241,9 +251,7 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
       setStatus(idleStatus(nextLanguage));
       setResult(null);
       setComplexity(null);
-      setStep(0);
-      setPlaying(false);
-      setSelectedFrameIndex(null);
+      resetPlayback();
       setFunctionOverrideState(null);
       setInputDrafts(null);
       setPracticeNotebook(EMPTY_PRACTICE_NOTEBOOK);
@@ -251,7 +259,7 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
       setPendingInitialInputs(null);
       scheduleAnalyze(codeRef.current, nextLanguage);
     },
-    [scheduleAnalyze],
+    [resetPlayback, scheduleAnalyze],
   );
 
   const loadSource = useCallback(
@@ -268,9 +276,7 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
       setStatus(idleStatus(options.language));
       setResult(null);
       setComplexity(null);
-      setStep(0);
-      setPlaying(false);
-      setSelectedFrameIndex(null);
+      resetPlayback();
       setFunctionOverrideState(options.language === 'python' ? (options.functionName ?? null) : null);
       setInputDrafts(null);
       setPracticeNotebook(EMPTY_PRACTICE_NOTEBOOK);
@@ -279,7 +285,7 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
       setSeed(options.language === 'python' ? (options.seed ?? null) : null);
       scheduleAnalyze(nextCode, options.language);
     },
-    [scheduleAnalyze],
+    [resetPlayback, scheduleAnalyze],
   );
 
   const activeFunction = useMemo(() => {
@@ -407,14 +413,12 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
     setFunctionOverrideState(nextFunction);
     setResult(null);
     setComplexity(null);
-    setStep(0);
-    setPlaying(false);
-    setSelectedFrameIndex(null);
+    resetPlayback();
     setInputDrafts(null);
     setPracticeNotebook(EMPTY_PRACTICE_NOTEBOOK);
     setTestCases([]);
     setPendingInitialInputs(null);
-  }, []);
+  }, [resetPlayback]);
 
   const run = useCallback(
     async (overrides?: { freshInputs?: boolean; inputs?: string[]; seed?: number }) => {
@@ -425,11 +429,9 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
         window.clearTimeout(analyzeTimer.current);
         analyzeTimer.current = null;
       }
-      setPlaying(false);
       setResult(null);
       setComplexity(null);
-      setStep(0);
-      setSelectedFrameIndex(null);
+      resetPlayback();
 
       const useSeed = overrides?.seed ?? seed ?? undefined;
       const useInputs = overrides?.inputs ?? (overrides?.freshInputs ? undefined : inputLiterals);
@@ -508,7 +510,18 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
         }
       }
     },
-    [code, functionOverride, getClient, inputLiterals, isBusy, seed, testCasesBusy],
+    [
+      code,
+      functionOverride,
+      getClient,
+      inputLiterals,
+      isBusy,
+      resetPlayback,
+      seed,
+      setPlaying,
+      setStep,
+      testCasesBusy,
+    ],
   );
 
   const regenerateInputs = useCallback(() => {
@@ -721,48 +734,6 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
     }
   }, [code, complexityBusy, functionOverride, getClient, isBusy, seed]);
 
-  // Playback timer.
-  useEffect(() => {
-    if (!playing || totalSteps <= 1) {
-      return;
-    }
-    const timer = window.setInterval(
-      () => {
-        setStep((current) => {
-          if (current >= totalSteps - 1) {
-            setPlaying(false);
-            return current;
-          }
-          return current + 1;
-        });
-      },
-      Math.max(40, Math.round(1000 / speed)),
-    );
-    return () => window.clearInterval(timer);
-  }, [playing, speed, totalSteps]);
-
-  const jumpToStep = useCallback(
-    (nextStep: number) => {
-      setPlaying(false);
-      setStep(Math.max(0, Math.min(nextStep, Math.max(totalSteps - 1, 0))));
-    },
-    [totalSteps],
-  );
-
-  const stepForward = useCallback(() => jumpToStep(step + 1), [jumpToStep, step]);
-  const stepBack = useCallback(() => jumpToStep(step - 1), [jumpToStep, step]);
-  const togglePlay = useCallback(() => {
-    if (totalSteps <= 1) {
-      return;
-    }
-    setPlaying((current) => {
-      if (!current && step >= totalSteps - 1) {
-        setStep(0);
-      }
-      return !current;
-    });
-  }, [step, totalSteps]);
-
   /** Restore an exported session (replay without re-running). */
   const importSession = useCallback(
     (
@@ -796,7 +767,7 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
       );
       setSeed(importedLanguage === 'python' ? (imported.run?.seed ?? null) : null);
     },
-    [],
+    [setPlaying, setStep],
   );
 
   return {

@@ -1,5 +1,5 @@
 /* ============================================================ *
- *  "Traced Light" skin (.app-shell.design-traced)               *
+ *  "Traced Light" skin (.app-shell.dashboard-instrument)               *
  *  The dashboard's one and only design; the class stays so the  *
  *  rules keep their specificity over the base panel styling.    *
  *  The whole app is variable-driven, so re-declaring the tokens *
@@ -8,7 +8,7 @@
  *  Fonts are self-hosted via @fontsource imports in main.tsx.   *
  * ============================================================ */
 
-.app-shell.design-traced {
+.app-shell.dashboard-instrument {
   --bg: #0b0e14;
   --bg-raised: #10141c;
   --bg-inset: #080b10;
@@ -34,7 +34,7 @@
 }
 
 /* light-theme variant: the same instrument rendered on paper */
-:root[data-theme='light'] .app-shell.design-traced {
+:root[data-theme='light'] .app-shell.dashboard-instrument {
   --bg: #eef1f6;
   --bg-raised: #ffffff;
   --bg-inset: #e6eaf1;
@@ -59,7 +59,7 @@
 }
 
 /* the ground: ink + a luminous 44px lattice, the plate's signature */
-.design-traced .dashboard-stage {
+.dashboard-instrument .dashboard-stage {
   background:
     linear-gradient(var(--tl-grid) 1px, transparent 1px),
     linear-gradient(90deg, var(--tl-grid) 1px, transparent 1px),
@@ -73,36 +73,35 @@
 }
 
 /* chrome: flat ink bars, hairline rules, no glossy gradient */
-.design-traced .top-bar,
-.design-traced .controls-bar,
-.design-traced .embed-bar {
+.dashboard-instrument .top-bar,
+.dashboard-instrument .controls-bar,
+.dashboard-instrument .embed-bar {
   background: color-mix(in srgb, var(--bg-raised) 86%, transparent);
   border: 1px solid var(--border);
   box-shadow: 0 1px 0 color-mix(in srgb, var(--text) 3%, transparent);
 }
 
 /* identity: an elegant serif wordmark against the mono UI.
-   Keep the font-size/spacing close to classic so the top bar does not
-   reflow when switching designs (the action cluster stays put). */
-.design-traced .brand h1 {
+   Keep the font-size/spacing compact so the top bar action cluster stays put. */
+.dashboard-instrument .brand h1 {
   font-family: 'Italiana', var(--sans);
   font-weight: 400;
   letter-spacing: 0.03em;
 }
 
-.design-traced .brand-mark {
+.dashboard-instrument .brand-mark {
   filter: drop-shadow(0 0 14px color-mix(in srgb, var(--accent) 38%, transparent));
 }
 
 /* panels: flat instrument cards; the per-panel accent reads as a state key */
-.design-traced .panel {
+.dashboard-instrument .panel {
   background: color-mix(in srgb, var(--bg-raised) 92%, var(--bg));
   border-color: var(--border);
   border-radius: 7px;
   box-shadow: inset 2px 0 0 color-mix(in srgb, var(--panel-accent) 30%, transparent);
 }
 
-.design-traced .panel:focus-within {
+.dashboard-instrument .panel:focus-within {
   border-color: color-mix(in srgb, var(--panel-accent) 46%, var(--border-strong));
   box-shadow:
     inset 2px 0 0 var(--panel-accent),
@@ -110,12 +109,12 @@
 }
 
 /* clinical labels: monospaced, tracked, quiet instrumentation */
-.design-traced .panel-header {
+.dashboard-instrument .panel-header {
   background: transparent;
   border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
 }
 
-.design-traced .panel-header h2 {
+.dashboard-instrument .panel-header h2 {
   color: var(--text-dim);
   font-family: var(--mono);
   font-size: 11px;
@@ -125,7 +124,7 @@
 }
 
 /* the single luminous focal: the active line burns brighter here */
-.design-traced .cv-exec-line {
+.dashboard-instrument .cv-exec-line {
   background:
     linear-gradient(90deg, color-mix(in srgb, var(--accent) 34%, transparent), transparent 72%);
   box-shadow:
@@ -135,7 +134,7 @@
 }
 
 /* the scrubber as a horizon line crossing the full field */
-.design-traced .scrubber {
+.dashboard-instrument .scrubber {
   background: transparent;
   border: 0;
   border-top: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
@@ -143,16 +142,16 @@
   padding-top: 9px;
 }
 
-.design-traced .scrubber input[type='range'] {
+.dashboard-instrument .scrubber input[type='range'] {
   accent-color: var(--accent);
 }
 
-.design-traced .transport,
-.design-traced .speed-control {
+.dashboard-instrument .transport,
+.dashboard-instrument .speed-control {
   background: color-mix(in srgb, var(--bg-inset) 70%, transparent);
   border-color: var(--border);
 }
 
-.design-traced .run-button {
+.dashboard-instrument .run-button {
   box-shadow: 0 0 22px color-mix(in srgb, var(--green) 26%, transparent);
 }

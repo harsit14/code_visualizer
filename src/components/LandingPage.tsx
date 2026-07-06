@@ -27,7 +27,7 @@ import {
   X,
 } from 'lucide-react';
 import { encodeShareState } from '../app/shareState';
-import { applyTheme, initialTheme, type Theme } from '../app/theme';
+import { useTheme } from '../app/theme';
 import { AccountMenu } from './AccountMenu';
 import { useMenuDismiss } from './useMenuDismiss';
 import { LandingInteractiveDemo } from './LandingInteractiveDemo';
@@ -205,7 +205,7 @@ const snippetPresets = [
 export function LandingPage() {
   const [activePreview, setActivePreview] = useState('Variables');
   const [activeSnippetId, setActiveSnippetId] = useState(snippetPresets[0].id);
-  const [theme, setTheme] = useState<Theme>(initialTheme);
+  const { theme, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   useMenuDismiss();
   const activeSnippet =
@@ -230,10 +230,6 @@ export function LandingPage() {
   }, []);
 
   useEffect(() => {
-    applyTheme(theme);
-  }, [theme]);
-
-  useEffect(() => {
     const revealElements = [...document.querySelectorAll('.reveal')];
     if (!('IntersectionObserver' in window)) {
       revealElements.forEach((element) => element.classList.add('active-reveal'));
@@ -254,8 +250,6 @@ export function LandingPage() {
     revealElements.forEach((element) => observer.observe(element));
     return () => observer.disconnect();
   }, []);
-
-  const toggleTheme = () => setTheme((current) => (current === 'dark' ? 'light' : 'dark'));
 
   return (
     <div className="landing-page">

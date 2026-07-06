@@ -18,27 +18,20 @@ import { LogoMark } from '../components/LogoMark';
 import { TopBar } from '../components/TopBar';
 import { VariablesPanel } from '../components/VariablesPanel';
 import { WatchPanel } from '../components/WatchPanel';
-import { lineExecutionCounts } from '../engine/traceMetrics';
-import {
-  nextStepOnLine,
-  stepOverStep,
-  traceBreakpointStep,
-  traceStepOnLine,
-} from '../engine/traceNavigation';
-import type { Language, SessionResult } from '../engine/types';
+import type { Language } from '../engine/types';
 import { CUSTOM_CODE_ID, DEFAULT_EXAMPLE_ID, getExample } from '../examples/examples';
 import { loadStoredCodeDraft, saveStoredCodeDraft } from './codeDraft';
 import type { ColumnId, PanelId } from './layoutState';
-import { saveCodeHistory, type CodeHistoryItem } from './historyClient';
-import { buildIframeEmbedCode, decodeShareHash, encodeShareState } from './shareState';
-import { applyTheme, initialTheme, type Theme } from './theme';
-import { buildTraceSvgExport } from './traceSvgExport';
+import type { CodeHistoryItem } from './historyClient';
+import { decodeShareHash } from './shareState';
+import { useTheme } from './theme';
+import { useCodeHistorySync } from './useCodeHistorySync';
 import { useResizableLayout } from './useResizableLayout';
 import { useSession } from './useSession';
+import { useTraceNavigation } from './useTraceNavigation';
+import { useTraceTransfer } from './useTraceTransfer';
+import { useTransportShortcuts } from './useTransportShortcuts';
 
-const EXPORT_VERSION = 2;
-const DEFAULT_IMPORT_LABEL = 'Import';
-const DEFAULT_IMPORT_TITLE = 'Import a previously exported trace';
 const DASHBOARD_ONBOARDING_STORAGE_KEY = 'cv-dashboard-onboarding-v1';
 const EMBED_SEARCH_PARAM = 'embed';
 
@@ -86,21 +79,6 @@ function initialLanguage(exampleId: string | null, sharedLanguage: Language | un
   return sharedLanguage ?? (exampleId ? (getExample(exampleId)?.language ?? 'python') : 'python');
 }
 
-function historyTitle(exampleId: string | null, functionName: string | null, code: string): string {
-  const exampleTitle = exampleId ? getExample(exampleId)?.title : null;
-  if (exampleTitle) {
-    return exampleTitle;
-  }
-  if (functionName) {
-    return functionName;
-  }
-  return code
-    .split('\n')
-    .map((line) => line.trim())
-    .find(Boolean)
-    ?.slice(0, 80) ?? 'Untitled code';
-}
-
 export function App() {
   const [showDashboard, setShowDashboard] = useState(shouldShowDashboard);
   const openLanding = useCallback(() => {
@@ -140,20 +118,13 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
     exampleId,
     shared?.language ?? bootDraft?.language,
   );
-  const [theme, setTheme] = useState<Theme>(initialTheme);
-  const [shareLabel, setShareLabel] = useState('Share');
-  const [embedLabel, setEmbedLabel] = useState('Embed');
+  const { theme, toggleTheme } = useTheme();
   const [embedMode] = useState(initialEmbedMode);
   const [showDashboardOnboarding, setShowDashboardOnboarding] = useState(() =>
     initialDashboardOnboarding(embedMode),
   );
-  const [importLabel, setImportLabel] = useState(DEFAULT_IMPORT_LABEL);
-  const [importTitle, setImportTitle] = useState(DEFAULT_IMPORT_TITLE);
   const [watchedVariables, setWatchedVariables] = useState<string[]>([]);
   const [draftAvailable, setDraftAvailable] = useState(() => loadStoredCodeDraft() !== null);
-  const [historyRefreshToken, setHistoryRefreshToken] = useState(0);
-  const [breakpoints, setBreakpoints] = useState<Set<number>>(() => new Set());
-  const [cursorLine, setCursorLine] = useState<number | null>(null);
   const {
     adjustColumnPair,
     adjustPanelPair,
@@ -169,8 +140,6 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
     startPanelResize,
     togglePanelVisibility,
   } = useResizableLayout(embedMode);
-  const importStatusTimeoutRef = useRef<number | null>(null);
-  const currentHistoryIdRef = useRef<string | null>(null);
   // Only actual typing produces a draft; programmatic loads (examples,
   // history, imports, the restore itself) must not overwrite it.
   const userEditedRef = useRef(false);
@@ -183,79 +152,86 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
   });
   const { importSession, jumpToStep, selectedFrameIndex, setCode, setLanguage, step, steps } =
     session;
+  const { clearHistoryItemId, historyRefreshToken, setHistoryItemId } = useCodeHistorySync({
+    code: session.code,
+    embedMode,
+    exampleId,
+    functionOverride: session.functionOverride,
+    language: session.language,
+    result: session.result,
+  });
+  const {
+    breakpointLines,
+    cursorLine,
+    cursorTarget,
+    executionCounts,
+    nextBreakpointTarget,
+    resetTraceNavigation,
+    runToBreakpoint,
+    runToCursor,
+    runToLine,
+    setCursorLine,
+    stepOver,
+    stepOverTarget,
+    toggleBreakpoint,
+  } = useTraceNavigation({
+    jumpToStep,
+    selectedFrameIndex,
+    step,
+    steps,
+  });
 
-  const executionCounts = useMemo(() => lineExecutionCounts(steps), [steps]);
-  const breakpointLines = useMemo(() => [...breakpoints].sort((a, b) => a - b), [breakpoints]);
-  const nextBreakpointTarget = useMemo(
-    () => traceBreakpointStep(steps, step, breakpoints),
-    [breakpoints, step, steps],
-  );
-  const cursorTarget = useMemo(
-    () => traceStepOnLine(steps, step, cursorLine),
-    [cursorLine, step, steps],
-  );
-  const stepOverTarget = useMemo(
-    () => stepOverStep(steps, step, selectedFrameIndex),
-    [selectedFrameIndex, step, steps],
-  );
-
-  const resetTraceNavigation = useCallback(() => {
-    setBreakpoints(new Set());
-    setCursorLine(null);
-  }, []);
-
-  const toggleBreakpoint = useCallback((line: number) => {
-    setBreakpoints((current) => {
-      const next = new Set(current);
-      if (next.has(line)) {
-        next.delete(line);
-      } else {
-        next.add(line);
-      }
-      return next;
-    });
-  }, []);
-
-  const runToLine = useCallback(
-    (line: number) => {
-      const target = nextStepOnLine(steps, step, line);
-      if (target !== null) {
-        jumpToStep(target);
-      }
+  const handleImportedTrace = useCallback(
+    ({
+      code,
+      language,
+      result,
+      step,
+    }: {
+      code: string;
+      language: Language;
+      result: Parameters<typeof importSession>[1];
+      step: number;
+    }) => {
+      clearHistoryItemId();
+      userEditedRef.current = false;
+      setExampleId(null);
+      setWatchedVariables([]);
+      resetTraceNavigation();
+      importSession(code, result, step, language);
     },
-    [jumpToStep, step, steps],
+    [clearHistoryItemId, importSession, resetTraceNavigation],
   );
+  const {
+    embedLabel,
+    handleEmbed,
+    handleExport,
+    handleExportSvg,
+    handleImport,
+    handleShare,
+    importLabel,
+    importTitle,
+    shareLabel,
+  } = useTraceTransfer({
+    code: session.code,
+    exampleId,
+    functionOverride: session.functionOverride,
+    inputLiterals: session.inputLiterals,
+    language: session.language,
+    onImportTrace: handleImportedTrace,
+    result: session.result,
+    seed: session.seed,
+    step: session.step,
+  });
 
-  const runToBreakpoint = useCallback(() => {
-    if (nextBreakpointTarget !== null) {
-      jumpToStep(nextBreakpointTarget);
-    }
-  }, [jumpToStep, nextBreakpointTarget]);
-
-  const runToCursor = useCallback(() => {
-    if (cursorTarget !== null) {
-      jumpToStep(cursorTarget);
-    }
-  }, [cursorTarget, jumpToStep]);
-
-  const stepOver = useCallback(() => {
-    if (stepOverTarget !== null) {
-      jumpToStep(stepOverTarget);
-    }
-  }, [jumpToStep, stepOverTarget]);
-
-  useEffect(() => {
-    applyTheme(theme);
-  }, [theme]);
-
-  useEffect(
-    () => () => {
-      if (importStatusTimeoutRef.current !== null) {
-        window.clearTimeout(importStatusTimeoutRef.current);
-      }
-    },
-    [],
-  );
+  useTransportShortcuts({
+    jumpToStep,
+    run: session.run,
+    stepBack: session.stepBack,
+    stepForward: session.stepForward,
+    togglePlay: session.togglePlay,
+    totalSteps: session.totalSteps,
+  });
 
   // Analyze the initial snippet so the inputs panel is ready pre-run.
   useEffect(() => {
@@ -276,109 +252,16 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
     return () => window.clearTimeout(timeout);
   }, [embedMode, exampleId, session.code, session.language]);
 
-  useEffect(() => {
-    if (embedMode || session.result?.status !== 'ok' || !session.result.run) {
-      return;
-    }
-
-    let cancelled = false;
-    const run = session.result.run;
-    void saveCodeHistory({
-      code: session.code,
-      exampleId,
-      functionName: run.functionName ?? session.functionOverride,
-      id: currentHistoryIdRef.current,
-      inputs: run.inputs.map((input) => input.literal),
-      language: session.language,
-      seed: run.seed,
-      title: historyTitle(exampleId, run.functionName ?? session.functionOverride, session.code),
-    })
-      .then((item) => {
-        if (!cancelled && item) {
-          currentHistoryIdRef.current = item.id;
-          setHistoryRefreshToken((current) => current + 1);
-        }
-      })
-      .catch(() => {
-        /* History is best-effort: guests and local static dev can still run code. */
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    embedMode,
-    exampleId,
-    session.code,
-    session.functionOverride,
-    session.language,
-    session.result,
-  ]);
-
-  // Keyboard transport: Cmd/Ctrl+Enter run, ←/→ step, Space play/pause,
-  // Home/End jump. Transport keys are ignored while typing; run is global.
-  const { stepBack, stepForward, togglePlay, totalSteps, run: runSession } = session;
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key === 'Enter') {
-        event.preventDefault();
-        void runSession();
-        return;
-      }
-      if (event.metaKey || event.ctrlKey || event.altKey) {
-        return;
-      }
-      const target = event.target;
-      if (
-        target instanceof HTMLElement &&
-        (target.tagName === 'INPUT' ||
-          target.tagName === 'TEXTAREA' ||
-          target.tagName === 'SELECT' ||
-          target.isContentEditable ||
-          target.closest('.cm-editor'))
-      ) {
-        return;
-      }
-      switch (event.key) {
-        case 'ArrowLeft':
-          event.preventDefault();
-          stepBack();
-          break;
-        case 'ArrowRight':
-          event.preventDefault();
-          stepForward();
-          break;
-        case ' ':
-        case 'Spacebar':
-          event.preventDefault();
-          togglePlay();
-          break;
-        case 'Home':
-          event.preventDefault();
-          jumpToStep(0);
-          break;
-        case 'End':
-          event.preventDefault();
-          jumpToStep(totalSteps - 1);
-          break;
-        default:
-          break;
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [stepBack, stepForward, togglePlay, jumpToStep, totalSteps, runSession]);
-
   const handleCodeChange = useCallback(
     (code: string) => {
-      currentHistoryIdRef.current = null;
+      clearHistoryItemId();
       userEditedRef.current = true;
       setExampleId(null);
       setWatchedVariables([]);
       resetTraceNavigation();
       setCode(code);
     },
-    [resetTraceNavigation, setCode],
+    [clearHistoryItemId, resetTraceNavigation, setCode],
   );
 
   const handleExampleChange = useCallback(
@@ -388,7 +271,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
         if (!draft) {
           return;
         }
-        currentHistoryIdRef.current = null;
+        clearHistoryItemId();
         userEditedRef.current = false;
         setExampleId(null);
         setWatchedVariables([]);
@@ -400,181 +283,30 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
       if (!example) {
         return;
       }
-      currentHistoryIdRef.current = null;
+      clearHistoryItemId();
       setExampleId(id);
       setWatchedVariables([]);
       resetTraceNavigation();
       setLanguage(example.language);
       setCode(example.code);
     },
-    [resetTraceNavigation, session, setCode, setLanguage],
+    [clearHistoryItemId, resetTraceNavigation, session, setCode, setLanguage],
   );
 
   const handleLanguageChange = useCallback(
     (nextLanguage: Language) => {
-      currentHistoryIdRef.current = null;
+      clearHistoryItemId();
       setExampleId(null);
       setWatchedVariables([]);
       resetTraceNavigation();
       setLanguage(nextLanguage);
     },
-    [resetTraceNavigation, setLanguage],
-  );
-
-  const buildShareUrl = useCallback(
-    (embed: boolean) => {
-      const url = new URL(window.location.href);
-      url.hash = encodeShareState({
-        code: session.code,
-        exampleId: exampleId ?? undefined,
-        inputs: session.inputLiterals,
-        language: session.language,
-        seed: session.seed ?? undefined,
-        functionName: session.functionOverride ?? undefined,
-      });
-      if (embed) {
-        url.searchParams.set(EMBED_SEARCH_PARAM, '1');
-      } else {
-        url.searchParams.delete(EMBED_SEARCH_PARAM);
-      }
-      return url;
-    },
-    [
-      exampleId,
-      session.code,
-      session.functionOverride,
-      session.inputLiterals,
-      session.language,
-      session.seed,
-    ],
-  );
-
-  const handleShare = useCallback(async () => {
-    const url = buildShareUrl(false);
-    window.history.replaceState(null, '', url);
-    try {
-      if (!navigator.clipboard) {
-        throw new Error('Clipboard unavailable');
-      }
-      await navigator.clipboard.writeText(url.toString());
-      setShareLabel('Copied!');
-    } catch {
-      setShareLabel('Link set');
-    }
-    window.setTimeout(() => setShareLabel('Share'), 1800);
-  }, [buildShareUrl]);
-
-  const handleEmbed = useCallback(async () => {
-    const url = buildShareUrl(true);
-    const code = buildIframeEmbedCode(url.toString());
-    try {
-      if (!navigator.clipboard) {
-        throw new Error('Clipboard unavailable');
-      }
-      await navigator.clipboard.writeText(code);
-      setEmbedLabel('Copied!');
-    } catch {
-      setEmbedLabel('Copy failed');
-    }
-    window.setTimeout(() => setEmbedLabel('Embed'), 1800);
-  }, [buildShareUrl]);
-
-  const handleExport = useCallback(() => {
-    if (!session.result) {
-      return;
-    }
-    const payload = {
-      version: EXPORT_VERSION,
-      exportedAt: new Date().toISOString(),
-      code: session.code,
-      step: session.step,
-      result: session.result,
-      language: session.language,
-    };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], {
-      type: 'application/json;charset=utf-8',
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `code-visualizer-trace-${Date.now()}.json`;
-    document.body.append(link);
-    link.click();
-    link.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-  }, [session.code, session.language, session.result, session.step]);
-
-  const handleExportSvg = useCallback(() => {
-    const exportData = buildTraceSvgExport(session.code, session.result);
-    if (!exportData) {
-      return;
-    }
-    const blob = new Blob([exportData.svg], {
-      type: 'image/svg+xml;charset=utf-8',
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = exportData.filename;
-    document.body.append(link);
-    link.click();
-    link.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-  }, [session.code, session.result]);
-
-  const showImportStatus = useCallback((label: string, title: string) => {
-    if (importStatusTimeoutRef.current !== null) {
-      window.clearTimeout(importStatusTimeoutRef.current);
-    }
-    setImportLabel(label);
-    setImportTitle(title);
-    importStatusTimeoutRef.current = window.setTimeout(() => {
-      setImportLabel(DEFAULT_IMPORT_LABEL);
-      setImportTitle(DEFAULT_IMPORT_TITLE);
-      importStatusTimeoutRef.current = null;
-    }, 2200);
-  }, []);
-
-  const handleImport = useCallback(
-    (file: File) => {
-      void file
-        .text()
-        .then((text) => {
-          try {
-            const payload = JSON.parse(text) as {
-              version?: number;
-              code?: string;
-              language?: Language;
-              step?: number;
-              result?: SessionResult;
-            };
-            if (typeof payload.code === 'string' && payload.result) {
-              const importedLanguage: Language =
-                payload.language === 'javascript' || payload.language === 'typescript'
-                  ? payload.language
-                  : 'python';
-              currentHistoryIdRef.current = null;
-              userEditedRef.current = false;
-              setExampleId(null);
-              setWatchedVariables([]);
-              resetTraceNavigation();
-              importSession(payload.code, payload.result, payload.step ?? 0, importedLanguage);
-              showImportStatus('Imported', 'Trace imported successfully');
-              return;
-            }
-            showImportStatus('Import failed', 'Selected JSON is not a Code Visualizer trace');
-          } catch {
-            showImportStatus('Import failed', 'Selected file is not valid JSON');
-          }
-        })
-        .catch(() => showImportStatus('Import failed', 'Could not read selected file'));
-    },
-    [resetTraceNavigation, importSession, showImportStatus],
+    [clearHistoryItemId, resetTraceNavigation, setLanguage],
   );
 
   const handleOpenHistoryItem = useCallback(
     (item: CodeHistoryItem) => {
-      currentHistoryIdRef.current = item.id;
+      setHistoryItemId(item.id);
       userEditedRef.current = false;
       setExampleId(item.exampleId);
       setWatchedVariables([]);
@@ -586,7 +318,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
         seed: item.seed,
       });
     },
-    [resetTraceNavigation, session],
+    [resetTraceNavigation, session, setHistoryItemId],
   );
 
   const toggleWatchedVariable = useCallback((name: string) => {
@@ -860,7 +592,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
   );
 
   return (
-    <div className={`app-shell design-traced${embedMode ? ' app-shell-embed' : ''}`}>
+    <div className={`app-shell dashboard-instrument${embedMode ? ' app-shell-embed' : ''}`}>
       <section className="dashboard-stage" aria-label="Code Visualizer dashboard">
         {embedMode ? (
           <header className="embed-bar">
@@ -893,7 +625,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
             onShare={() => void handleShare()}
             onShowAllPanels={showAllPanels}
             onTogglePanel={togglePanelVisibility}
-            onToggleTheme={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))}
+            onToggleTheme={toggleTheme}
             historyRefreshToken={historyRefreshToken}
             panelControls={panelControls}
             shareLabel={shareLabel}
