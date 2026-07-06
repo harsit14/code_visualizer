@@ -3,7 +3,7 @@
  * between the session hook and the dashboard panels.
  */
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { CallStackPanel } from '../components/CallStackPanel';
 import { ConsolePanel } from '../components/ConsolePanel';
 import { ControlsBar } from '../components/ControlsBar';
@@ -28,53 +28,19 @@ import {
 import type { Language, SessionResult } from '../engine/types';
 import { CUSTOM_CODE_ID, DEFAULT_EXAMPLE_ID, getExample } from '../examples/examples';
 import { loadStoredCodeDraft, saveStoredCodeDraft } from './codeDraft';
-import {
-  DEFAULT_COLUMN_WEIGHTS,
-  DEFAULT_PANEL_VISIBILITY,
-  DEFAULT_PANEL_WEIGHTS,
-  FULL_PANEL_VISIBILITY,
-  PANEL_DEFINITIONS,
-  normalizePanelVisibility,
-  normalizeWeights,
-  type ColumnId,
-  type ColumnWeights,
-  type PanelId,
-  type PanelVisibility,
-  type PanelWeights,
-} from './layoutState';
+import type { ColumnId, PanelId } from './layoutState';
 import { saveCodeHistory, type CodeHistoryItem } from './historyClient';
 import { buildIframeEmbedCode, decodeShareHash, encodeShareState } from './shareState';
 import { applyTheme, initialTheme, type Theme } from './theme';
 import { buildTraceSvgExport } from './traceSvgExport';
+import { useResizableLayout } from './useResizableLayout';
 import { useSession } from './useSession';
 
 const EXPORT_VERSION = 2;
 const DEFAULT_IMPORT_LABEL = 'Import';
 const DEFAULT_IMPORT_TITLE = 'Import a previously exported trace';
-const PANEL_VISIBILITY_STORAGE_KEY = 'cv-panel-visibility-v1';
-const COLUMN_WEIGHTS_STORAGE_KEY = 'cv-column-weights-v1';
-const PANEL_WEIGHTS_STORAGE_KEY = 'cv-panel-weights-v1';
 const DASHBOARD_ONBOARDING_STORAGE_KEY = 'cv-dashboard-onboarding-v1';
-
-const COLUMN_MIN_WIDTHS: Record<ColumnId, number> = {
-  left: 300,
-  center: 320,
-  right: 280,
-};
-
-const PANEL_MIN_HEIGHT = 92;
 const EMBED_SEARCH_PARAM = 'embed';
-
-const DEFAULT_EMBED_PANEL_VISIBILITY: PanelVisibility = {
-  code: true,
-  inputs: true,
-  data: true,
-  variables: false,
-  watch: false,
-  callStack: true,
-  explainer: false,
-  console: true,
-};
 
 type PanelSlotConfig = {
   content: ReactNode;
@@ -120,51 +86,6 @@ function initialLanguage(exampleId: string | null, sharedLanguage: Language | un
   return sharedLanguage ?? (exampleId ? (getExample(exampleId)?.language ?? 'python') : 'python');
 }
 
-function readStoredValue<T>(key: string, fallback: T, normalize: (value: unknown) => T): T {
-  try {
-    const raw = window.localStorage.getItem(key);
-    return raw ? normalize(JSON.parse(raw)) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function saveStoredValue(key: string, value: unknown) {
-  try {
-    window.localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    /* local storage unavailable */
-  }
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max);
-}
-
-/* Snapshot rendered sizes so a resize only redistributes space between the
-   two adjacent tracks while every other track keeps its pixel size. */
-function measuredColumnWidths(
-  refs: Record<ColumnId, HTMLDivElement | null>,
-): Partial<ColumnWeights> {
-  return Object.fromEntries(
-    Object.entries(refs)
-      .map(([columnId, node]) => [columnId, node?.getBoundingClientRect().width])
-      .filter((entry): entry is [ColumnId, number] => typeof entry[1] === 'number'),
-  ) as Partial<ColumnWeights>;
-}
-
-function measuredPanelHeights(
-  refs: Partial<Record<PanelId, HTMLDivElement | null>>,
-): Partial<PanelWeights> {
-  return Object.fromEntries(
-    Object.entries(refs)
-      .map(([panelId, node]) => [panelId, node?.getBoundingClientRect().height])
-      .filter((entry): entry is [PanelId, number] => typeof entry[1] === 'number'),
-  ) as Partial<PanelWeights>;
-}
-
-const KEYBOARD_RESIZE_STEP = 24;
-
 function historyTitle(exampleId: string | null, functionName: string | null, code: string): string {
   const exampleTitle = exampleId ? getExample(exampleId)?.title : null;
   if (exampleTitle) {
@@ -178,25 +99,6 @@ function historyTitle(exampleId: string | null, functionName: string | null, cod
     .map((line) => line.trim())
     .find(Boolean)
     ?.slice(0, 80) ?? 'Untitled code';
-}
-
-function isPanelId(id: string): id is PanelId {
-  return PANEL_DEFINITIONS.some((panel) => panel.id === id);
-}
-
-function columnTrack(columnId: ColumnId, weights: ColumnWeights): string {
-  return `minmax(${COLUMN_MIN_WIDTHS[columnId]}px, ${weights[columnId]}fr)`;
-}
-
-function workbenchColumns(columnIds: readonly ColumnId[], weights: ColumnWeights): string {
-  if (columnIds.length === 0) {
-    return '1fr';
-  }
-  return columnIds
-    .flatMap((columnId, index) =>
-      index === 0 ? [columnTrack(columnId, weights)] : ['10px', columnTrack(columnId, weights)],
-    )
-    .join(' ');
 }
 
 export function App() {
@@ -252,35 +154,21 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
   const [historyRefreshToken, setHistoryRefreshToken] = useState(0);
   const [breakpoints, setBreakpoints] = useState<Set<number>>(() => new Set());
   const [cursorLine, setCursorLine] = useState<number | null>(null);
-  const [panelVisibility, setPanelVisibility] = useState<PanelVisibility>(() =>
-    embedMode
-      ? { ...DEFAULT_EMBED_PANEL_VISIBILITY }
-      : readStoredValue(
-          PANEL_VISIBILITY_STORAGE_KEY,
-          DEFAULT_PANEL_VISIBILITY,
-          normalizePanelVisibility,
-        ),
-  );
-  const [columnWeights, setColumnWeights] = useState<ColumnWeights>(() =>
-    embedMode
-      ? { ...DEFAULT_COLUMN_WEIGHTS }
-      : readStoredValue(COLUMN_WEIGHTS_STORAGE_KEY, DEFAULT_COLUMN_WEIGHTS, (value) =>
-          normalizeWeights(value, DEFAULT_COLUMN_WEIGHTS),
-        ),
-  );
-  const [panelWeights, setPanelWeights] = useState<PanelWeights>(() =>
-    embedMode
-      ? { ...DEFAULT_PANEL_WEIGHTS }
-      : readStoredValue(PANEL_WEIGHTS_STORAGE_KEY, DEFAULT_PANEL_WEIGHTS, (value) =>
-          normalizeWeights(value, DEFAULT_PANEL_WEIGHTS),
-        ),
-  );
-  const columnRefs = useRef<Record<ColumnId, HTMLDivElement | null>>({
-    left: null,
-    center: null,
-    right: null,
-  });
-  const panelSlotRefs = useRef<Partial<Record<PanelId, HTMLDivElement | null>>>({});
+  const {
+    adjustColumnPair,
+    adjustPanelPair,
+    columnsTemplate,
+    panelControls,
+    panelVisibility,
+    panelWeights,
+    registerColumn,
+    registerPanelSlot,
+    resetLayout,
+    showAllPanels,
+    startColumnResize,
+    startPanelResize,
+    togglePanelVisibility,
+  } = useResizableLayout(embedMode);
   const importStatusTimeoutRef = useRef<number | null>(null);
   const currentHistoryIdRef = useRef<string | null>(null);
   // Only actual typing produces a draft; programmatic loads (examples,
@@ -359,24 +247,6 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
   useEffect(() => {
     applyTheme(theme);
   }, [theme]);
-
-  useEffect(() => {
-    if (!embedMode) {
-      saveStoredValue(PANEL_VISIBILITY_STORAGE_KEY, panelVisibility);
-    }
-  }, [embedMode, panelVisibility]);
-
-  useEffect(() => {
-    if (!embedMode) {
-      saveStoredValue(COLUMN_WEIGHTS_STORAGE_KEY, columnWeights);
-    }
-  }, [columnWeights, embedMode]);
-
-  useEffect(() => {
-    if (!embedMode) {
-      saveStoredValue(PANEL_WEIGHTS_STORAGE_KEY, panelWeights);
-    }
-  }, [embedMode, panelWeights]);
 
   useEffect(
     () => () => {
@@ -729,35 +599,6 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
     setWatchedVariables((current) => current.filter((item) => item !== name));
   }, []);
 
-  const registerColumn = useCallback((columnId: ColumnId, node: HTMLDivElement | null) => {
-    columnRefs.current[columnId] = node;
-  }, []);
-
-  const registerPanelSlot = useCallback((panelId: PanelId, node: HTMLDivElement | null) => {
-    panelSlotRefs.current[panelId] = node;
-  }, []);
-
-  const togglePanelVisibility = useCallback((id: string, visible: boolean) => {
-    if (!isPanelId(id)) {
-      return;
-    }
-    setPanelVisibility((current) => ({ ...current, [id]: visible }));
-  }, []);
-
-  const resetLayout = useCallback(() => {
-    setPanelVisibility(
-      embedMode ? { ...DEFAULT_EMBED_PANEL_VISIBILITY } : { ...DEFAULT_PANEL_VISIBILITY },
-    );
-    setColumnWeights({ ...DEFAULT_COLUMN_WEIGHTS });
-    setPanelWeights({ ...DEFAULT_PANEL_WEIGHTS });
-  }, [embedMode]);
-
-  const showAllPanels = useCallback(() => {
-    setPanelVisibility(embedMode ? { ...DEFAULT_EMBED_PANEL_VISIBILITY } : { ...FULL_PANEL_VISIBILITY });
-    setColumnWeights({ ...DEFAULT_COLUMN_WEIGHTS });
-    setPanelWeights({ ...DEFAULT_PANEL_WEIGHTS });
-  }, [embedMode]);
-
   const dismissDashboardOnboarding = useCallback(() => {
     setShowDashboardOnboarding(false);
     try {
@@ -766,162 +607,6 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
       /* local storage unavailable */
     }
   }, []);
-
-  const startColumnResize = useCallback(
-    (beforeColumn: ColumnId, afterColumn: ColumnId, event: ReactPointerEvent) => {
-      if (event.button !== 0) {
-        return;
-      }
-      const beforeNode = columnRefs.current[beforeColumn];
-      const afterNode = columnRefs.current[afterColumn];
-      if (!beforeNode || !afterNode) {
-        return;
-      }
-
-      event.preventDefault();
-      const startX = event.clientX;
-      const startBefore = beforeNode.getBoundingClientRect().width;
-      const startAfter = afterNode.getBoundingClientRect().width;
-      const startWidths = measuredColumnWidths(columnRefs.current);
-      const total = startBefore + startAfter;
-      const beforeMin = Math.min(COLUMN_MIN_WIDTHS[beforeColumn], total / 2);
-      const afterMin = Math.min(COLUMN_MIN_WIDTHS[afterColumn], total / 2);
-      const previousCursor = document.body.style.cursor;
-      const previousUserSelect = document.body.style.userSelect;
-
-      document.body.style.cursor = 'col-resize';
-      document.body.style.userSelect = 'none';
-
-      const handleMove = (moveEvent: PointerEvent) => {
-        const beforeWidth = clamp(
-          startBefore + moveEvent.clientX - startX,
-          beforeMin,
-          total - afterMin,
-        );
-        setColumnWeights((current) => ({
-          ...current,
-          ...startWidths,
-          [beforeColumn]: beforeWidth,
-          [afterColumn]: total - beforeWidth,
-        }));
-      };
-
-      const stopResize = () => {
-        document.body.style.cursor = previousCursor;
-        document.body.style.userSelect = previousUserSelect;
-        window.removeEventListener('pointermove', handleMove);
-        window.removeEventListener('pointerup', stopResize);
-        window.removeEventListener('pointercancel', stopResize);
-      };
-
-      window.addEventListener('pointermove', handleMove);
-      window.addEventListener('pointerup', stopResize);
-      window.addEventListener('pointercancel', stopResize);
-    },
-    [],
-  );
-
-  const startPanelResize = useCallback(
-    (beforePanel: PanelId, afterPanel: PanelId, event: ReactPointerEvent) => {
-      if (event.button !== 0) {
-        return;
-      }
-      const beforeNode = panelSlotRefs.current[beforePanel];
-      const afterNode = panelSlotRefs.current[afterPanel];
-      if (!beforeNode || !afterNode) {
-        return;
-      }
-
-      event.preventDefault();
-      const startY = event.clientY;
-      const startBefore = beforeNode.getBoundingClientRect().height;
-      const startAfter = afterNode.getBoundingClientRect().height;
-      const startHeights = measuredPanelHeights(panelSlotRefs.current);
-      const total = startBefore + startAfter;
-      const minHeight = Math.min(PANEL_MIN_HEIGHT, total / 2);
-      const previousCursor = document.body.style.cursor;
-      const previousUserSelect = document.body.style.userSelect;
-
-      document.body.style.cursor = 'row-resize';
-      document.body.style.userSelect = 'none';
-
-      const handleMove = (moveEvent: PointerEvent) => {
-        const beforeHeight = clamp(
-          startBefore + moveEvent.clientY - startY,
-          minHeight,
-          total - minHeight,
-        );
-        setPanelWeights((current) => ({
-          ...current,
-          ...startHeights,
-          [beforePanel]: beforeHeight,
-          [afterPanel]: total - beforeHeight,
-        }));
-      };
-
-      const stopResize = () => {
-        document.body.style.cursor = previousCursor;
-        document.body.style.userSelect = previousUserSelect;
-        window.removeEventListener('pointermove', handleMove);
-        window.removeEventListener('pointerup', stopResize);
-        window.removeEventListener('pointercancel', stopResize);
-      };
-
-      window.addEventListener('pointermove', handleMove);
-      window.addEventListener('pointerup', stopResize);
-      window.addEventListener('pointercancel', stopResize);
-    },
-    [],
-  );
-
-  // Keyboard equivalents of the drag resizers (arrow keys on the focused
-  // separator): shift space between the two adjacent tracks in fixed steps.
-  const adjustColumnPair = useCallback(
-    (beforeColumn: ColumnId, afterColumn: ColumnId, delta: number) => {
-      const beforeNode = columnRefs.current[beforeColumn];
-      const afterNode = columnRefs.current[afterColumn];
-      if (!beforeNode || !afterNode) {
-        return;
-      }
-      const startBefore = beforeNode.getBoundingClientRect().width;
-      const startAfter = afterNode.getBoundingClientRect().width;
-      const startWidths = measuredColumnWidths(columnRefs.current);
-      const total = startBefore + startAfter;
-      const beforeMin = Math.min(COLUMN_MIN_WIDTHS[beforeColumn], total / 2);
-      const afterMin = Math.min(COLUMN_MIN_WIDTHS[afterColumn], total / 2);
-      const beforeWidth = clamp(startBefore + delta, beforeMin, total - afterMin);
-      setColumnWeights((current) => ({
-        ...current,
-        ...startWidths,
-        [beforeColumn]: beforeWidth,
-        [afterColumn]: total - beforeWidth,
-      }));
-    },
-    [],
-  );
-
-  const adjustPanelPair = useCallback(
-    (beforePanel: PanelId, afterPanel: PanelId, delta: number) => {
-      const beforeNode = panelSlotRefs.current[beforePanel];
-      const afterNode = panelSlotRefs.current[afterPanel];
-      if (!beforeNode || !afterNode) {
-        return;
-      }
-      const startBefore = beforeNode.getBoundingClientRect().height;
-      const startAfter = afterNode.getBoundingClientRect().height;
-      const startHeights = measuredPanelHeights(panelSlotRefs.current);
-      const total = startBefore + startAfter;
-      const minHeight = Math.min(PANEL_MIN_HEIGHT, total / 2);
-      const beforeHeight = clamp(startBefore + delta, minHeight, total - minHeight);
-      setPanelWeights((current) => ({
-        ...current,
-        ...startHeights,
-        [beforePanel]: beforeHeight,
-        [afterPanel]: total - beforeHeight,
-      }));
-    },
-    [],
-  );
 
   const run = session.result?.run ?? null;
   const errorLine = useMemo(() => {
@@ -937,14 +622,6 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
   const atLastStep = session.totalSteps > 0 && session.step === session.totalSteps - 1;
   const previousStep = session.step > 0 ? session.steps[session.step - 1] : undefined;
   const showInputs = session.language === 'python' && session.analysis?.mode === 'function';
-  const panelControls = useMemo(
-    () =>
-      PANEL_DEFINITIONS.map((panel) => ({
-        ...panel,
-        visible: panelVisibility[panel.id],
-      })),
-    [panelVisibility],
-  );
 
   const leftSlots: PanelSlotConfig[] = [
     panelVisibility.code
@@ -1141,7 +818,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
     (columnId) => columnSlots[columnId].length > 0,
   );
   const workbenchStyle = {
-    '--workbench-columns': workbenchColumns(visibleColumns, columnWeights),
+    '--workbench-columns': columnsTemplate(visibleColumns),
   } as CSSProperties;
 
   const renderPanelStack = (columnId: ColumnId, slots: PanelSlotConfig[]) => (
@@ -1169,7 +846,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
                 adjustPanelPair(
                   slot.id,
                   slots[index + 1].id,
-                  event.key === 'ArrowUp' ? -KEYBOARD_RESIZE_STEP : KEYBOARD_RESIZE_STEP,
+                  event.key === 'ArrowUp' ? -1 : 1,
                 );
               }}
               onPointerDown={(event) => startPanelResize(slot.id, slots[index + 1].id, event)}
@@ -1250,7 +927,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
                       adjustColumnPair(
                         columnId,
                         visibleColumns[index + 1],
-                        event.key === 'ArrowLeft' ? -KEYBOARD_RESIZE_STEP : KEYBOARD_RESIZE_STEP,
+                        event.key === 'ArrowLeft' ? -1 : 1,
                       );
                     }}
                     onPointerDown={(event) =>
