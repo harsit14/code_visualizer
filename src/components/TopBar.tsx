@@ -105,7 +105,14 @@ export function TopBar({
       <div className="brand">
         <LogoMark />
         <h1>Code Visualizer</h1>
-        <span className={`status-pill status-${status.phase}`}>{status.message}</span>
+        <span
+          aria-atomic="true"
+          aria-live="polite"
+          className={`status-pill status-${status.phase}`}
+          role="status"
+        >
+          {status.message}
+        </span>
       </div>
 
       <div className="top-actions">

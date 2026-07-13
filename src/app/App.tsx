@@ -600,7 +600,12 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
               <LogoMark />
               <strong>Code Visualizer</strong>
             </span>
-            <span className={`status-pill status-${session.status.phase}`}>
+            <span
+              aria-atomic="true"
+              aria-live="polite"
+              className={`status-pill status-${session.status.phase}`}
+              role="status"
+            >
               {session.status.message}
             </span>
           </header>

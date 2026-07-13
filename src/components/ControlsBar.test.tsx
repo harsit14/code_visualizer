@@ -93,4 +93,22 @@ describe('ControlsBar', () => {
     expect(html).not.toContain('controls-bar-prerun');
     expect(html).not.toMatch(/(?:Cmd|Ctrl) Enter/);
   });
+
+  it('names icon controls and announces trace changes', () => {
+    const html = renderControls({
+      currentStep: traceStep,
+      playing: true,
+      totalSteps: 2,
+    });
+
+    expect(html).toContain('aria-label="Jump to first step"');
+    expect(html).toContain('aria-label="Previous step"');
+    expect(html).toContain('aria-label="Pause trace playback"');
+    expect(html).toContain('aria-pressed="true"');
+    expect(html).toContain('aria-label="Next step"');
+    expect(html).toContain('aria-label="Jump to final step"');
+    expect(html).toContain('aria-label="Reset trace to first step"');
+    expect(html).toContain('aria-live="polite"');
+    expect(html).toContain('Playing. Step 1 of 2.');
+  });
 });

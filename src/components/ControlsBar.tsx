@@ -200,17 +200,29 @@ export function ControlsBar({
         <>
           <div className="transport" role="group" aria-label="Step navigation">
             <ControlTip text={startTitle}>
-              <button disabled={!hasTrace || step === 0} onClick={() => onJump(0)} type="button">
+              <button
+                aria-label="Jump to first step"
+                disabled={!hasTrace || step === 0}
+                onClick={() => onJump(0)}
+                type="button"
+              >
                 <SkipBack size={15} />
               </button>
             </ControlTip>
             <ControlTip text={backTitle}>
-              <button disabled={!hasTrace || step === 0} onClick={onStepBack} type="button">
+              <button
+                aria-label="Previous step"
+                disabled={!hasTrace || step === 0}
+                onClick={onStepBack}
+                type="button"
+              >
                 <ChevronLeft size={16} />
               </button>
             </ControlTip>
             <ControlTip text={playTitle}>
               <button
+                aria-label={playing ? 'Pause trace playback' : 'Play trace'}
+                aria-pressed={playing}
                 className="play-toggle"
                 disabled={totalSteps <= 1}
                 onClick={onTogglePlay}
@@ -221,6 +233,7 @@ export function ControlsBar({
             </ControlTip>
             <ControlTip text={forwardTitle}>
               <button
+                aria-label="Next step"
                 disabled={!hasTrace || step >= totalSteps - 1}
                 onClick={onStepForward}
                 type="button"
@@ -230,6 +243,7 @@ export function ControlsBar({
             </ControlTip>
             <ControlTip text={endTitle}>
               <button
+                aria-label="Jump to final step"
                 disabled={!hasTrace || step >= totalSteps - 1}
                 onClick={() => onJump(totalSteps - 1)}
                 type="button"
@@ -273,6 +287,10 @@ export function ControlsBar({
           </div>
 
           <div className="scrubber" title={scrubberTitle}>
+            <span aria-atomic="true" aria-live="polite" className="sr-only">
+              {playing ? 'Playing. ' : 'Paused. '}Step {step + 1} of {totalSteps}.{' '}
+              {describeStep(currentStep)}
+            </span>
             <input
               aria-label="Trace position"
               disabled={!hasTrace}
@@ -319,6 +337,7 @@ export function ControlsBar({
 
           <ControlTip text={resetTitle}>
             <button
+              aria-label="Reset trace to first step"
               className="ghost-button"
               disabled={!hasTrace}
               onClick={() => onJump(0)}

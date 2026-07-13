@@ -242,6 +242,7 @@ export function InputsPanel({
                         {statusLabel(testCase.status)}
                       </span>
                       <button
+                        aria-label={`Trace ${testCase.name}`}
                         className="icon-button"
                         disabled={isBusy}
                         onClick={() => onTraceTestCase(testCase.id)}
@@ -251,6 +252,7 @@ export function InputsPanel({
                         <Route size={13} />
                       </button>
                       <button
+                        aria-label={`Remove ${testCase.name}`}
                         className="icon-button"
                         disabled={isBusy}
                         onClick={() => onRemoveTestCase(testCase.id)}

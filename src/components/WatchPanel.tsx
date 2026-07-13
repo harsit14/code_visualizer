@@ -141,6 +141,7 @@ export function WatchPanel({
                   </div>
                   <div className="watch-card-actions">
                     <button
+                      aria-label={`Jump to previous change of ${name}`}
                       className="icon-button"
                       disabled={prevChange === undefined}
                       onClick={() => prevChange !== undefined && onJump(prevChange)}
@@ -150,6 +151,7 @@ export function WatchPanel({
                       <ChevronUp size={13} />
                     </button>
                     <button
+                      aria-label={`Jump to next change of ${name}`}
                       className="icon-button"
                       disabled={nextChange === undefined}
                       onClick={() => nextChange !== undefined && onJump(nextChange)}
@@ -159,6 +161,7 @@ export function WatchPanel({
                       <ChevronDown size={13} />
                     </button>
                     <button
+                      aria-label={`Remove ${name} from watch`}
                       className="icon-button watch-remove"
                       onClick={() => onRemoveVariable(name)}
                       title={`Remove ${name} from watch`}
