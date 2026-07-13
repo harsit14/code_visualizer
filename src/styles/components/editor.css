@@ -29,6 +29,18 @@
   min-width: 18px;
 }
 
+@media (pointer: coarse) {
+  .cv-breakpoint-gutter .cm-gutterElement {
+    min-width: 28px;
+  }
+
+  .cv-breakpoint-marker,
+  .cv-breakpoint-spacer {
+    height: 12px;
+    width: 12px;
+  }
+}
+
 .cv-breakpoint-marker,
 .cv-breakpoint-spacer {
   border-radius: 999px;

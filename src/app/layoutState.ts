@@ -109,6 +109,14 @@ export function normalizeWeights<T extends string>(
   ) as Record<T, number>;
 }
 
+export function pairPercentage(before: number, after: number): number {
+  const total = before + after;
+  if (!Number.isFinite(total) || total <= 0) {
+    return 50;
+  }
+  return Math.round((before / total) * 100);
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

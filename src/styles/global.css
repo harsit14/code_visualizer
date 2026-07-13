@@ -267,17 +267,54 @@ input[type='password'] {
   }
 
   .workbench {
+    gap: 10px;
     grid-template-columns: 1fr;
   }
 
-  .column-resizer {
+  .column {
+    gap: 10px;
+  }
+
+  .panel-slot {
+    flex: 0 0 auto !important;
+    min-height: min(52svh, 420px);
+  }
+
+  .column-right {
+    overflow: visible;
+  }
+
+  .column-resizer,
+  .stack-resizer {
     display: none;
   }
 }
 
 @media (max-width: 720px) {
+  .app-shell {
+    padding-inline: 8px;
+  }
+
   .viewport-note {
     display: block;
+  }
+
+  .panel-slot {
+    min-height: min(58svh, 420px);
+  }
+}
+
+@media (pointer: coarse) {
+  .dashboard-instrument button,
+  .dashboard-instrument summary,
+  .dashboard-instrument select {
+    min-height: 40px;
+  }
+
+  .dashboard-instrument .icon-button,
+  .dashboard-instrument .transport button {
+    min-width: 40px;
+    width: 40px;
   }
 }
 

@@ -6,6 +6,7 @@ import {
   LEARN_PANEL_VISIBILITY,
   normalizePanelVisibility,
   normalizeWeights,
+  pairPercentage,
 } from './layoutState';
 
 describe('layoutState', () => {
@@ -49,5 +50,10 @@ describe('layoutState', () => {
       variables: true,
       watch: false,
     });
+  });
+
+  it('describes adjacent layout sizes as a percentage', () => {
+    expect(pairPercentage(3, 1)).toBe(75);
+    expect(pairPercentage(0, 0)).toBe(50);
   });
 });

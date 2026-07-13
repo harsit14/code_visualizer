@@ -21,7 +21,7 @@ import { WatchPanel } from '../components/WatchPanel';
 import type { Language } from '../engine/types';
 import { CUSTOM_CODE_ID, DEFAULT_EXAMPLE_ID, getExample } from '../examples/examples';
 import { loadStoredCodeDraft, saveStoredCodeDraft } from './codeDraft';
-import type { ColumnId, PanelId } from './layoutState';
+import { pairPercentage, type ColumnId, type PanelId } from './layoutState';
 import type { CodeHistoryItem } from './historyClient';
 import { decodeShareHash } from './shareState';
 import { useTheme } from './theme';
@@ -127,6 +127,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
     adjustColumnPair,
     adjustPanelPair,
     columnsTemplate,
+    columnWeights,
     panelControls,
     panelVisibility,
     panelWeights,
@@ -567,6 +568,12 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
             <div
               aria-label={`Resize ${slot.id} and ${slots[index + 1].id}`}
               aria-orientation="horizontal"
+              aria-valuemax={100}
+              aria-valuemin={0}
+              aria-valuenow={pairPercentage(
+                panelWeights[slot.id],
+                panelWeights[slots[index + 1].id],
+              )}
               className="stack-resizer"
               onKeyDown={(event) => {
                 if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') {
@@ -650,6 +657,12 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
                   <div
                     aria-label={`Resize ${columnId} and ${visibleColumns[index + 1]} columns`}
                     aria-orientation="vertical"
+                    aria-valuemax={100}
+                    aria-valuemin={0}
+                    aria-valuenow={pairPercentage(
+                      columnWeights[columnId],
+                      columnWeights[visibleColumns[index + 1]],
+                    )}
                     className="column-resizer"
                     onKeyDown={(event) => {
                       if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') {

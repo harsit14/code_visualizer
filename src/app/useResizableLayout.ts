@@ -391,6 +391,7 @@ export function useResizableLayout(embedMode: boolean) {
     adjustColumnPair,
     adjustPanelPair,
     columnsTemplate,
+    columnWeights,
     panelControls,
     panelVisibility,
     panelWeights,
