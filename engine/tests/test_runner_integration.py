@@ -125,6 +125,16 @@ def test_script_mode_runs_top_level():
     assert run["memoryIsEstimate"] is False
 
 
+def test_stdout_offsets_use_javascript_utf16_units():
+    result = run_session("print('😀')\nprint('x')")
+    line_two = next(
+        step
+        for step in result["run"]["steps"]
+        if step["event"] == "line" and step["line"] == 2
+    )
+    assert line_two["stdoutLen"] == 3  # emoji surrogate pair plus newline
+
+
 def test_script_exception_returns_error_with_partial_trace():
     result = run_session("a = 1\nb = a / 0")
     run = result["run"]
@@ -304,6 +314,23 @@ def test_complexity_reports_when_sampling_stops_early():
     )
     assert result["truncated"] is True
     assert result["truncationReason"].startswith("Stopped at n=4:")
+
+
+def test_complexity_samples_use_fresh_program_state():
+    result = measure_complexity(
+        "calls = 0\n"
+        "def f(nums):\n"
+        "    global calls\n"
+        "    calls += 1\n"
+        "    if calls > 1:\n"
+        "        raise RuntimeError('state leaked between samples')\n"
+        "    for value in nums:\n"
+        "        pass\n",
+        seed=1,
+        sizes=[4, 8, 16],
+    )
+    assert [sample["n"] for sample in result["samples"]] == [4, 8, 16]
+    assert result["error"] is None
 
 
 def test_json_api_round_trip():

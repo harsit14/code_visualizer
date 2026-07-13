@@ -333,6 +333,11 @@ describe('stdoutAtStep', () => {
     expect(stdoutAtStep('ab\ncd\n', step)).toBe('ab\n');
     expect(stdoutAtStep('ab\n', undefined)).toBe('');
   });
+
+  it('slices non-BMP output using Python UTF-16 offsets', () => {
+    const step = { stdoutLen: 3 } as TraceStep;
+    expect(stdoutAtStep('😀\nx\n', step)).toBe('😀\n');
+  });
 });
 
 describe('variableTimeline', () => {

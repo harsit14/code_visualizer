@@ -27,6 +27,11 @@ USER_FILENAME = "<user_code>"
 BYTES_PER_MB = 1024 * 1024
 
 
+def _javascript_string_length(value: str) -> int:
+    """Length in UTF-16 code units, matching JavaScript ``String.length``."""
+    return len(value.encode("utf-16-le")) // 2
+
+
 def _base_globals(analysis: Analysis) -> dict[str, Any]:
     """Globals for user code, with TreeNode/ListNode injected when needed."""
     env: dict[str, Any] = {"__name__": "__main__", "__file__": USER_FILENAME}
@@ -241,7 +246,7 @@ def _run_script(
         snapshotter=snapshotter,
         max_steps=max_steps,
         max_seconds=max_seconds,
-        stdout_len=lambda: len(stdout.getvalue()),
+        stdout_len=lambda: _javascript_string_length(stdout.getvalue()),
     )
     run: dict[str, Any] = {
         "functionName": None,
@@ -367,7 +372,7 @@ def _run_function(
         snapshotter=snapshotter,
         max_steps=max_steps,
         max_seconds=max_seconds,
-        stdout_len=lambda: len(stdout.getvalue()),
+        stdout_len=lambda: _javascript_string_length(stdout.getvalue()),
     )
     try:
         with redirect_stdout(stdout), redirect_stderr(stderr):
@@ -416,9 +421,8 @@ def measure_complexity(
         payload["error"] = {"type": "AnalysisError", "msg": "No function to measure."}
         return payload
 
-    env = _base_globals(analysis)
     try:
-        exec(compile(source, USER_FILENAME, "exec"), env)
+        code = compile(source, USER_FILENAME, "exec")
     except BaseException as exc:
         payload["error"] = _error_payload(exc)
         return payload
@@ -426,11 +430,22 @@ def measure_complexity(
     used_seed = seed if seed is not None else 1234
     payload["seed"] = used_seed
     for size in sizes or [4, 8, 16, 32, 64]:
+        # Start every sample from a clean module and class instance so caches,
+        # globals, and attributes cannot leak into the next input size.
+        env = _base_globals(analysis)
+        setup_stdout, setup_stderr = io.StringIO(), io.StringIO()
+        try:
+            with redirect_stdout(setup_stdout), redirect_stderr(setup_stderr):
+                exec(code, env)
+        except BaseException as exc:
+            payload["error"] = _error_payload(exc)
+            return payload
         generated, _ = generate_inputs(info, seed=used_seed, size=size, make_solvable=False)
         try:
             arguments = [evaluate_input(item.literal) for item in generated]
-        except BaseException:
-            continue
+        except BaseException as exc:
+            payload["error"] = _error_payload(exc)
+            return payload
         constructor_values = arguments[: info.constructor_param_count]
         function_values = arguments[info.constructor_param_count :]
         try:
