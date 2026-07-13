@@ -584,12 +584,36 @@ def _assignment_hints_for_body(body: list[ast.stmt]) -> list[dict[str, Any]]:
     return visitor.hints
 
 
+class _YieldVisitor(ast.NodeVisitor):
+    """Find yields in one function body without entering nested scopes."""
+
+    def __init__(self) -> None:
+        self.found = False
+
+    def visit_Yield(self, node: ast.Yield) -> None:
+        self.found = True
+
+    def visit_YieldFrom(self, node: ast.YieldFrom) -> None:
+        self.found = True
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+        return
+
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+        return
+
+    def visit_Lambda(self, node: ast.Lambda) -> None:
+        return
+
+    def visit_ClassDef(self, node: ast.ClassDef) -> None:
+        return
+
+
 def _is_generator(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
-    for child in ast.walk(node):
-        if isinstance(child, (ast.Yield, ast.YieldFrom)):
-            # Nested defs have their own generator-ness; close enough for UI hints.
-            return True
-    return False
+    visitor = _YieldVisitor()
+    for statement in node.body:
+        visitor.visit(statement)
+    return visitor.found
 
 
 def _has_meaningful_top_level(tree: ast.Module) -> bool:

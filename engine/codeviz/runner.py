@@ -8,7 +8,9 @@ function at several input sizes and counting operations.
 
 from __future__ import annotations
 
+import asyncio
 import io
+import inspect
 import time
 import traceback
 import tracemalloc
@@ -87,6 +89,25 @@ def _resolve_callable(
         raise NameError(f"Class {info.class_name!r} not found after executing source.")
     instance = cls()
     return getattr(instance, info.name)
+
+
+async def _collect_async_generator(value: Any) -> list[Any]:
+    return [item async for item in value]
+
+
+async def _await_value(value: Any) -> Any:
+    return await value
+
+
+def _materialize_return_value(value: Any, is_generator: bool) -> Any:
+    """Resolve coroutine/generator results while tracing their execution."""
+    if inspect.isasyncgen(value):
+        return asyncio.run(_collect_async_generator(value))
+    if inspect.isawaitable(value):
+        value = asyncio.run(_await_value(value))
+    if is_generator and inspect.isgenerator(value):
+        return list(value)
+    return value
 
 
 def run_session(
@@ -305,9 +326,9 @@ def _run_function(
             with tracer:
                 metric_started_at, tracemalloc_was_tracing = _start_run_metrics()
                 try:
-                    return_value = target(*arguments)
-                    if info.is_generator and hasattr(return_value, "__iter__"):
-                        return_value = list(return_value)
+                    return_value = _materialize_return_value(
+                        target(*arguments), info.is_generator
+                    )
                 finally:
                     _finish_run_metrics(run, metric_started_at, tracemalloc_was_tracing)
         run["returnValue"] = snapshotter.snapshot(return_value)
@@ -373,9 +394,7 @@ def measure_complexity(
         try:
             with redirect_stdout(stdout), redirect_stderr(stderr):
                 with tracer:
-                    value = target(*arguments)
-                    if info.is_generator and hasattr(value, "__iter__"):
-                        list(value)
+                    _materialize_return_value(target(*arguments), info.is_generator)
         except TraceLimitError as exc:
             payload["truncated"] = True
             payload["truncationReason"] = (

@@ -145,6 +145,16 @@ def test_generator_detection():
     assert analysis.functions[0].is_generator
 
 
+def test_nested_generator_does_not_mark_outer_function():
+    analysis = analyze(
+        "def solve(n):\n"
+        "    def inner():\n"
+        "        yield n\n"
+        "    return 'ok'\n"
+    )
+    assert analysis.functions[0].is_generator is False
+
+
 def test_default_function_prefers_solution_method():
     analysis = analyze(
         "def helper(x):\n    return x\n\n"

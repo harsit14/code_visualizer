@@ -158,6 +158,44 @@ def test_generator_function_materialized():
     assert values == ["3", "2", "1"]
 
 
+def test_nested_generator_does_not_materialize_regular_iterable_return():
+    result = run_session(
+        "def solve(n):\n"
+        "    def inner():\n"
+        "        yield n\n"
+        "    return 'ok'\n",
+        inputs=["3"],
+    )
+    assert result["run"]["returnValue"]["v"] == "ok"
+
+
+def test_async_function_is_awaited_and_traced():
+    result = run_session(
+        "import asyncio\n"
+        "async def solve(n):\n"
+        "    await asyncio.sleep(0)\n"
+        "    return n + 1\n",
+        inputs=["3"],
+    )
+    run = result["run"]
+    assert run["exception"] is None
+    assert run["returnValue"]["v"] == "4"
+    assert any(step["func"] == "solve" for step in run["steps"])
+
+
+def test_async_generator_is_materialized_and_traced():
+    result = run_session(
+        "async def countdown(n):\n"
+        "    while n > 0:\n"
+        "        yield n\n"
+        "        n -= 1\n",
+        inputs=["3"],
+    )
+    run = result["run"]
+    assert [item["v"] for item in run["returnValue"]["items"]] == ["3", "2", "1"]
+    assert any(step["func"] == "countdown" for step in run["steps"])
+
+
 def test_recursive_function_mode():
     result = run_session(
         "def fib(n):\n"
