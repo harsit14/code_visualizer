@@ -26,6 +26,7 @@ function renderTopBar() {
       onShowAllPanels={() => {}}
       onTogglePanel={() => {}}
       onToggleTheme={() => {}}
+      onUseLearnLayout={() => {}}
       panelControls={[
         { id: 'code', label: 'Code', visible: true },
         { id: 'data', label: 'Data', visible: true },
@@ -51,6 +52,8 @@ describe('TopBar', () => {
     expect(html).toContain('aria-label="Copy runnable link"');
     expect(html).toContain('aria-label="Open workspace menu"');
     expect(html).toContain('Layout');
+    expect(html).toContain('Learn');
+    expect(html).toContain('Advanced');
     expect(html).toContain('Trace tools');
     expect(html).toContain('Shortcuts');
     expect(html.match(/<details class="panel-menu/g)).toHaveLength(2);

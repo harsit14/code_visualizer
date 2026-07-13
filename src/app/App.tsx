@@ -106,9 +106,7 @@ type DashboardAppProps = {
 function DashboardApp({ onOpenLanding }: DashboardAppProps) {
   const [shared] = useState(initialShare);
   // Restore the local draft on boot unless a share link or embed supplies code.
-  const [bootDraft] = useState(() =>
-    shared || initialEmbedMode() ? null : loadStoredCodeDraft(),
-  );
+  const [bootDraft] = useState(() => (shared || initialEmbedMode() ? null : loadStoredCodeDraft()));
   const [exampleId, setExampleId] = useState<string | null>(
     shared ? (shared.exampleId ?? null) : bootDraft ? null : DEFAULT_EXAMPLE_ID,
   );
@@ -136,6 +134,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
     registerPanelSlot,
     resetLayout,
     showAllPanels,
+    useLearnLayout,
     startColumnResize,
     startPanelResize,
     togglePanelVisibility,
@@ -575,11 +574,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
                 }
                 event.preventDefault();
                 event.stopPropagation();
-                adjustPanelPair(
-                  slot.id,
-                  slots[index + 1].id,
-                  event.key === 'ArrowUp' ? -1 : 1,
-                );
+                adjustPanelPair(slot.id, slots[index + 1].id, event.key === 'ArrowUp' ? -1 : 1);
               }}
               onPointerDown={(event) => startPanelResize(slot.id, slots[index + 1].id, event)}
               role="separator"
@@ -629,6 +624,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
             onResetLayout={resetLayout}
             onShare={() => void handleShare()}
             onShowAllPanels={showAllPanels}
+            onUseLearnLayout={useLearnLayout}
             onTogglePanel={togglePanelVisibility}
             onToggleTheme={toggleTheme}
             historyRefreshToken={historyRefreshToken}

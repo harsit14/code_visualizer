@@ -3,6 +3,7 @@ import {
   DEFAULT_COLUMN_WEIGHTS,
   DEFAULT_PANEL_VISIBILITY,
   FULL_PANEL_VISIBILITY,
+  LEARN_PANEL_VISIBILITY,
   normalizePanelVisibility,
   normalizeWeights,
 } from './layoutState';
@@ -35,5 +36,18 @@ describe('layoutState', () => {
       explainer: false,
     });
     expect(Object.values(FULL_PANEL_VISIBILITY).every(Boolean)).toBe(true);
+  });
+
+  it('offers a focused learning preset without advanced analysis panels', () => {
+    expect(LEARN_PANEL_VISIBILITY).toEqual({
+      callStack: false,
+      code: true,
+      console: true,
+      data: true,
+      explainer: false,
+      inputs: true,
+      variables: true,
+      watch: false,
+    });
   });
 });

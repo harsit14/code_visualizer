@@ -10,6 +10,7 @@ import {
   DEFAULT_PANEL_VISIBILITY,
   DEFAULT_PANEL_WEIGHTS,
   FULL_PANEL_VISIBILITY,
+  LEARN_PANEL_VISIBILITY,
   PANEL_DEFINITIONS,
   normalizePanelVisibility,
   normalizeWeights,
@@ -128,9 +129,7 @@ function workbenchColumns(columnIds: readonly ColumnId[], weights: ColumnWeights
 
 export function useResizableLayout(embedMode: boolean) {
   const [panelVisibility, setPanelVisibility] = useState<PanelVisibility>(() =>
-    embedMode
-      ? { ...DEFAULT_EMBED_PANEL_VISIBILITY }
-      : readStoredPanelVisibility(),
+    embedMode ? { ...DEFAULT_EMBED_PANEL_VISIBILITY } : readStoredPanelVisibility(),
   );
   const [columnWeights, setColumnWeights] = useState<ColumnWeights>(() =>
     embedMode
@@ -197,6 +196,14 @@ export function useResizableLayout(embedMode: boolean) {
   const showAllPanels = useCallback(() => {
     setPanelVisibility(
       embedMode ? { ...DEFAULT_EMBED_PANEL_VISIBILITY } : { ...FULL_PANEL_VISIBILITY },
+    );
+    setColumnWeights({ ...DEFAULT_COLUMN_WEIGHTS });
+    setPanelWeights({ ...DEFAULT_PANEL_WEIGHTS });
+  }, [embedMode]);
+
+  const useLearnLayout = useCallback(() => {
+    setPanelVisibility(
+      embedMode ? { ...DEFAULT_EMBED_PANEL_VISIBILITY } : { ...LEARN_PANEL_VISIBILITY },
     );
     setColumnWeights({ ...DEFAULT_COLUMN_WEIGHTS });
     setPanelWeights({ ...DEFAULT_PANEL_WEIGHTS });
@@ -391,6 +398,7 @@ export function useResizableLayout(embedMode: boolean) {
     registerPanelSlot,
     resetLayout,
     showAllPanels,
+    useLearnLayout,
     startColumnResize,
     startPanelResize,
     togglePanelVisibility,

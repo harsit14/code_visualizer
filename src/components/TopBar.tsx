@@ -49,6 +49,7 @@ type TopBarProps = {
   onImport: (file: File) => void;
   onResetLayout: () => void;
   onShowAllPanels: () => void;
+  onUseLearnLayout: () => void;
   onTogglePanel: (id: string, visible: boolean) => void;
   panelControls: readonly PanelControl[];
   historyRefreshToken: number;
@@ -89,6 +90,7 @@ export function TopBar({
   onImport,
   onResetLayout,
   onShowAllPanels,
+  onUseLearnLayout,
   onTogglePanel,
   panelControls,
   historyRefreshToken,
@@ -183,6 +185,9 @@ export function TopBar({
                 <div className="workspace-menu-section">
                   <strong className="workspace-menu-heading">Layout</strong>
                   <div className="panel-menu-presets" aria-label="Panel layout presets">
+                    <button className="panel-menu-action" onClick={onUseLearnLayout} type="button">
+                      Learn
+                    </button>
                     <button
                       className="panel-menu-action"
                       onClick={onResetLayout}
@@ -192,7 +197,7 @@ export function TopBar({
                       Default
                     </button>
                     <button className="panel-menu-action" onClick={onShowAllPanels} type="button">
-                      Show all
+                      Advanced
                     </button>
                   </div>
                   <div className="workspace-panel-grid" aria-label="Visible panels">

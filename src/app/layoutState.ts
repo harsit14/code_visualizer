@@ -42,6 +42,17 @@ export const DEFAULT_PANEL_VISIBILITY: PanelVisibility = {
   console: true,
 };
 
+export const LEARN_PANEL_VISIBILITY: PanelVisibility = {
+  code: true,
+  inputs: true,
+  data: true,
+  variables: true,
+  watch: false,
+  callStack: false,
+  explainer: false,
+  console: true,
+};
+
 export const FULL_PANEL_VISIBILITY: PanelVisibility = {
   code: true,
   inputs: true,
