@@ -232,7 +232,7 @@ After deployment:
 1. Open the Cloudflare Workers URL.
 2. Open `/api/explain-step`; confirm it returns JSON, not the app shell.
 3. Run `Loop accumulator`; confirm stdout shows `10` at the final step.
-4. Run `Two Sum (no entry point)`; confirm inputs are generated and the return
+4. Run `Two Sum — LeetCode function`; confirm inputs are generated and the return
    value shows two indices.
 5. Run `Reverse Linked List`; confirm chains render with pointer markers.
 6. Click `Share`; reload the copied link and confirm the code is restored.

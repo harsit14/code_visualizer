@@ -5,7 +5,7 @@ type DashboardOnboardingBarProps = {
 };
 
 const cues = [
-  { icon: Play, label: 'Run', text: 'Start a trace from the green button.' },
+  { icon: Play, label: 'Run', text: 'Start a trace from the primary Run button.' },
   { icon: SlidersHorizontal, label: 'Scrub', text: 'Replay each recorded step after code runs.' },
   { icon: Highlighter, label: 'Follow', text: 'Watch the highlighted line move through the code.' },
 ];

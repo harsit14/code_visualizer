@@ -270,9 +270,38 @@
   z-index: 20;
 }
 
-.shortcuts-popover {
+.workspace-popover {
+  gap: 10px;
+  max-height: min(76vh, 680px);
+  min-width: min(360px, calc(100vw - 24px));
+  overflow-y: auto;
+}
+
+.workspace-menu-section {
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
   gap: 6px;
-  min-width: 238px;
+  padding-bottom: 10px;
+}
+
+.workspace-menu-section:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.workspace-menu-heading {
+  color: var(--text-faint);
+  font-size: 11.5px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.workspace-panel-grid,
+.workspace-action-grid {
+  display: grid;
+  gap: 3px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .shortcut-row {
@@ -326,12 +355,9 @@
 }
 
 .panel-menu-presets {
-  border-bottom: 1px solid var(--border);
   display: grid;
   gap: 5px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin-bottom: 4px;
-  padding-bottom: 7px;
 }
 
 .panel-menu-action {
@@ -342,10 +368,6 @@
 
 .panel-menu-action svg {
   flex: 0 0 auto;
-}
-
-.action-popover {
-  min-width: 190px;
 }
 
 .panel-menu-reset {

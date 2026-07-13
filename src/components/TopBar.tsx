@@ -8,9 +8,7 @@ import {
   Columns3,
   Download,
   FileImage,
-  HelpCircle,
   Link2,
-  MoreHorizontal,
   Moon,
   Sun,
   Upload,
@@ -118,7 +116,12 @@ export function TopBar({
       <div className="top-actions">
         <div className="top-action-row top-action-row-primary">
           <div className="top-action-group top-action-context" aria-label="Workspace context">
-            <button onClick={onOpenLanding} title="Back to the landing page" type="button">
+            <button
+              aria-label="Back to landing page"
+              onClick={onOpenLanding}
+              title="Back to the landing page"
+              type="button"
+            >
               <ArrowLeft size={14} />
               <span className="top-action-label">Landing</span>
             </button>
@@ -161,6 +164,7 @@ export function TopBar({
         <div className="top-action-row top-action-row-secondary">
           <div className="top-action-group" aria-label="Workspace tools">
             <button
+              aria-label="Copy runnable link"
               className="top-share-button"
               onClick={onShare}
               title="Copy a runnable link to this code"
@@ -170,92 +174,91 @@ export function TopBar({
               <span className="top-action-label">{shareLabel}</span>
             </button>
             <HistoryMenu onOpen={onOpenHistoryItem} refreshToken={historyRefreshToken} />
-            <details className="panel-menu shortcuts-menu">
-              <summary title="Show keyboard and editor shortcuts">
-                <HelpCircle size={14} />
-                <span className="top-action-label">Shortcuts</span>
-              </summary>
-              <div className="panel-menu-popover shortcuts-popover">
-                {SHORTCUTS.map((shortcut) => (
-                  <div className="shortcut-row" key={shortcut.label}>
-                    <span className="shortcut-keys">
-                      {shortcut.keys.map((key) => (
-                        <kbd key={key}>{key}</kbd>
-                      ))}
-                    </span>
-                    <span>{shortcut.label}</span>
-                  </div>
-                ))}
-              </div>
-            </details>
-            <details className="panel-menu">
-              <summary title="Show, hide, and reset panels">
+            <details className="panel-menu workspace-menu">
+              <summary aria-label="Open workspace menu" title="Layout, trace files, and shortcuts">
                 <Columns3 size={14} />
-                <span className="top-action-label">Panels</span>
+                <span className="top-action-label">Workspace</span>
               </summary>
-              <div className="panel-menu-popover">
-                <div className="panel-menu-presets" aria-label="Panel layout presets">
-                  <button
-                    className="panel-menu-action"
-                    onClick={onResetLayout}
-                    title="Restore the default panels and sizes"
-                    type="button"
-                  >
-                    Default layout
-                  </button>
-                  <button className="panel-menu-action" onClick={onShowAllPanels} type="button">
-                    Show all
-                  </button>
+              <div className="panel-menu-popover workspace-popover">
+                <div className="workspace-menu-section">
+                  <strong className="workspace-menu-heading">Layout</strong>
+                  <div className="panel-menu-presets" aria-label="Panel layout presets">
+                    <button
+                      className="panel-menu-action"
+                      onClick={onResetLayout}
+                      title="Restore the default panels and sizes"
+                      type="button"
+                    >
+                      Default
+                    </button>
+                    <button className="panel-menu-action" onClick={onShowAllPanels} type="button">
+                      Show all
+                    </button>
+                  </div>
+                  <div className="workspace-panel-grid" aria-label="Visible panels">
+                    {panelControls.map((panel) => (
+                      <label className="panel-menu-item" key={panel.id}>
+                        <input
+                          checked={panel.visible}
+                          onChange={(event) => onTogglePanel(panel.id, event.target.checked)}
+                          type="checkbox"
+                        />
+                        <span>{panel.label}</span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
-                {panelControls.map((panel) => (
-                  <label className="panel-menu-item" key={panel.id}>
-                    <input
-                      checked={panel.visible}
-                      onChange={(event) => onTogglePanel(panel.id, event.target.checked)}
-                      type="checkbox"
-                    />
-                    <span>{panel.label}</span>
-                  </label>
-                ))}
-              </div>
-            </details>
-            <details className="panel-menu trace-actions-menu">
-              <summary title="Embed, import, and export traces">
-                <MoreHorizontal size={14} />
-                <span className="top-action-label">Actions</span>
-              </summary>
-              <div className="panel-menu-popover action-popover">
-                <button className="panel-menu-action" onClick={onEmbed} type="button">
-                  <Code2 size={14} />
-                  <span>{embedLabel}</span>
-                </button>
-                <button
-                  className="panel-menu-action"
-                  disabled={!canExport}
-                  onClick={onExport}
-                  type="button"
-                >
-                  <Download size={14} />
-                  <span>Export JSON</span>
-                </button>
-                <button
-                  className="panel-menu-action"
-                  disabled={!canExport}
-                  onClick={onExportSvg}
-                  type="button"
-                >
-                  <FileImage size={14} />
-                  <span>Export SVG</span>
-                </button>
-                <button
-                  className="panel-menu-action"
-                  onClick={() => fileInputRef.current?.click()}
-                  title={importTitle}
-                  type="button"
-                >
-                  <Upload size={14} />
-                  <span>{importLabel}</span>
-                </button>
+
+                <div className="workspace-menu-section">
+                  <strong className="workspace-menu-heading">Trace tools</strong>
+                  <div className="workspace-action-grid">
+                    <button className="panel-menu-action" onClick={onEmbed} type="button">
+                      <Code2 size={14} />
+                      <span>{embedLabel}</span>
+                    </button>
+                    <button
+                      className="panel-menu-action"
+                      disabled={!canExport}
+                      onClick={onExport}
+                      type="button"
+                    >
+                      <Download size={14} />
+                      <span>Export JSON</span>
+                    </button>
+                    <button
+                      className="panel-menu-action"
+                      disabled={!canExport}
+                      onClick={onExportSvg}
+                      type="button"
+                    >
+                      <FileImage size={14} />
+                      <span>Export SVG</span>
+                    </button>
+                    <button
+                      className="panel-menu-action"
+                      onClick={() => fileInputRef.current?.click()}
+                      title={importTitle}
+                      type="button"
+                    >
+                      <Upload size={14} />
+                      <span>{importLabel}</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="workspace-menu-section">
+                  <strong className="workspace-menu-heading">Shortcuts</strong>
+                  {SHORTCUTS.map((shortcut) => (
+                    <div className="shortcut-row" key={shortcut.label}>
+                      <span className="shortcut-keys">
+                        {shortcut.keys.map((key) => (
+                          <kbd key={key}>{key}</kbd>
+                        ))}
+                      </span>
+                      <span>{shortcut.label}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </details>
           </div>
@@ -265,6 +268,7 @@ export function TopBar({
             aria-label="Appearance and account"
           >
             <button
+              aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
               onClick={onToggleTheme}
               title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
               type="button"

@@ -11,7 +11,7 @@ export type Example = {
 export const examples: Example[] = [
   {
     id: 'two-sum',
-    title: 'Two Sum (no entry point)',
+    title: 'Two Sum — LeetCode function',
     category: 'LeetCode style',
     language: 'python',
     code: `class Solution:

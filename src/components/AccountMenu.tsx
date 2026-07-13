@@ -1,12 +1,6 @@
 import { LogOut, UserRound } from 'lucide-react';
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  fetchAccount,
-  signIn,
-  signOut,
-  signUp,
-  type AccountState,
-} from '../app/accountClient';
+import { fetchAccount, signIn, signOut, signUp, type AccountState } from '../app/accountClient';
 
 type AccountMenuProps = {
   compact?: boolean;
@@ -111,7 +105,7 @@ export function AccountMenu({ compact = false }: AccountMenuProps) {
 
   return (
     <details className={`account-menu${compact ? ' account-menu-compact' : ''}`}>
-      <summary title={summaryTitle}>
+      <summary aria-label={summaryTitle} title={summaryTitle}>
         <UserRound size={14} />
         <span className="account-summary-label">{summaryLabel}</span>
       </summary>
@@ -129,8 +123,8 @@ export function AccountMenu({ compact = false }: AccountMenuProps) {
 
         {!account.accountConfigured ? (
           <p className="account-note">
-            Accounts require the Cloudflare Worker API and Supabase database. This host is serving the
-            static app only.
+            Accounts require the Cloudflare Worker API and Supabase database. This host is serving
+            the static app only.
           </p>
         ) : null}
 

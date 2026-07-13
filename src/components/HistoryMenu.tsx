@@ -1,10 +1,6 @@
 import { FolderOpen, History, RefreshCw, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  deleteCodeHistory,
-  listCodeHistory,
-  type CodeHistoryItem,
-} from '../app/historyClient';
+import { deleteCodeHistory, listCodeHistory, type CodeHistoryItem } from '../app/historyClient';
 
 type HistoryMenuProps = {
   onOpen: (item: CodeHistoryItem) => void;
@@ -65,7 +61,7 @@ export function HistoryMenu({ onOpen, refreshToken }: HistoryMenuProps) {
 
   return (
     <details className="panel-menu history-menu" onToggle={handleToggle} ref={detailsRef}>
-      <summary title="Open saved code history">
+      <summary aria-label="Open saved code history" title="Open saved code history">
         <History size={14} />
         <span className="top-action-label">History</span>
       </summary>
@@ -73,7 +69,9 @@ export function HistoryMenu({ onOpen, refreshToken }: HistoryMenuProps) {
         <header className="history-popover-header">
           <div>
             <strong>Saved history</strong>
-            <span>{items.length > 0 ? `${items.length} recent runs` : 'Recent rerunnable code'}</span>
+            <span>
+              {items.length > 0 ? `${items.length} recent runs` : 'Recent rerunnable code'}
+            </span>
           </div>
           <button
             aria-label="Refresh history"
@@ -92,7 +90,9 @@ export function HistoryMenu({ onOpen, refreshToken }: HistoryMenuProps) {
           </p>
         ) : null}
 
-        {!error && busy && items.length === 0 ? <p className="history-note">Loading history...</p> : null}
+        {!error && busy && items.length === 0 ? (
+          <p className="history-note">Loading history...</p>
+        ) : null}
 
         {!error && !busy && items.length === 0 ? (
           <p className="history-note">Sign in and run code to save it here.</p>
@@ -144,11 +144,13 @@ export function HistoryMenu({ onOpen, refreshToken }: HistoryMenuProps) {
 }
 
 function codePreview(code: string): string {
-  return code
-    .split('\n')
-    .map((line) => line.trim())
-    .find(Boolean)
-    ?.slice(0, 96) ?? 'Untitled code';
+  return (
+    code
+      .split('\n')
+      .map((line) => line.trim())
+      .find(Boolean)
+      ?.slice(0, 96) ?? 'Untitled code'
+  );
 }
 
 function languageLabel(language: CodeHistoryItem['language']): string {
