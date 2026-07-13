@@ -222,6 +222,47 @@ def test_function_picker_override():
     assert result["run"]["returnValue"]["v"] == "2"
 
 
+def test_function_parameter_kinds_are_invoked_correctly():
+    result = run_session(
+        "def f(a, /, b, *values, c, **options):\n"
+        "    return a + b + sum(values) + c + options['extra']\n",
+        inputs=["1", "2", "[3, 4]", "5", "{'extra': 6}"],
+    )
+    assert result["run"]["returnValue"]["v"] == "21"
+
+
+def test_instance_method_accepts_constructor_inputs():
+    result = run_session(
+        "class Solver:\n"
+        "    def __init__(self, base: int):\n"
+        "        self.base = base\n"
+        "    def solve(self, n: int):\n"
+        "        return self.base + n\n",
+        inputs=["10", "4"],
+    )
+    run = result["run"]
+    assert [item["name"] for item in run["inputs"]] == ["__init__.base", "n"]
+    assert run["returnValue"]["v"] == "14"
+
+
+def test_static_and_class_methods_do_not_construct_instances():
+    source = (
+        "class Solver:\n"
+        "    def __init__(self, required):\n"
+        "        raise AssertionError('must not construct')\n"
+        "    @staticmethod\n"
+        "    def static_solve(n: int):\n"
+        "        return n + 1\n"
+        "    @classmethod\n"
+        "    def class_solve(cls, n: int):\n"
+        "        return n + 2\n"
+    )
+    static_result = run_session(source, function="Solver.static_solve", inputs=["3"])
+    class_result = run_session(source, function="Solver.class_solve", inputs=["3"])
+    assert static_result["run"]["returnValue"]["v"] == "4"
+    assert class_result["run"]["returnValue"]["v"] == "5"
+
+
 def test_complexity_measurement_linear_vs_quadratic():
     linear = measure_complexity("def f(nums):\n    return sum(nums)", seed=1)
     quadratic = measure_complexity(

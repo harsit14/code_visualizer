@@ -74,7 +74,7 @@ def _finish_run_metrics(
 
 
 def _resolve_callable(
-    env: dict[str, Any], info: FunctionInfo
+    env: dict[str, Any], info: FunctionInfo, constructor_values: list[Any]
 ) -> Any:
     """Find the runtime callable for ``info``, instantiating ``Solution``-style
     classes for methods."""
@@ -87,8 +87,33 @@ def _resolve_callable(
     cls = env.get(info.class_name)
     if cls is None:
         raise NameError(f"Class {info.class_name!r} not found after executing source.")
-    instance = cls()
+    if info.binding in ("static", "class"):
+        return getattr(cls, info.name)
+    constructor_args, constructor_kwargs = _prepare_call(
+        info.params[: info.constructor_param_count], constructor_values
+    )
+    instance = cls(*constructor_args, **constructor_kwargs)
     return getattr(instance, info.name)
+
+
+def _prepare_call(params: list[Any], values: list[Any]) -> tuple[list[Any], dict[str, Any]]:
+    args: list[Any] = []
+    kwargs: dict[str, Any] = {}
+    for param, value in zip(params, values):
+        name = param.runtime_name or param.name
+        if param.kind in ("positional_only", "positional_or_keyword"):
+            args.append(value)
+        elif param.kind == "keyword_only":
+            kwargs[name] = value
+        elif param.kind == "var_positional":
+            if not isinstance(value, (list, tuple)):
+                raise TypeError(f"Input for *{name} must be a list or tuple.")
+            args.extend(value)
+        elif param.kind == "var_keyword":
+            if not isinstance(value, dict) or not all(isinstance(key, str) for key in value):
+                raise TypeError(f"Input for **{name} must be a dictionary with string keys.")
+            kwargs.update(value)
+    return args, kwargs
 
 
 async def _collect_async_generator(value: Any) -> list[Any]:
@@ -285,7 +310,6 @@ def _run_function(
     try:
         with redirect_stdout(stdout), redirect_stderr(stderr):
             exec(compile(source, USER_FILENAME, "exec"), env)
-        target = _resolve_callable(env, info)
     except BaseException as exc:
         run["setupError"] = _error_payload(exc)
         run["stdout"] = stdout.getvalue()
@@ -313,6 +337,27 @@ def _run_function(
         }
         return run
 
+
+    constructor_values = arguments[: info.constructor_param_count]
+    function_values = arguments[info.constructor_param_count :]
+    try:
+        with redirect_stdout(stdout), redirect_stderr(stderr):
+            target = _resolve_callable(env, info, constructor_values)
+    except BaseException as exc:
+        run["setupError"] = _error_payload(exc)
+        run["stdout"] = stdout.getvalue()
+        run["stderr"] = stderr.getvalue()
+        return run
+    try:
+        call_args, call_kwargs = _prepare_call(
+            info.params[info.constructor_param_count :], function_values
+        )
+    except BaseException as exc:
+        run["setupError"] = _error_payload(exc)
+        run["stdout"] = stdout.getvalue()
+        run["stderr"] = stderr.getvalue()
+        return run
+
     snapshotter = Snapshotter()
     tracer = Tracer(
         filename=USER_FILENAME,
@@ -327,7 +372,7 @@ def _run_function(
                 metric_started_at, tracemalloc_was_tracing = _start_run_metrics()
                 try:
                     return_value = _materialize_return_value(
-                        target(*arguments), info.is_generator
+                        target(*call_args, **call_kwargs), info.is_generator
                     )
                 finally:
                     _finish_run_metrics(run, metric_started_at, tracemalloc_was_tracing)
@@ -371,7 +416,6 @@ def measure_complexity(
     env = _base_globals(analysis)
     try:
         exec(compile(source, USER_FILENAME, "exec"), env)
-        target = _resolve_callable(env, info)
     except BaseException as exc:
         payload["error"] = _error_payload(exc)
         return payload
@@ -384,6 +428,15 @@ def measure_complexity(
             arguments = [evaluate_input(item.literal) for item in generated]
         except BaseException:
             continue
+        constructor_values = arguments[: info.constructor_param_count]
+        function_values = arguments[info.constructor_param_count :]
+        try:
+            target = _resolve_callable(env, info, constructor_values)
+            call_args, call_kwargs = _prepare_call(
+                info.params[info.constructor_param_count :], function_values
+            )
+        except BaseException:
+            continue
         stdout, stderr = io.StringIO(), io.StringIO()
         tracer = Tracer(
             filename=USER_FILENAME,
@@ -394,7 +447,9 @@ def measure_complexity(
         try:
             with redirect_stdout(stdout), redirect_stderr(stderr):
                 with tracer:
-                    _materialize_return_value(target(*arguments), info.is_generator)
+                    _materialize_return_value(
+                        target(*call_args, **call_kwargs), info.is_generator
+                    )
         except TraceLimitError as exc:
             payload["truncated"] = True
             payload["truncationReason"] = (

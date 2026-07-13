@@ -140,6 +140,37 @@ def test_self_excluded_from_params():
     assert names == ["nums", "target"]
 
 
+def test_all_parameter_kinds_are_preserved():
+    analysis = analyze(
+        "def f(a, /, b, *values, c, **options):\n"
+        "    return a, b, values, c, options\n"
+    )
+    params = analysis.functions[0].params
+    assert [(param.name, param.kind) for param in params] == [
+        ("a", "positional_only"),
+        ("b", "positional_or_keyword"),
+        ("values", "var_positional"),
+        ("c", "keyword_only"),
+        ("options", "var_keyword"),
+    ]
+    assert params[2].inferred == "list[int]"
+    assert params[4].inferred == "dict"
+
+
+def test_instance_method_includes_constructor_inputs():
+    analysis = analyze(
+        "class Solver:\n"
+        "    def __init__(self, base: int):\n"
+        "        self.base = base\n"
+        "    def solve(self, n: int):\n"
+        "        return self.base + n\n"
+    )
+    function = analysis.functions[0]
+    assert function.binding == "instance"
+    assert function.constructor_param_count == 1
+    assert [param.name for param in function.params] == ["__init__.base", "n"]
+
+
 def test_generator_detection():
     analysis = analyze("def gen(n):\n    for i in range(n):\n        yield i")
     assert analysis.functions[0].is_generator

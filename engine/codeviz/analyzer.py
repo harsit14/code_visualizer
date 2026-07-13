@@ -15,7 +15,7 @@ Answers three questions before anything runs:
 from __future__ import annotations
 
 import ast
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Optional
 
 #: Canonical inferred-type vocabulary understood by ``inputgen``.
@@ -106,6 +106,8 @@ class Param:
     annotation: Optional[str]
     inferred: str
     source: str  # "hint" | "usage" | "name" | "default"
+    kind: str = "positional_or_keyword"
+    runtime_name: Optional[str] = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -113,6 +115,7 @@ class Param:
             "annotation": self.annotation,
             "inferred": self.inferred,
             "source": self.source,
+            "kind": self.kind,
         }
 
 
@@ -128,6 +131,8 @@ class FunctionInfo:
     is_generator: bool
     docstring: Optional[str]
     returns: Optional[str]
+    binding: str = "function"
+    constructor_param_count: int = 0
     pointer_hints: dict[str, list[str]] = field(default_factory=dict)
     assignment_hints: list[dict[str, Any]] = field(default_factory=list)
 
@@ -141,6 +146,8 @@ class FunctionInfo:
             "isGenerator": self.is_generator,
             "docstring": self.docstring,
             "returns": self.returns,
+            "binding": self.binding,
+            "constructorParamCount": self.constructor_param_count,
             "pointerHints": self.pointer_hints,
             "assignmentHints": self.assignment_hints,
         }
@@ -287,17 +294,25 @@ class _UsageVisitor(ast.NodeVisitor):
 
 
 def _infer_params(node: ast.FunctionDef | ast.AsyncFunctionDef, is_method: bool) -> list[Param]:
-    args = node.args.args
-    if is_method and args and args[0].arg in ("self", "cls"):
+    args: list[tuple[ast.arg, str]] = [
+        *((arg, "positional_only") for arg in node.args.posonlyargs),
+        *((arg, "positional_or_keyword") for arg in node.args.args),
+    ]
+    if node.args.vararg:
+        args.append((node.args.vararg, "var_positional"))
+    args.extend((arg, "keyword_only") for arg in node.args.kwonlyargs)
+    if node.args.kwarg:
+        args.append((node.args.kwarg, "var_keyword"))
+    if is_method and args and args[0][0].arg in ("self", "cls"):
         args = args[1:]
 
-    param_names = {arg.arg for arg in args}
+    param_names = {arg.arg for arg, _ in args}
     usage = _UsageVisitor(param_names)
     for statement in node.body:
         usage.visit(statement)
 
     params: list[Param] = []
-    for arg in args:
+    for arg, kind in args:
         annotation_text: Optional[str] = None
         if arg.annotation is not None:
             try:
@@ -317,10 +332,59 @@ def _infer_params(node: ast.FunctionDef | ast.AsyncFunctionDef, is_method: bool)
             inferred, source = usage.weak[arg.arg], "usage"
         else:
             inferred, source = "int", "default"
+        if kind == "var_positional" and not inferred.startswith("list["):
+            inferred = {
+                "float": "list[float]",
+                "str": "list[str]",
+            }.get(inferred, "list[int]")
+        elif kind == "var_keyword":
+            inferred, source = "dict", "default"
         params.append(
-            Param(name=arg.arg, annotation=annotation_text, inferred=inferred, source=source)
+            Param(
+                name=arg.arg,
+                annotation=annotation_text,
+                inferred=inferred,
+                source=source,
+                kind=kind,
+                runtime_name=arg.arg,
+            )
         )
     return params
+
+
+def _decorator_name(node: ast.expr) -> Optional[str]:
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        return node.attr
+    return None
+
+
+def _method_binding(node: ast.FunctionDef | ast.AsyncFunctionDef) -> str:
+    decorators = {_decorator_name(decorator) for decorator in node.decorator_list}
+    if "staticmethod" in decorators:
+        return "static"
+    if "classmethod" in decorators:
+        return "class"
+    return "instance"
+
+
+def _constructor_params(node: ast.ClassDef) -> list[Param]:
+    initializer = next(
+        (
+            item
+            for item in node.body
+            if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and item.name == "__init__"
+        ),
+        None,
+    )
+    if initializer is None:
+        return []
+    return [
+        replace(param, name=f"__init__.{param.name}")
+        for param in _infer_params(initializer, is_method=True)
+    ]
 
 
 class _PointerHintVisitor(ast.NodeVisitor):
@@ -694,20 +758,26 @@ def analyze(source: str) -> Analysis:
                 defines_tree = True
             if node.name == "ListNode":
                 defines_list = True
+            constructor_params = _constructor_params(node)
             for item in node.body:
                 if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
                     if item.name.startswith("__"):
                         continue
+                    binding = _method_binding(item)
+                    invocation_constructor_params = constructor_params if binding == "instance" else []
+                    method_params = _infer_params(item, is_method=binding != "static")
                     functions.append(
                         FunctionInfo(
                             name=item.name,
                             qualname=f"{node.name}.{item.name}",
                             class_name=node.name,
-                            params=_infer_params(item, is_method=True),
+                            params=[*invocation_constructor_params, *method_params],
                             line=item.lineno,
                             is_generator=_is_generator(item),
                             docstring=ast.get_docstring(item),
                             returns=ast.unparse(item.returns) if item.returns else None,
+                            binding=binding,
+                            constructor_param_count=len(invocation_constructor_params),
                             pointer_hints=_pointer_hints_for_body(item.body),
                             assignment_hints=_assignment_hints_for_body(item.body),
                         )

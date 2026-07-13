@@ -76,6 +76,12 @@ export type ParamInfo = {
   annotation: string | null;
   inferred: string;
   source: 'hint' | 'usage' | 'name' | 'default';
+  kind?:
+    | 'positional_only'
+    | 'positional_or_keyword'
+    | 'var_positional'
+    | 'keyword_only'
+    | 'var_keyword';
 };
 
 export type AssignmentHint = {
@@ -94,6 +100,8 @@ export type FunctionInfo = {
   isGenerator: boolean;
   docstring: string | null;
   returns: string | null;
+  binding?: 'function' | 'instance' | 'class' | 'static';
+  constructorParamCount?: number;
   pointerHints?: Record<string, string[]>;
   assignmentHints?: AssignmentHint[];
 };
