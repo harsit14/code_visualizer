@@ -125,10 +125,11 @@ def test_script_mode_runs_top_level():
     assert run["memoryIsEstimate"] is False
 
 
-def test_script_exception_is_visualized_not_fatal():
+def test_script_exception_returns_error_with_partial_trace():
     result = run_session("a = 1\nb = a / 0")
     run = result["run"]
-    assert result["status"] == "ok"  # the tool worked; the code failed
+    assert result["status"] == "error"
+    assert result["error"]["type"] == "ZeroDivisionError"
     assert run["exception"]["type"] == "ZeroDivisionError"
     exc_steps = [s for s in run["steps"] if s["event"] == "exception"]
     assert exc_steps and exc_steps[0]["line"] == 2
@@ -137,7 +138,15 @@ def test_script_exception_is_visualized_not_fatal():
 def test_function_exception_recorded():
     result = run_session("def f(n):\n    return n / 0", inputs=["3"])
     run = result["run"]
+    assert result["status"] == "error"
     assert run["exception"]["type"] == "ZeroDivisionError"
+
+
+def test_assignment_only_script_is_traced():
+    result = run_session("x = 1")
+    assert result["mode"] == "script"
+    assert result["run"]["steps"]
+    assert result["run"]["steps"][-1]["stack"][-1]["locals"]["x"]["v"] == "1"
 
 
 def test_infinite_loop_truncates_gracefully():

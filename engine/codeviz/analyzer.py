@@ -27,7 +27,9 @@ TYPES = (
     "list[int]",
     "list[float]",
     "list[str]",
-    "grid",  # list[list[int]]
+    "grid",  # list[list[int]] inferred from usage/name
+    "grid[int]",
+    "grid[str]",
     "pairs",  # list of [start, end] pairs (intervals/edges)
     "dict",
     "tree",
@@ -85,8 +87,8 @@ _ANNOTATION_TYPES: dict[str, str] = {
     "list[int]": "list[int]",
     "list[float]": "list[float]",
     "list[str]": "list[str]",
-    "list[list[int]]": "grid",
-    "list[list[str]]": "grid",
+    "list[list[int]]": "grid[int]",
+    "list[list[str]]": "grid[str]",
     "list[bool]": "list[int]",
     "dict": "dict",
     "treenode": "tree",
@@ -793,7 +795,10 @@ def analyze(source: str) -> Analysis:
                 references_list = True
 
     has_driver = _has_meaningful_top_level(tree)
-    if has_driver:
+    has_assignment_only_script = not functions and any(
+        isinstance(node, (ast.Assign, ast.AnnAssign)) for node in tree.body
+    )
+    if has_driver or has_assignment_only_script:
         mode = "script"
     elif functions:
         mode = "function"

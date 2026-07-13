@@ -210,6 +210,9 @@ def run_session(
         if result["run"].get("setupError"):
             result["status"] = "error"
             result["error"] = result["run"]["setupError"]
+    if result["run"] and result["run"].get("exception"):
+        result["status"] = "error"
+        result["error"] = result["run"]["exception"]
     return result
 
 

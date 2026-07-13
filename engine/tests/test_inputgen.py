@@ -125,6 +125,14 @@ def test_grid_generation():
     assert len({len(row) for row in grid}) == 1  # rectangular
 
 
+def test_string_grid_annotation_generates_strings():
+    fn = _function("def f(items: list[list[str]]):\n    pass")
+    inputs, _ = generate_inputs(fn, seed=3)
+    grid = ast.literal_eval(inputs[0].literal)
+    assert inputs[0].type == "grid[str]"
+    assert all(isinstance(item, str) for row in grid for item in row)
+
+
 def test_pairs_are_sorted_intervals():
     fn = _function("def f(intervals):\n    pass")
     inputs, _ = generate_inputs(fn, seed=3)

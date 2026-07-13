@@ -65,6 +65,12 @@ def _gen_grid(rng: random.Random, size: Optional[int] = None) -> list[list[int]]
     return [[rng.randint(0, 9) for _ in range(cols)] for _ in range(rows)]
 
 
+def _gen_string_grid(rng: random.Random, size: Optional[int] = None) -> list[list[str]]:
+    rows = size if size is not None else rng.randint(3, 4)
+    cols = rng.randint(3, 4) if size is None else size
+    return [[rng.choice("abcd") for _ in range(cols)] for _ in range(rows)]
+
+
 def _gen_tree_values(rng: random.Random, size: Optional[int] = None) -> list[int | None]:
     """Level-order values for a small random tree with a few gaps."""
     count = size if size is not None else rng.randint(5, 7)
@@ -100,8 +106,10 @@ def generate_input(
     elif kind == "list[str]":
         count = size if size is not None else rng.randint(3, 5)
         literal = repr([_gen_str(rng, rng.randint(3, 5)) for _ in range(count)])
-    elif kind == "grid":
+    elif kind in ("grid", "grid[int]"):
         literal = repr(_gen_grid(rng, size))
+    elif kind == "grid[str]":
+        literal = repr(_gen_string_grid(rng, size))
     elif kind == "pairs":
         literal = repr(_gen_pairs(rng, size))
     elif kind == "dict":

@@ -26,6 +26,11 @@ def test_script_mode_detection():
     assert analysis.mode == "script"
 
 
+def test_assignment_only_program_is_script_mode():
+    assert analyze("x = 1").mode == "script"
+    assert analyze("x: int = 1").mode == "script"
+
+
 def test_function_mode_for_bare_class():
     analysis = analyze(TWO_SUM)
     assert analysis.mode == "function"
@@ -103,6 +108,13 @@ def test_usage_left_right_means_tree():
 def test_usage_double_subscript_means_grid():
     analysis = analyze("def f(data):\n    return data[0][0]")
     assert analysis.functions[0].params[0].inferred == "grid"
+
+
+def test_nested_list_annotations_preserve_element_type():
+    integers = analyze("def f(items: list[list[int]]):\n    return items")
+    strings = analyze("def f(items: list[list[str]]):\n    return items")
+    assert integers.functions[0].params[0].inferred == "grid[int]"
+    assert strings.functions[0].params[0].inferred == "grid[str]"
 
 
 def test_usage_index_or_slice_infers_list_weakly():

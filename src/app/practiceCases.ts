@@ -127,6 +127,17 @@ function literalForProfile(
         : 'linked([1, 2, 3])';
   }
 
+  if (inferred.includes('grid')) {
+    if (inferred.includes('str')) {
+      return profile === 'empty'
+        ? '[]'
+        : profile === 'single'
+          ? "[['a']]"
+          : "[['a', 'b'], ['c', 'd']]";
+    }
+    return profile === 'empty' ? '[]' : profile === 'single' ? '[[1]]' : '[[1, 2], [3, 4]]';
+  }
+
   if (inferred.includes('str') || name === 's' || name.includes('string')) {
     return profile === 'empty' ? "''" : profile === 'single' ? "'a'" : "'abba'";
   }
