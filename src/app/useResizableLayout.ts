@@ -20,7 +20,8 @@ import {
   type PanelWeights,
 } from './layoutState';
 
-const PANEL_VISIBILITY_STORAGE_KEY = 'cv-panel-visibility-v1';
+const PANEL_VISIBILITY_STORAGE_KEY = 'cv-panel-visibility-v2';
+const LEGACY_PANEL_VISIBILITY_STORAGE_KEY = 'cv-panel-visibility-v1';
 const COLUMN_WEIGHTS_STORAGE_KEY = 'cv-column-weights-v1';
 const PANEL_WEIGHTS_STORAGE_KEY = 'cv-panel-weights-v1';
 
@@ -59,6 +60,25 @@ function saveStoredValue(key: string, value: unknown) {
   } catch {
     /* local storage unavailable */
   }
+}
+
+export function readStoredPanelVisibility(): PanelVisibility {
+  try {
+    const current = window.localStorage.getItem(PANEL_VISIBILITY_STORAGE_KEY);
+    if (current) {
+      return normalizePanelVisibility(JSON.parse(current));
+    }
+
+    const legacy = window.localStorage.getItem(LEGACY_PANEL_VISIBILITY_STORAGE_KEY);
+    if (legacy) {
+      // Inputs used to default to hidden. Reveal them once during migration,
+      // while preserving every other layout choice from the previous schema.
+      return { ...normalizePanelVisibility(JSON.parse(legacy)), inputs: true };
+    }
+  } catch {
+    /* stored layout unavailable or malformed */
+  }
+  return { ...DEFAULT_PANEL_VISIBILITY };
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -110,11 +130,7 @@ export function useResizableLayout(embedMode: boolean) {
   const [panelVisibility, setPanelVisibility] = useState<PanelVisibility>(() =>
     embedMode
       ? { ...DEFAULT_EMBED_PANEL_VISIBILITY }
-      : readStoredValue(
-          PANEL_VISIBILITY_STORAGE_KEY,
-          DEFAULT_PANEL_VISIBILITY,
-          normalizePanelVisibility,
-        ),
+      : readStoredPanelVisibility(),
   );
   const [columnWeights, setColumnWeights] = useState<ColumnWeights>(() =>
     embedMode

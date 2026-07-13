@@ -482,7 +482,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
           </ErrorBoundary>,
         )
       : null,
-    panelVisibility.callStack
+    panelVisibility.callStack && Boolean(run)
       ? panelSlot(
           'callStack',
           <ErrorBoundary

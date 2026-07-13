@@ -31,7 +31,9 @@ export const PANEL_DEFINITIONS: PanelDefinition[] = [
 
 export const DEFAULT_PANEL_VISIBILITY: PanelVisibility = {
   code: true,
-  inputs: false,
+  // This panel is still rendered only for Python function mode, so enabling
+  // it by default reveals inputs contextually without adding script-mode UI.
+  inputs: true,
   data: true,
   variables: true,
   watch: false,

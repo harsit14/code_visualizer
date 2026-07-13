@@ -30,7 +30,7 @@ describe('layoutState', () => {
       variables: true,
       callStack: true,
       console: true,
-      inputs: false,
+      inputs: true,
       watch: false,
       explainer: false,
     });
