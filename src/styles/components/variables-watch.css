@@ -12,6 +12,14 @@
   vertical-align: top;
 }
 
+.var-table th {
+  color: var(--text-faint);
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 0 6px 4px 0;
+  text-align: left;
+}
+
 .var-name {
   align-items: center;
   color: var(--text);
@@ -72,7 +80,7 @@
   align-items: center;
   color: var(--text-dim);
   display: inline-flex;
-  font-size: 11px;
+  font-size: 11.5px;
   gap: 4px;
   white-space: nowrap;
 }
@@ -83,7 +91,7 @@
 
 .var-type {
   color: var(--text-faint);
-  font-size: 11.5px;
+  font-size: 12px;
   white-space: nowrap;
 }
 
@@ -153,7 +161,7 @@
 .var-badge {
   border-radius: 4px;
   font-family: var(--sans);
-  font-size: 10px;
+  font-size: 11.5px;
   margin-left: 7px;
   padding: 1px 5px;
   text-transform: uppercase;
@@ -223,7 +231,7 @@
 
 .watch-note {
   color: var(--text-faint);
-  font-size: 11.5px;
+  font-size: 12px;
   margin: 7px 0 0;
 }
 
@@ -263,7 +271,7 @@
 
 .watch-event-meta {
   color: var(--text-faint);
-  font-size: 11px;
+  font-size: 11.5px;
 }
 
 .watch-value {
@@ -285,7 +293,7 @@
   color: var(--purple);
   display: block;
   font-family: var(--mono);
-  font-size: 11.5px;
+  font-size: 12px;
   overflow-wrap: anywhere;
 }
 
@@ -301,7 +309,7 @@
   border-radius: 4px;
   color: var(--bg);
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size: 11.5px;
   padding: 1px 5px;
 }
 
@@ -317,6 +325,6 @@
   border-radius: 4px;
   color: var(--accent);
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size: 11.5px;
   padding: 1px 5px;
 }

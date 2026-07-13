@@ -16,7 +16,7 @@
   --border-strong: #2b3443;
   --text: #e7ecf3;
   --text-dim: #8a95a8;
-  --text-faint: #586275;
+  --text-faint: #78859b;
   --accent: #4f8ef7;
   --accent-soft: rgba(79, 142, 247, 0.16);
   --green: #3fb97f;
@@ -45,7 +45,7 @@
   --text-faint: #6b7482;
   --accent: #2769d8;
   --accent-soft: rgba(39, 105, 216, 0.12);
-  --green: #1d8a58;
+  --green: #187a4d;
   --green-soft: rgba(29, 138, 88, 0.13);
   --amber: #b07f1a;
   --amber-soft: rgba(176, 127, 26, 0.14);
@@ -117,7 +117,7 @@
 .dashboard-instrument .panel-header h2 {
   color: var(--text-dim);
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.16em;
   text-transform: uppercase;

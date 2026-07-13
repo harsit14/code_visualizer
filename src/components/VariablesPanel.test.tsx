@@ -53,6 +53,9 @@ describe('VariablesPanel', () => {
     );
 
     expect(html).toContain('self.memo');
+    expect(html).toContain('<th scope="col">Name</th>');
+    expect(html).toContain('<th scope="col">Type</th>');
+    expect(html).toContain('<th scope="col">Value</th>');
     expect(html).toContain('{1: 3}');
     expect(html).toContain('n');
     expect(html).not.toContain('Solution object');

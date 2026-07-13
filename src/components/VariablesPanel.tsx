@@ -98,6 +98,13 @@ export function VariablesPanel({
             <p className="panel-note">Frame too deep — locals were elided to save memory.</p>
           ) : null}
           <table className="var-table">
+            <thead>
+              <tr>
+                <th scope="col">Name</th>
+                <th scope="col">Type</th>
+                <th scope="col">Value</th>
+              </tr>
+            </thead>
             <tbody>
               {localEntries.map(([name, value]) => (
                 <VariableRow
@@ -125,6 +132,13 @@ export function VariablesPanel({
             <>
               <h3 className="subsection">Globals</h3>
               <table className="var-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Name</th>
+                    <th scope="col">Type</th>
+                    <th scope="col">Value</th>
+                  </tr>
+                </thead>
                 <tbody>
                   {globalEntries.map(([name, value]) => (
                     <VariableRow
