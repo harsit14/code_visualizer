@@ -153,15 +153,53 @@ def test_default_object_preview_strips_volatile_address():
     assert encoded["preview"].endswith("object>")
 
 
-def test_custom_repr_preview_is_preserved():
+def test_custom_repr_is_not_executed():
     class Tagged:
+        calls = 0
+
         def __repr__(self):
-            return "Tagged(at 0x100)"
+            type(self).calls += 1
+            return "unsafe"
 
     snap = Snapshotter()
     encoded = snap.snapshot(Tagged())
-    # A user-defined repr isn't the default-object form, so it's left intact.
-    assert encoded["preview"] == "Tagged(at 0x100)"
+    assert Tagged.calls == 0
+    assert encoded["preview"].endswith("Tagged object>")
+
+
+def test_properties_and_custom_collection_protocols_are_not_executed():
+    class ActiveObject:
+        def __init__(self):
+            self.calls = 0
+
+        @property
+        def val(self):
+            self.calls += 1
+            return 1
+
+        @property
+        def left(self):
+            self.calls += 1
+            return None
+
+        @property
+        def right(self):
+            self.calls += 1
+            return None
+
+        def __iter__(self):
+            self.calls += 1
+            return iter(())
+
+        def __len__(self):
+            self.calls += 1
+            return 0
+
+    value = ActiveObject()
+    encoded = Snapshotter().snapshot(value)
+    assert encoded["k"] == "obj"
+    assert encoded["attrs"]["calls"]["v"] == "0"
+    assert value.calls == 0
 
 
 def test_function_encoding():

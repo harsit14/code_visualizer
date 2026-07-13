@@ -25,7 +25,8 @@ UI can detect aliasing and diff by identity.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping, Sized
+from array import array
+from collections import Counter, OrderedDict, defaultdict, deque
 import re
 import types
 from typing import Any
@@ -50,45 +51,47 @@ def _strip_default_repr_address(text: str) -> str:
     return _DEFAULT_REPR_ADDRESS.sub(r"\1>", text)
 
 
-def _safe_repr(value: Any, limit: int = MAX_REPR) -> str:
+def _safe_builtin_repr(value: Any, limit: int = MAX_REPR) -> str:
+    """Return a representation without dispatching to user-defined ``__repr__``."""
     try:
-        text = repr(value)
-    except BaseException as exc:  # user __repr__ may raise anything
-        text = f"<repr failed: {type(exc).__name__}>"
+        text = object.__repr__(value)
+    except BaseException:
+        text = f"<{_type_name(value)} object>"
     if len(text) > limit:
         return text[: limit - 3] + "..."
     return text
 
 
-def _safe_len(value: Any) -> int | None:
+def _type_name(value: Any) -> str:
     try:
-        return len(value)
+        return type.__getattribute__(type(value), "__name__")
     except BaseException:
-        return None
+        return "object"
 
 
-def _is_sized_iterable(value: Any) -> bool:
-    return isinstance(value, Sized) and isinstance(value, Iterable) and _safe_len(value) is not None
+def _raw_attrs(value: Any) -> dict[str, Any]:
+    """Read an instance dictionary without invoking its attribute hooks."""
+    try:
+        attrs = object.__getattribute__(value, "__dict__")
+    except BaseException:
+        return {}
+    return attrs if type(attrs) is dict else {}
+
+
+_SAFE_SEQUENCE_TYPES = (list, tuple, set, frozenset, range, deque, array)
+_SAFE_MAPPING_TYPES = (dict, OrderedDict, defaultdict, Counter)
 
 
 def looks_like_tree(value: Any) -> bool:
-    """Duck-typed binary tree node: has ``val``, ``left`` and ``right``."""
-    cls = type(value)
-    return (
-        hasattr(cls, "__dict__")
-        and not isinstance(value, type)
-        and all(hasattr(value, attr) for attr in ("val", "left", "right"))
-    )
+    """Duck-typed binary tree node using raw attributes only."""
+    attrs = _raw_attrs(value)
+    return not isinstance(value, type) and all(attr in attrs for attr in ("val", "left", "right"))
 
 
 def looks_like_listnode(value: Any) -> bool:
-    """Duck-typed linked list node: has ``val`` and ``next`` but no children."""
-    return (
-        not isinstance(value, type)
-        and hasattr(value, "val")
-        and hasattr(value, "next")
-        and not hasattr(value, "left")
-    )
+    """Duck-typed linked-list node using raw attributes only."""
+    attrs = _raw_attrs(value)
+    return not isinstance(value, type) and "val" in attrs and "next" in attrs and "left" not in attrs
 
 
 class Snapshotter:
@@ -116,11 +119,11 @@ class Snapshotter:
 
         if value is None:
             return {"k": "none"}
-        if isinstance(value, bool):
+        if type(value) is bool:
             return {"k": "num", "t": "bool", "v": "True" if value else "False"}
-        if isinstance(value, (int, float, complex)):
-            return {"k": "num", "t": type(value).__name__, "v": _safe_repr(value)}
-        if isinstance(value, str):
+        if type(value) in (int, float, complex):
+            return {"k": "num", "t": _type_name(value), "v": repr(value)}
+        if type(value) is str:
             truncated = len(value) > MAX_STR
             return {
                 "k": "str",
@@ -128,29 +131,26 @@ class Snapshotter:
                 "len": len(value),
                 "truncated": truncated,
             }
-        if isinstance(value, (bytes, bytearray)):
-            return {"k": "repr", "t": type(value).__name__, "v": _safe_repr(value)}
+        if type(value) in (bytes, bytearray):
+            return {"k": "repr", "t": _type_name(value), "v": repr(value)}
 
         if id(value) in seen:
             return {"k": "ref", "id": self.object_id(value)}
 
-        if isinstance(
-            value,
-            (types.FunctionType, types.BuiltinFunctionType, types.MethodType, type),
-        ):
-            name = getattr(value, "__name__", None) or _safe_repr(value)
+        if type(value) in (types.FunctionType, types.BuiltinFunctionType, types.MethodType, type):
+            name = getattr(value, "__name__", None) or _type_name(value)
             return {"k": "func", "name": name}
-        if isinstance(value, types.ModuleType):
-            return {"k": "repr", "t": "module", "v": _safe_repr(value)}
+        if type(value) is types.ModuleType:
+            return {"k": "repr", "t": "module", "v": object.__repr__(value)}
 
         if looks_like_tree(value):
             return self._snapshot_tree(value, depth, seen)
         if looks_like_listnode(value):
             return self._snapshot_chain(value, depth, seen)
 
-        if isinstance(value, Mapping):
+        if type(value) in _SAFE_MAPPING_TYPES:
             return self._snapshot_mapping(value, depth, seen)
-        if _is_sized_iterable(value):
+        if type(value) in _SAFE_SEQUENCE_TYPES:
             return self._snapshot_sequence(value, depth, seen)
 
         return self._snapshot_object(value, depth, seen)
@@ -159,9 +159,9 @@ class Snapshotter:
         self, value: Any, depth: int, seen: set[int]
     ) -> JsonValue:
         obj_id = self.object_id(value)
-        type_name = type(value).__name__
+        type_name = _type_name(value)
         if depth >= MAX_DEPTH:
-            return {"k": "repr", "t": type_name, "v": _safe_repr(value), "id": obj_id}
+            return {"k": "repr", "t": type_name, "v": _safe_builtin_repr(value), "id": obj_id}
 
         seen = seen | {id(value)}
         items = []
@@ -173,21 +173,21 @@ class Snapshotter:
                     break
                 items.append(self.snapshot(item, depth + 1, seen))
         except BaseException:
-            return {"k": "repr", "t": type_name, "v": _safe_repr(value), "id": obj_id}
+            return {"k": "repr", "t": type_name, "v": _safe_builtin_repr(value), "id": obj_id}
         return {
             "k": "seq",
             "t": type_name,
             "id": obj_id,
             "items": items,
-            "len": _safe_len(value) or len(items),
+            "len": len(value),
             "truncated": truncated,
         }
 
-    def _snapshot_mapping(self, value: Mapping[Any, Any], depth: int, seen: set[int]) -> JsonValue:
+    def _snapshot_mapping(self, value: Any, depth: int, seen: set[int]) -> JsonValue:
         obj_id = self.object_id(value)
-        type_name = type(value).__name__
+        type_name = _type_name(value)
         if depth >= MAX_DEPTH:
-            return {"k": "repr", "t": type_name, "v": _safe_repr(value), "id": obj_id}
+            return {"k": "repr", "t": type_name, "v": _safe_builtin_repr(value), "id": obj_id}
 
         seen = seen | {id(value)}
         entries = []
@@ -201,22 +201,28 @@ class Snapshotter:
                     [self.snapshot(key, depth + 1, seen), self.snapshot(item, depth + 1, seen)]
                 )
         except BaseException:
-            return {"k": "repr", "t": type_name, "v": _safe_repr(value), "id": obj_id}
+            return {"k": "repr", "t": type_name, "v": _safe_builtin_repr(value), "id": obj_id}
         return {
             "k": "dict",
             "t": type_name,
             "id": obj_id,
             "entries": entries,
-            "len": _safe_len(value) or len(entries),
+            "len": len(value),
             "truncated": truncated,
         }
 
     def _snapshot_tree(self, node: Any, depth: int, seen: set[int]) -> JsonValue:
         obj_id = self.object_id(node)
         if depth >= MAX_TREE_DEPTH:
-            return {"k": "repr", "t": type(node).__name__, "v": _safe_repr(node), "id": obj_id}
+            return {
+                "k": "repr",
+                "t": _type_name(node),
+                "v": _safe_builtin_repr(node),
+                "id": obj_id,
+            }
 
         seen = seen | {id(node)}
+        attrs = _raw_attrs(node)
 
         def encode_child(child: Any) -> JsonValue | None:
             if child is None:
@@ -228,9 +234,9 @@ class Snapshotter:
         return {
             "k": "tree",
             "id": obj_id,
-            "val": self.snapshot(node.val, depth + 1, seen),
-            "left": encode_child(node.left),
-            "right": encode_child(node.right),
+            "val": self.snapshot(attrs["val"], depth + 1, seen),
+            "left": encode_child(attrs["left"]),
+            "right": encode_child(attrs["right"]),
         }
 
     def _snapshot_chain(self, head: Any, depth: int, seen: set[int]) -> JsonValue:
@@ -241,6 +247,9 @@ class Snapshotter:
         full_seen = seen.copy()
         node = head
         while node is not None:
+            attrs = _raw_attrs(node)
+            if "val" not in attrs or "next" not in attrs:
+                break
             if id(node) in walk_seen:
                 cyclic = True
                 break
@@ -252,10 +261,10 @@ class Snapshotter:
             nodes.append(
                 {
                     "id": self.object_id(node),
-                    "val": self.snapshot(node.val, depth + 1, full_seen),
+                    "val": self.snapshot(attrs["val"], depth + 1, full_seen),
                 }
             )
-            node = getattr(node, "next", None)
+            node = attrs["next"]
             if node is not None and not looks_like_listnode(node):
                 break
         return {
@@ -268,14 +277,11 @@ class Snapshotter:
 
     def _snapshot_object(self, value: Any, depth: int, seen: set[int]) -> JsonValue:
         obj_id = self.object_id(value)
-        type_name = type(value).__name__
+        type_name = _type_name(value)
         attrs: dict[str, JsonValue] = {}
         if depth < MAX_DEPTH:
             seen = seen | {id(value)}
-            try:
-                raw_attrs = vars(value)
-            except TypeError:
-                raw_attrs = {}
+            raw_attrs = _raw_attrs(value)
             for index, (name, attr) in enumerate(raw_attrs.items()):
                 if index >= MAX_ITEMS:
                     break
@@ -287,5 +293,5 @@ class Snapshotter:
             "id": obj_id,
             "t": type_name,
             "attrs": attrs,
-            "preview": _strip_default_repr_address(_safe_repr(value)),
+            "preview": _strip_default_repr_address(_safe_builtin_repr(value)),
         }
