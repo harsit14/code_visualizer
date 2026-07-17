@@ -111,6 +111,35 @@ npm run ci
 
 Full deployment and operations notes live in [docs/deployment.md](docs/deployment.md).
 
+## Ownership, Use, and Attribution
+
+Code Visualizer was created, designed, and developed by **Harsit Upadhya**.
+
+Copyright 2026 Harsit Upadhya.
+
+The software in this repository is available under the
+[PolyForm Noncommercial License 1.0.0](LICENSE). You may use, study, modify, and
+share it for permitted noncommercial purposes. Commercial or revenue-generating
+use—including resale, paid access, advertising-supported hosting, incorporation
+into a paid product or service, or use intended for commercial advantage—is not
+licensed without prior written permission from Harsit Upadhya.
+
+If you distribute the software or a modified version, you must include the
+license and preserve the required creator and copyright notice in [NOTICE](NOTICE):
+
+> **Code Visualizer — created by Harsit Upadhya**
+>
+> <https://github.com/harsit14/code_visualizer>
+
+Original documentation, screenshots, the logo, and other visual assets are
+available for noncommercial sharing and adaptation under
+[CC BY-NC 4.0](CONTENT-LICENSE.md), with attribution. Third-party dependencies
+and materials remain subject to their own licenses.
+
+Because commercial use is restricted, this project is **source-available**, not
+open source as defined by the Open Source Initiative. The licenses do not grant
+permission to imply endorsement or ownership by anyone else.
+
 ## Project Notes
 
 - Custom Python class instances render as attribute tables unless they match

@@ -3,6 +3,7 @@ name = "codeviz-engine"
 version = "2.0.0"
 description = "Execution tracing, static analysis, and input generation engine for Code Visualizer"
 requires-python = ">=3.11"
+license = "PolyForm-Noncommercial-1.0.0"
 
 [dependency-groups]
 dev = ["pytest>=8"]
