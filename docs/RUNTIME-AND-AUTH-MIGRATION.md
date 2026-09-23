@@ -1,6 +1,6 @@
 # Runtime isolation and account migration
 
-Status: opt-in runtime implementation and pending managed-auth design, 23 September 2026. A separate-origin runner is implemented behind `VITE_RUNNER_URL`; unconfigured builds retain same-origin workers. The existing account system remains in use. No deployment, account or live schema was changed. Production isolation is not certified by local verification.
+Status: opt-in runtime and managed-auth implementations, 23 September 2026. A separate-origin runner is implemented behind `VITE_RUNNER_URL`; unconfigured builds retain same-origin workers. Unconfigured deployments retain the existing account system; verified email sign-in is now available behind an explicit rollout flag. No deployment, account or live schema was changed. Production isolation is not certified by local verification.
 
 ## Implemented prerequisite: runtime recovery
 
@@ -91,6 +91,14 @@ Both JS and Python-through-JS-interop probes must fail to read or change app his
 
 ## Managed authentication migration
 
+**Implementation update:** the verified email-code adapter, explicit linking UI,
+transactional identity/session migration and database-backed auth limiter are now
+implemented locally. See [the rollout guide](MANAGED-AUTH-ROLLOUT.md) for settings,
+recovery, revocation, staging tests and rollback. The design below remains the
+ownership rationale. No live schema or account migration was performed. Provider
+email verification replaces new password storage in managed mode; this app does
+not retain provider refresh tokens or implement provider password recovery.
+
 Use the existing Supabase platform for the next auth implementation, while retaining the application's stable internal user IDs. Current `public.users` records are application accounts; they are not already Supabase `auth.users` identities. Supabase's project-to-project auth export instructions do not migrate this custom HMAC password format. Its Auth0 migration documentation describes bcrypt/Argon2 hash support; do not pass our HMAC hashes as though they were compatible. [Supabase migration formats](https://supabase.com/docs/guides/platform/migrating-to-supabase/auth0).
 
 Proposed identity mapping: `account_identities(provider, provider_subject, app_user_id, linked_at)`, with unique provider/subject and a unique Supabase identity per app user. Existing history, usage, subscriptions and provisioned admin IDs continue to reference the original app user ID. Only the server can create or change mappings. Neither email text nor client metadata can choose an existing user ID.
@@ -116,7 +124,7 @@ Before implementation cutover, identify the staging Supabase project, provider e
 1. **Completed:** lifecycle recovery with unit tests and local browser verification.
 2. **Implemented locally:** shared protocol validators, a separate runner build/deployment and iframe bridge behind an explicit origin. Broken configured runners fail closed.
 3. **Partially complete:** server origin checks and delivered-header unit tests are implemented. Complete adversarial staging probes and the browser acceptance matrix before switching production execution.
-4. Add managed auth adapter, identity-link schema, verification/recovery UI and durable throttling. Test conflicts, replay, cross-account history access, expired proofs and rollback with synthetic accounts.
+4. **Implemented locally:** email-code adapter, identity-link SQL, verification/linking UI and durable auth throttling, with synthetic SQL/API/UI coverage. Hosted delivery, real concurrent transactions and production rollback still require staging.
 5. Pilot opt-in migration, reconcile account/history counts by stable ID, then disable new legacy signup. Complete a tested session-revocation and rollout plan before wider migration.
 
 Do not deploy schema changes or migrate live identities as part of a source-only commit. Retain a tested database backup and audit trail before cutover. Roll back runner versions without enabling a silent same-origin fallback; disable execution visibly if required. Do not re-enable weak legacy login for already migrated accounts on an application rollback. Preserve identity mappings and stable ownership IDs throughout rollback.

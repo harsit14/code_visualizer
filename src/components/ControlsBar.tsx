@@ -2,7 +2,7 @@
  * Transport controls: run, play/pause, step back/forward, jump-to-step,
  * a scrubber over the whole trace, and a playback speed slider.
  */
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
@@ -56,9 +56,17 @@ function describeStep(step: TraceStep | undefined): string {
   return `${step.event}${step.phase === 'before' ? ' · before execution' : step.phase === 'after' ? ' · after execution' : ''} · line ${step.line} · ${where}`;
 }
 
-function ControlTip({ children, text }: { children: ReactNode; text: string }) {
+function ControlTip({
+  children,
+  text,
+  secondary = false,
+}: {
+  children: ReactNode;
+  text: string;
+  secondary?: boolean;
+}) {
   return (
-    <span className="control-tip" title={text}>
+    <span className={`control-tip${secondary ? ' mobile-secondary-control' : ''}`} title={text}>
       {children}
     </span>
   );
@@ -121,6 +129,7 @@ export function ControlsBar({
   currentStep,
   status,
 }: ControlsBarProps) {
+  const [expanded, setExpanded] = useState(false);
   const hasTrace = totalSteps > 0;
   const categories = [...new Set(examples.map((example) => example.category))];
   const runShortcutLabel =
@@ -170,7 +179,7 @@ export function ControlsBar({
 
   return (
     <footer
-      className={`controls-bar${hasTrace ? '' : ' controls-bar-prerun'}`}
+      className={`controls-bar${hasTrace ? '' : ' controls-bar-prerun'}${expanded ? ' mobile-controls-expanded' : ''}`}
       aria-label="Playback controls"
     >
       <ControlTip text={runTitle}>
@@ -221,7 +230,7 @@ export function ControlsBar({
       ) : (
         <>
           <div className="transport" role="group" aria-label="Step navigation">
-            <ControlTip text={startTitle}>
+            <ControlTip secondary text={startTitle}>
               <button
                 aria-label="Jump to first step"
                 disabled={!hasTrace || step === 0}
@@ -263,7 +272,7 @@ export function ControlsBar({
                 <ChevronRight size={16} />
               </button>
             </ControlTip>
-            <ControlTip text={endTitle}>
+            <ControlTip secondary text={endTitle}>
               <button
                 aria-label="Jump to final step"
                 disabled={!hasTrace || step >= totalSteps - 1}
@@ -273,7 +282,7 @@ export function ControlsBar({
                 <SkipForward size={15} />
               </button>
             </ControlTip>
-            <ControlTip text={stepOverTitle}>
+            <ControlTip secondary text={stepOverTitle}>
               <button
                 aria-label="Step over"
                 className="debug-nav-button"
@@ -284,7 +293,7 @@ export function ControlsBar({
                 <CornerDownRight size={15} />
               </button>
             </ControlTip>
-            <ControlTip text={breakpointTitle}>
+            <ControlTip secondary text={breakpointTitle}>
               <button
                 aria-label="Run to breakpoint"
                 className="debug-nav-button"
@@ -295,7 +304,7 @@ export function ControlsBar({
                 <CircleDot size={15} />
               </button>
             </ControlTip>
-            <ControlTip text={cursorTitle}>
+            <ControlTip secondary text={cursorTitle}>
               <button
                 aria-label="Run to cursor"
                 className="debug-nav-button"
@@ -308,6 +317,14 @@ export function ControlsBar({
             </ControlTip>
           </div>
 
+          <button
+            className="mobile-controls-toggle"
+            type="button"
+            aria-expanded={expanded}
+            onClick={() => setExpanded((value) => !value)}
+          >
+            {expanded ? 'Less' : 'More'}
+          </button>
           <div className="scrubber" title={scrubberTitle}>
             <span aria-atomic="true" aria-live="polite" className="sr-only">
               {playing ? 'Playing. ' : 'Paused. '}Step {step + 1} of {totalSteps}.{' '}
@@ -357,7 +374,7 @@ export function ControlsBar({
             <span>{speed}×</span>
           </div>
 
-          <ControlTip text={resetTitle}>
+          <ControlTip secondary text={resetTitle}>
             <button
               aria-label="Reset trace to first step"
               className="ghost-button"

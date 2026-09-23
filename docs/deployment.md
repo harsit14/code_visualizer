@@ -324,3 +324,18 @@ covers local Chromium workflows and unit tests, not the deployed isolation bound
 Schema-valid output can still be dishonest, and termination does not provide a
 hard browser memory quota. The runner permits access to its own static assets for
 Pyodide; it is not a no-network interpreter.
+
+## Verified email accounts (opt-in)
+
+The managed account rollout requires the `0002_managed_auth.sql` migration,
+Supabase OTP email delivery, `SUPABASE_ANON_KEY` and `MANAGED_AUTH_ENABLED=true`.
+Keep `PASSWORD_PEPPER` while legacy users link their accounts. Follow
+[MANAGED-AUTH-ROLLOUT.md](MANAGED-AUTH-ROLLOUT.md) before enabling the feature.
+No live migration or deployment was performed as part of implementation.
+
+Successful-run history upload is now an explicit **Workspace → Saving and privacy
+→ Save runs to account history** preference. It defaults to local only and turns
+off on an account change. Existing saved histories remain accessible. Failed
+uploads show a retry action; retrying a request whose acknowledgement was lost
+can currently create a duplicate history entry. Named versioned workspaces and
+idempotent cloud saves remain separate roadmap work.

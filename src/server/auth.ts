@@ -10,7 +10,7 @@ import type { AuthUser, ServerEnv, UserSubscription } from './types';
 
 export const SESSION_COOKIE = 'cv_session';
 
-const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
+export const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
 const PASSWORD_HASH_ALGORITHM = 'hmac_sha256_v1';
 const LEGACY_PBKDF2_ALGORITHM = 'pbkdf2_sha256';
 const DEFAULT_LEGACY_PBKDF2_VERIFY_LIMIT = 20_000;
@@ -23,7 +23,7 @@ const textEncoder = new TextEncoder();
 export class PasswordHashUpgradeRequiredError extends Error {
   constructor() {
     super(
-      'This account uses an older password hash that is too expensive for this Worker. Recreate the account or update the stored password hash after the latest deployment.',
+      'This account needs assisted recovery. Contact the site owner to restore access; creating another account does not recover your saved history.',
     );
     this.name = 'PasswordHashUpgradeRequiredError';
   }
@@ -219,6 +219,7 @@ export function serializeAccount(context: SessionContext | null) {
           createdAt: context.user.createdAt,
           email: context.user.email,
           id: context.user.id,
+          authMethod: context.user.authMethod ?? 'legacy',
         }
       : null,
   };
@@ -266,7 +267,7 @@ export async function sha256Hex(value: string): Promise<string> {
   return bytesToHex(new Uint8Array(digest));
 }
 
-function readSessionCookie(request: Request): string | null {
+export function readSessionCookie(request: Request): string | null {
   const cookie = request.headers.get('Cookie');
   if (!cookie) {
     return null;
@@ -275,11 +276,14 @@ function readSessionCookie(request: Request): string | null {
     .split(';')
     .map((item) => item.trim())
     .find((item) => item.startsWith(`${SESSION_COOKIE}=`));
-  return match ? decodeURIComponent(match.slice(SESSION_COOKIE.length + 1)) : null;
+  if (!match) return null;
+  const token = match.slice(SESSION_COOKIE.length + 1);
+  return /^[A-Za-z0-9_-]{43}$/.test(token) ? token : null;
 }
 
 function rowToUser(row: UserRow): AuthUser {
   return {
+    authMethod: row.auth_method ?? 'legacy',
     createdAt: row.created_at,
     email: row.email,
     id: row.id,
@@ -298,7 +302,7 @@ function rowToSubscription(row: SubscriptionRow): UserSubscription {
   };
 }
 
-function randomToken(bytes: number): string {
+export function randomToken(bytes: number): string {
   const value = crypto.getRandomValues(new Uint8Array(bytes));
   return bytesToBase64Url(value);
 }

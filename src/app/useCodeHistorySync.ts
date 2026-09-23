@@ -2,6 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Language, SessionResult } from '../engine/types';
 import { getExample } from '../examples/examples';
 import { saveCodeHistory } from './historyClient';
+const SYNC_KEY = 'cv-history-sync-enabled';
+function initialSync() {
+  try {
+    return localStorage.getItem(SYNC_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
 
 type UseCodeHistorySyncOptions = {
   code: string;
@@ -37,6 +45,27 @@ export function useCodeHistorySync({
   language,
   result,
 }: UseCodeHistorySyncOptions) {
+  const [historySyncEnabled, setEnabled] = useState(initialSync);
+  const [historySaveStatus, setHistorySaveStatus] = useState<
+    'idle' | 'saving' | 'saved' | 'failed'
+  >('idle');
+  const [historyError, setHistoryError] = useState('');
+  const [retry, setRetry] = useState(0);
+  const controllerRef = useRef<AbortController | null>(null);
+  const generationRef = useRef(0);
+  const setHistorySyncEnabled = useCallback((enabled: boolean) => {
+    generationRef.current++;
+    controllerRef.current?.abort();
+    setEnabled(enabled);
+    setHistorySaveStatus('idle');
+    setHistoryError('');
+    try {
+      localStorage.setItem(SYNC_KEY, String(enabled));
+    } catch {
+      /* preference lasts this visit */
+    }
+  }, []);
+  const retryHistorySave = useCallback(() => setRetry((value) => value + 1), []);
   const currentHistoryIdRef = useRef<string | null>(null);
   const [historyRefreshToken, setHistoryRefreshToken] = useState(0);
 
@@ -49,38 +78,78 @@ export function useCodeHistorySync({
   }, []);
 
   useEffect(() => {
-    if (embedMode || result?.status !== 'ok' || !result.run) {
+    const changed = () => {
+      currentHistoryIdRef.current = null;
+      setHistorySyncEnabled(false);
+      setHistoryRefreshToken((value) => value + 1);
+    };
+    const storage = (event: StorageEvent) => {
+      if (event.key === 'cv-account-change') changed();
+    };
+    window.addEventListener('cv-account-changed', changed);
+    window.addEventListener('storage', storage);
+    return () => {
+      window.removeEventListener('cv-account-changed', changed);
+      window.removeEventListener('storage', storage);
+    };
+  }, [setHistorySyncEnabled]);
+
+  useEffect(() => {
+    if (!historySyncEnabled || embedMode || result?.status !== 'ok' || !result.run) {
+      setHistorySaveStatus('idle');
       return;
     }
 
     let cancelled = false;
+    const controller = new AbortController();
+    controllerRef.current = controller;
+    const generation = ++generationRef.current;
+    setHistorySaveStatus('saving');
+    setHistoryError('');
     const run = result.run;
-    void saveCodeHistory({
-      code,
-      exampleId,
-      functionName: run.functionName ?? functionOverride,
-      id: currentHistoryIdRef.current,
-      inputs: run.inputs.map((input) => input.literal),
-      language,
-      seed: run.seed,
-      title: historyTitle(exampleId, run.functionName ?? functionOverride, code),
-    })
+    void saveCodeHistory(
+      {
+        code,
+        exampleId,
+        functionName: run.functionName ?? functionOverride,
+        id: currentHistoryIdRef.current,
+        inputs: run.inputs.map((input) => input.literal),
+        language,
+        seed: run.seed,
+        title: historyTitle(exampleId, run.functionName ?? functionOverride, code),
+      },
+      controller.signal,
+    )
       .then((item) => {
-        if (!cancelled && item) {
+        if (!item) throw new Error('The server did not confirm this save. Please retry.');
+        if (!cancelled && generation === generationRef.current && item) {
+          setHistorySaveStatus('saved');
           currentHistoryIdRef.current = item.id;
           setHistoryRefreshToken((current) => current + 1);
         }
       })
-      .catch(() => {
-        /* History is best-effort: guests and local static dev can still run code. */
+      .catch((error) => {
+        if (cancelled || generation !== generationRef.current || controller.signal.aborted) return;
+        setHistorySaveStatus('failed');
+        setHistoryError(
+          error instanceof Error
+            ? error.message
+            : 'History save failed. Your code remains on this device.',
+        );
       });
 
     return () => {
       cancelled = true;
+      controller.abort();
     };
-  }, [code, embedMode, exampleId, functionOverride, language, result]);
+  }, [code, embedMode, exampleId, functionOverride, language, result, historySyncEnabled, retry]);
 
   return {
+    historySyncEnabled,
+    setHistorySyncEnabled,
+    historySaveStatus,
+    historyError,
+    retryHistorySave,
     clearHistoryItemId,
     historyRefreshToken,
     setHistoryItemId,

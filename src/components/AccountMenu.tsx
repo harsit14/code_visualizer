@@ -1,3 +1,4 @@
+import { EmailCodeForm } from './EmailCodeForm';
 import { LogOut, UserRound } from 'lucide-react';
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { fetchAccount, signIn, signOut, signUp, type AccountState } from '../app/accountClient';
@@ -18,6 +19,8 @@ const EMPTY_ACCOUNT: AccountState = {
 
 export function AccountMenu({ compact = false }: AccountMenuProps) {
   const [account, setAccount] = useState<AccountState>(EMPTY_ACCOUNT);
+  const [legacyLogin, setLegacyLogin] = useState(false);
+  const [linking, setLinking] = useState(false);
   const [mode, setMode] = useState<AuthMode>('signup');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -72,21 +75,27 @@ export function AccountMenu({ compact = false }: AccountMenuProps) {
       setMessage(null);
       try {
         const nextAccount =
-          mode === 'signup' ? await signUp({ email, password }) : await signIn({ email, password });
+          mode === 'signup' && account.authMode !== 'email-code'
+            ? await signUp({ email, password })
+            : await signIn({ email, password });
         setAccount({
           ...EMPTY_ACCOUNT,
           ...nextAccount,
           accountConfigured: true,
         });
         setPassword('');
-        setMessage(mode === 'signup' ? 'Account created.' : 'Signed in.');
+        setMessage(
+          mode === 'signup' && account.authMode !== 'email-code'
+            ? 'Account created.'
+            : 'Signed in.',
+        );
       } catch (requestError) {
         setError(errorMessage(requestError));
       } finally {
         setBusy(false);
       }
     },
-    [email, mode, password],
+    [email, mode, password, account.authMode],
   );
 
   const handleSignOut = useCallback(async () => {
@@ -94,7 +103,13 @@ export function AccountMenu({ compact = false }: AccountMenuProps) {
     setError(null);
     try {
       await signOut();
-      setAccount({ ...EMPTY_ACCOUNT, accountConfigured: true });
+      setAccount((current) => ({
+        ...EMPTY_ACCOUNT,
+        accountConfigured: true,
+        authMode: current.authMode,
+      }));
+      setLegacyLogin(false);
+      setLinking(false);
       setMessage('Signed out.');
     } catch (requestError) {
       setError(errorMessage(requestError));
@@ -115,7 +130,9 @@ export function AccountMenu({ compact = false }: AccountMenuProps) {
             {account.user
               ? account.user.email
               : account.accountConfigured
-                ? 'Create your account'
+                ? account.authMode === 'email-code'
+                  ? 'Sign in with email'
+                  : 'Create your account'
                 : 'Accounts unavailable'}
           </strong>
           <span>{account.accountConfigured ? planLabel : 'Static host'}</span>
@@ -128,7 +145,26 @@ export function AccountMenu({ compact = false }: AccountMenuProps) {
           </p>
         ) : null}
 
-        {account.user ? (
+        {account.accountConfigured &&
+        account.authMode === 'email-code' &&
+        ((!account.user && !legacyLogin) || linking) ? (
+          <EmailCodeForm
+            linkEmail={linking ? account.user?.email : undefined}
+            onCancel={() => {
+              setLegacyLogin(true);
+              setLinking(false);
+              setMode('signin');
+            }}
+            onAuthenticated={(next) => {
+              setAccount(next);
+              setLinking(false);
+              setLegacyLogin(false);
+              setError(null);
+              setMessage('Signed in with verified email.');
+              void refresh();
+            }}
+          />
+        ) : account.user ? (
           <div className="account-signed-in">
             {account.usage ? (
               <div className="account-usage">
@@ -138,6 +174,18 @@ export function AccountMenu({ compact = false }: AccountMenuProps) {
                 </strong>
               </div>
             ) : null}
+            {account.authMode === 'email-code' && account.user.authMethod !== 'supabase' && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  setLinking(true);
+                  setMessage(null);
+                }}
+              >
+                Enable email sign-in
+              </button>
+            )}
             <button disabled={busy} onClick={handleSignOut} type="button">
               <LogOut size={14} />
               Sign out
@@ -160,7 +208,11 @@ export function AccountMenu({ compact = false }: AccountMenuProps) {
             <label>
               Password
               <input
-                autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+                autoComplete={
+                  mode === 'signup' && account.authMode !== 'email-code'
+                    ? 'new-password'
+                    : 'current-password'
+                }
                 id="account-password"
                 minLength={10}
                 name="password"
@@ -171,19 +223,36 @@ export function AccountMenu({ compact = false }: AccountMenuProps) {
               />
             </label>
             <button disabled={busy || !account.accountConfigured} type="submit">
-              {busy ? 'Working...' : mode === 'signup' ? 'Create account' : 'Sign in'}
+              {busy
+                ? 'Working...'
+                : mode === 'signup' && account.authMode !== 'email-code'
+                  ? 'Create account'
+                  : 'Sign in'}
             </button>
             <button
               className="account-mode-button"
-              onClick={() => setMode((current) => (current === 'signup' ? 'signin' : 'signup'))}
+              disabled={busy}
+              onClick={() =>
+                account.authMode === 'email-code'
+                  ? setLegacyLogin(false)
+                  : setMode((current) => (current === 'signup' ? 'signin' : 'signup'))
+              }
               type="button"
             >
-              {mode === 'signup' ? 'I already have an account' : 'Create a new account'}
+              {account.authMode === 'email-code'
+                ? 'Use email code instead'
+                : mode === 'signup'
+                  ? 'I already have an account'
+                  : 'Create a new account'}
             </button>
           </form>
         ) : null}
 
-        {message ? <p className="account-message">{message}</p> : null}
+        {message ? (
+          <p className="account-message" role="status">
+            {message}
+          </p>
+        ) : null}
         {error ? (
           <p className="account-error" role="alert">
             {error}

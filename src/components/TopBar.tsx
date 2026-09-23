@@ -13,7 +13,7 @@ import {
   Sun,
   Upload,
 } from 'lucide-react';
-import { useRef } from 'react';
+import { useRef, type ReactNode } from 'react';
 import { AccountMenu } from './AccountMenu';
 import { HistoryMenu } from './HistoryMenu';
 import { LogoMark } from './LogoMark';
@@ -29,6 +29,8 @@ type PanelControl = {
 };
 
 type TopBarProps = {
+  storageControls?: ReactNode;
+  mobile?: boolean;
   exampleId: string | null;
   hasDraft: boolean;
   onExampleChange: (id: string) => void;
@@ -69,6 +71,8 @@ const SHORTCUTS = [
 ];
 
 export function TopBar({
+  storageControls,
+  mobile = false,
   exampleId,
   hasDraft,
   onExampleChange,
@@ -182,8 +186,11 @@ export function TopBar({
                 <span className="top-action-label">Workspace</span>
               </summary>
               <div className="panel-menu-popover workspace-popover">
+                {storageControls && <div className="workspace-menu-section">{storageControls}</div>}
                 <div className="workspace-menu-section">
-                  <strong className="workspace-menu-heading">Layout</strong>
+                  <strong className="workspace-menu-heading">
+                    {mobile ? 'Desktop layout' : 'Layout'}
+                  </strong>
                   <div className="panel-menu-presets" aria-label="Panel layout presets">
                     <button className="panel-menu-action" onClick={onUseLearnLayout} type="button">
                       Learn

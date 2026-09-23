@@ -4,6 +4,9 @@ export type AssetBinding = {
 
 export type ServerEnv = {
   ASSETS?: AssetBinding;
+  MANAGED_AUTH_ENABLED?: string;
+  AUTH_RATE_LIMIT_MODE?: string;
+  SUPABASE_ANON_KEY?: string;
   RUNNER_URL?: string;
   DEEPSEEK_API_KEY?: string;
   DEEPSEEK_MODEL?: string;
@@ -26,6 +29,7 @@ export type ServerEnv = {
 };
 
 export type AuthUser = {
+  authMethod?: 'legacy' | 'supabase';
   createdAt: string;
   email: string;
   id: string;

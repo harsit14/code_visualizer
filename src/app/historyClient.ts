@@ -44,8 +44,10 @@ export async function listCodeHistory(): Promise<CodeHistoryItem[]> {
 
 export async function saveCodeHistory(
   payload: SaveCodeHistoryPayload,
+  signal?: AbortSignal,
 ): Promise<CodeHistoryItem | null> {
   const response = await requestJson<HistoryItemPayload>('/api/history', {
+    signal,
     body: JSON.stringify(payload),
     headers: { 'Content-Type': 'application/json' },
     method: 'POST',

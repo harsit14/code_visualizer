@@ -465,7 +465,9 @@ input[type='password'] {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  min-width: 292px;
+  width: min(340px, calc(100vw - 24px));
+  max-height: calc(100dvh - 100px);
+  overflow-y: auto;
   padding: 12px;
   position: absolute;
   right: 0;
@@ -4342,5 +4344,16 @@ input[type='password'] {
   .tour-section {
     gap: 20px;
     padding-top: 32px;
+  }
+}
+
+@media (max-width: 600px) {
+  .account-popover {
+    position: fixed;
+    top: 140px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+    max-height: calc(100dvh - 164px);
   }
 }

@@ -55,6 +55,37 @@ Batch validation: `npm run ci` passes typecheck, lint, 236 tests in 42 files, th
 app production build/smoke and the separate runner build/smoke. Bootstrap tests
 cover parent/origin checks, replayed sequences, overlapping requests and disposal.
 
+## Fourth batch: managed accounts, phone workflow and save recovery
+
+- Added opt-in verified email-code sign-in and explicit linking from a fresh legacy
+  login. The SQL migration retains stable app IDs/history, blocks email-only
+  takeover, revokes old sessions and rejects legacy logins racing with linking.
+- Added shared database-backed IP/email throttling with fail-closed outages.
+  Managed sessions recheck provider eligibility. See the
+  [managed-auth rollout guide](MANAGED-AUTH-ROLLOUT.md).
+- Added phone Code / Visualize / Inputs / Inspect tabs, compact persistent
+  transport, a current-source-line summary, keyboard tab navigation and bounded
+  account/workspace popovers. Desktop panel preferences are preserved.
+- Draft writes now flush on source replacement, page hiding and unmount; failures
+  remain visible and retryable. Account-history uploads default to local only,
+  expose save/retry status and are cancelled/disabled on account changes.
+- Updated vulnerable tooling dependencies, including Vitest 4.1.11. The approved
+  npm advisory check reports zero known vulnerabilities after these updates.
+
+Still outstanding: hosted isolation/auth rollout and real browser matrix; AST-based
+JS/TS instrumentation; stable named/versioned workspaces with complete backups;
+trace bookmarks/search, richer learning feedback, run comparison, algorithm views,
+lessons and performance measurements. Current history saves can duplicate an
+entry after a lost acknowledgement; full idempotent workspace sync is not complete.
+Monetary contributions remain excluded.
+
+Validation: full CI passes typecheck, lint, 262 tests in 48 files, app build/smoke
+and isolated runner build/smoke. Local Chromium checks covered the email-code and
+linking UI with synthetic API responses, invalid-code recovery, phone Python/JS
+runs, inputs, inspection, More/Less transport, draft restore, history save failure
+and retry, and restoring the desktop panel layout. Real email delivery and hosted
+account changes were not exercised. The CI workflow now checks the runner build.
+
 ## Evidence and limits (original audit)
 
 | Check                                       | Result                                                                                                                                  |
@@ -262,4 +293,4 @@ A practical first batch is: (1) privilege protection, (2) practice equality repa
 - Test replay with 100, 1,000 and 3,000 steps and several structure sizes. Agree budgets after measuring baseline; a reasonable initial target is p95 step-to-render under 100 ms on a named reference device.
 - Measure first successful run, meaningful stepping after a run, successful failure-case debugging, saved-work recovery and return visits. Use privacy-preserving events; exclude code, inputs, locals, notebook text and full share URLs.
 
-Next remaining milestones: validate the opt-in runner in staging, implement managed authentication with safe identity linking and durable throttling, then complete responsive workflows, workspace recovery and the learning features. The runtime/auth design is now documented and the runner implementation is available for staging.
+Next remaining milestones: stage the isolated runner and managed accounts, verify the real browser/device matrix, replace experimental JS/TS instrumentation, and implement stable workspaces/backups and the learning features. Phone navigation and save-failure recovery are implemented locally; the full workspace model remains outstanding.

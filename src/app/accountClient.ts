@@ -7,6 +7,7 @@ export type AccountUsage = {
 };
 
 export type AccountState = {
+  authMode?: 'password' | 'email-code';
   accountConfigured: boolean;
   billingConfigured: boolean;
   subscription: {
@@ -16,6 +17,7 @@ export type AccountState = {
   } | null;
   usage: AccountUsage | null;
   user: {
+    authMethod?: 'legacy' | 'supabase';
     createdAt: string;
     email: string;
     id: string;
@@ -91,6 +93,18 @@ async function requestJson<T = unknown>(url: string, init: RequestInit): Promise
         : `Request failed (${response.status}).`;
     throw new Error(detail);
   }
+  if (
+    url.startsWith('/api/auth/') &&
+    url !== '/api/auth/email-code' &&
+    typeof window !== 'undefined'
+  ) {
+    window.dispatchEvent(new Event('cv-account-changed'));
+    try {
+      window.localStorage.setItem('cv-account-change', crypto.randomUUID());
+    } catch {
+      /* current tab is still notified */
+    }
+  }
   return payload as T;
 }
 
@@ -101,4 +115,23 @@ function isErrorPayload(value: unknown): value is ErrorPayload {
     'error' in value &&
     (typeof value.error === 'string' || value.error === undefined)
   );
+}
+
+export async function requestEmailCode(email: string, link: boolean): Promise<{ message: string }> {
+  return requestJson('/api/auth/email-code', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, link }),
+  });
+}
+export async function verifyAccountCode(
+  email: string,
+  code: string,
+  link: boolean,
+): Promise<AccountState> {
+  return requestJson('/api/auth/verify-code', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, code, link }),
+  });
 }

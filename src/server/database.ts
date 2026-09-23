@@ -2,6 +2,7 @@ import { isRecord } from './http';
 import type { AccountPlan, ServerEnv } from './types';
 
 export type UserRow = {
+  auth_method?: 'legacy' | 'supabase';
   created_at: string;
   email: string;
   id: string;
@@ -43,6 +44,17 @@ export type SubscriptionUpsertRow = SubscriptionRow & {
 };
 
 export type AppDatabase = {
+  consumeAuthLimit(
+    bucket: string,
+    limit: number,
+    windowSeconds: number,
+  ): Promise<{ allowed: boolean; retry_after: number }>;
+  completeManagedAuth(
+    subject: string,
+    email: string,
+    legacyTokenHash: string | null,
+    newTokenHash: string,
+  ): Promise<UserRow>;
   billingEventExists(id: string): Promise<boolean>;
   createSession(row: {
     created_at: string;
@@ -126,6 +138,39 @@ class SupabaseRestDatabase implements AppDatabase {
     this.serviceRoleKey = serviceRoleKey;
   }
 
+  async consumeAuthLimit(bucket: string, limit: number, windowSeconds: number) {
+    const rows = await this.request<Array<{ allowed: boolean; retry_after: number }>>(
+      'rpc/consume_auth_limit',
+      {
+        method: 'POST',
+        body: { p_bucket: bucket, p_limit: limit, p_window_seconds: windowSeconds },
+      },
+    );
+    const row = rows?.[0];
+    if (!row || typeof row.allowed !== 'boolean' || !Number.isFinite(row.retry_after))
+      throw new Error('Invalid rate limit response.');
+    return row;
+  }
+
+  async completeManagedAuth(
+    subject: string,
+    email: string,
+    legacyTokenHash: string | null,
+    newTokenHash: string,
+  ): Promise<UserRow> {
+    const rows = await this.request<UserRow[]>('rpc/complete_managed_auth', {
+      method: 'POST',
+      body: {
+        p_subject: subject,
+        p_email: email,
+        p_legacy_token_hash: legacyTokenHash,
+        p_new_token_hash: newTokenHash,
+      },
+    });
+    if (!rows?.[0]?.id) throw new Error('Missing managed account.');
+    return rows[0];
+  }
+
   async billingEventExists(id: string): Promise<boolean> {
     const row = await this.first<{ id: string }>('billing_events', {
       id: eq(id),
@@ -175,11 +220,18 @@ class SupabaseRestDatabase implements AppDatabase {
   }
 
   async findSessionUser(tokenHash: string, expiresAfter: string): Promise<UserRow | null> {
-    const session = await this.first<{ user_id: string }>('sessions', {
+    const session = await this.first<{ user_id: string; auth_method?: string }>('sessions', {
       expires_at: gt(expiresAfter),
-      select: 'user_id',
+      select: '*',
       token_hash: eq(tokenHash),
     });
+    if (session?.auth_method === 'supabase') {
+      const rows = await this.request<UserRow[]>('rpc/managed_session_user', {
+        method: 'POST',
+        body: { p_token_hash: tokenHash },
+      });
+      return rows[0] ? { ...rows[0], auth_method: 'supabase' } : null;
+    }
     return session ? this.findUserById(session.user_id) : null;
   }
 
@@ -207,8 +259,7 @@ class SupabaseRestDatabase implements AppDatabase {
 
   async getSubscriptionForUser(userId: string): Promise<SubscriptionRow | null> {
     return this.first<SubscriptionRow>('subscriptions', {
-      select:
-        'user_id,stripe_subscription_id,status,price_id,current_period_end,updated_at',
+      select: 'user_id,stripe_subscription_id,status,price_id,current_period_end,updated_at',
       user_id: eq(userId),
     });
   }
@@ -302,12 +353,7 @@ class SupabaseRestDatabase implements AppDatabase {
   }
 
   async updateUserStripeCustomerId(userId: string, customerId: string): Promise<void> {
-    await this.mutate(
-      'users',
-      'PATCH',
-      { stripe_customer_id: customerId },
-      { id: eq(userId) },
-    );
+    await this.mutate('users', 'PATCH', { stripe_customer_id: customerId }, { id: eq(userId) });
   }
 
   async upsertSubscription(row: SubscriptionUpsertRow): Promise<void> {
@@ -326,7 +372,10 @@ class SupabaseRestDatabase implements AppDatabase {
     });
   }
 
-  private async first<T>(table: string, params: Record<string, string | number>): Promise<T | null> {
+  private async first<T>(
+    table: string,
+    params: Record<string, string | number>,
+  ): Promise<T | null> {
     const rows = await this.select<T>(table, { ...params, limit: 1 });
     return rows[0] ?? null;
   }
@@ -345,10 +394,7 @@ class SupabaseRestDatabase implements AppDatabase {
     });
   }
 
-  private async select<T>(
-    table: string,
-    params: Record<string, string | number>,
-  ): Promise<T[]> {
+  private async select<T>(table: string, params: Record<string, string | number>): Promise<T[]> {
     return this.request<T[]>(table, { params });
   }
 
@@ -383,6 +429,8 @@ class SupabaseRestDatabase implements AppDatabase {
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
       headers,
       method,
+      redirect: 'error',
+      signal: AbortSignal.timeout(10_000),
     });
     const text = await response.text();
 
@@ -421,10 +469,7 @@ function supabaseError(status: number, text: string): DatabaseRequestError {
     const code = typeof payload.code === 'string' ? payload.code : undefined;
     return new DatabaseRequestError(message, status, code);
   }
-  return new DatabaseRequestError(
-    text || `Supabase database request failed (${status}).`,
-    status,
-  );
+  return new DatabaseRequestError(text || `Supabase database request failed (${status}).`, status);
 }
 
 function parseJson(value: string): unknown {

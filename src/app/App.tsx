@@ -2,6 +2,8 @@
  * App shell: layout, theme, share links, trace export/import, and wiring
  * between the session hook and the dashboard panels.
  */
+import { MobileWorkspaceTabs } from '../components/MobileWorkspaceTabs';
+import { panelMobileTab, useMobileWorkspace } from './useMobileWorkspace';
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { CallStackPanel } from '../components/CallStackPanel';
@@ -20,7 +22,8 @@ import { VariablesPanel } from '../components/VariablesPanel';
 import { WatchPanel } from '../components/WatchPanel';
 import type { Language } from '../engine/types';
 import { CUSTOM_CODE_ID, DEFAULT_EXAMPLE_ID, getExample } from '../examples/examples';
-import { loadStoredCodeDraft, saveStoredCodeDraft } from './codeDraft';
+import { loadStoredCodeDraft } from './codeDraft';
+import { useDraftPersistence } from './useDraftPersistence';
 import { pairPercentage, type ColumnId, type PanelId } from './layoutState';
 import type { CodeHistoryItem } from './historyClient';
 import { decodeShareHash } from './shareState';
@@ -104,6 +107,7 @@ type DashboardAppProps = {
 };
 
 function DashboardApp({ onOpenLanding }: DashboardAppProps) {
+  const { mobile, mobileTab, setMobileTab } = useMobileWorkspace();
   const [shared] = useState(initialShare);
   // Restore the local draft on boot unless a share link or embed supplies code.
   const [bootDraft] = useState(() => (shared || initialEmbedMode() ? null : loadStoredCodeDraft()));
@@ -122,7 +126,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
     initialDashboardOnboarding(embedMode),
   );
   const [watchedVariables, setWatchedVariables] = useState<string[]>([]);
-  const [draftAvailable, setDraftAvailable] = useState(() => loadStoredCodeDraft() !== null);
+  const { draftAvailable, draftStatus, queueDraft, flushDraft } = useDraftPersistence();
   const {
     adjustColumnPair,
     adjustPanelPair,
@@ -152,7 +156,16 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
   });
   const { importSession, jumpToStep, selectedFrameIndex, setCode, setLanguage, step, steps } =
     session;
-  const { clearHistoryItemId, historyRefreshToken, setHistoryItemId } = useCodeHistorySync({
+  const {
+    clearHistoryItemId,
+    historyRefreshToken,
+    setHistoryItemId,
+    historySyncEnabled,
+    setHistorySyncEnabled,
+    historySaveStatus,
+    historyError,
+    retryHistorySave,
+  } = useCodeHistorySync({
     code: session.code,
     embedMode,
     exampleId,
@@ -194,13 +207,14 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
       step: number;
     }) => {
       clearHistoryItemId();
+      flushDraft();
       userEditedRef.current = false;
       setExampleId(null);
       setWatchedVariables([]);
       resetTraceNavigation();
       importSession(code, result, step, language);
     },
-    [clearHistoryItemId, importSession, resetTraceNavigation],
+    [clearHistoryItemId, flushDraft, importSession, resetTraceNavigation],
   );
   const {
     importError,
@@ -241,39 +255,29 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Autosave custom code as a local draft so switching examples or
-  // languages, or reloading the page, never loses typed work.
-  useEffect(() => {
-    if (embedMode || exampleId !== null || !userEditedRef.current) {
-      return;
-    }
-    const timeout = window.setTimeout(() => {
-      saveStoredCodeDraft(session.code, session.language);
-      setDraftAvailable(session.code.trim().length > 0);
-    }, 600);
-    return () => window.clearTimeout(timeout);
-  }, [embedMode, exampleId, session.code, session.language]);
-
   const handleCodeChange = useCallback(
     (code: string) => {
       clearHistoryItemId();
       userEditedRef.current = true;
+      queueDraft(code, session.language);
       setExampleId(null);
       setWatchedVariables([]);
       resetTraceNavigation();
       setCode(code);
     },
-    [clearHistoryItemId, resetTraceNavigation, setCode],
+    [clearHistoryItemId, queueDraft, resetTraceNavigation, session.language, setCode],
   );
 
   const handleExampleChange = useCallback(
     (id: string) => {
+      flushDraft();
       if (id === CUSTOM_CODE_ID) {
         const draft = loadStoredCodeDraft();
         if (!draft) {
           return;
         }
         clearHistoryItemId();
+        flushDraft();
         userEditedRef.current = false;
         setExampleId(null);
         setWatchedVariables([]);
@@ -289,26 +293,30 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
       setExampleId(id);
       setWatchedVariables([]);
       resetTraceNavigation();
+      userEditedRef.current = false;
       setLanguage(example.language);
       setCode(example.code);
     },
-    [clearHistoryItemId, resetTraceNavigation, session, setCode, setLanguage],
+    [clearHistoryItemId, flushDraft, resetTraceNavigation, session, setCode, setLanguage],
   );
 
   const handleLanguageChange = useCallback(
     (nextLanguage: Language) => {
+      flushDraft();
+      if (userEditedRef.current) queueDraft(session.code, nextLanguage);
       clearHistoryItemId();
       setExampleId(null);
       setWatchedVariables([]);
       resetTraceNavigation();
       setLanguage(nextLanguage);
     },
-    [clearHistoryItemId, resetTraceNavigation, setLanguage],
+    [clearHistoryItemId, flushDraft, queueDraft, resetTraceNavigation, session.code, setLanguage],
   );
 
   const handleOpenHistoryItem = useCallback(
     (item: CodeHistoryItem) => {
       setHistoryItemId(item.id);
+      flushDraft();
       userEditedRef.current = false;
       setExampleId(item.exampleId);
       setWatchedVariables([]);
@@ -320,7 +328,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
         seed: item.seed,
       });
     },
-    [resetTraceNavigation, session, setHistoryItemId],
+    [flushDraft, resetTraceNavigation, session, setHistoryItemId],
   );
 
   const toggleWatchedVariable = useCallback((name: string) => {
@@ -357,8 +365,12 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
   const previousStep = session.step > 0 ? session.steps[session.step - 1] : undefined;
   const showInputs = session.language === 'python' && session.analysis?.mode === 'function';
 
+  const visiblePanels = mobile
+    ? Object.fromEntries(Object.keys(panelVisibility).map((key) => [key, true]))
+    : panelVisibility;
+
   const leftSlots: PanelSlotConfig[] = [
-    panelVisibility.code
+    visiblePanels.code
       ? panelSlot(
           'code',
           <ErrorBoundary
@@ -384,7 +396,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
           </ErrorBoundary>,
         )
       : null,
-    showInputs && panelVisibility.inputs
+    showInputs && visiblePanels.inputs
       ? panelSlot(
           'inputs',
           <ErrorBoundary
@@ -421,7 +433,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
       : null,
   ].filter(isPanelSlot);
 
-  const centerSlots: PanelSlotConfig[] = panelVisibility.data
+  const centerSlots: PanelSlotConfig[] = visiblePanels.data
     ? [
         panelSlot(
           'data',
@@ -444,7 +456,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
     : [];
 
   const rightSlots: PanelSlotConfig[] = [
-    panelVisibility.variables
+    visiblePanels.variables
       ? panelSlot(
           'variables',
           <ErrorBoundary
@@ -462,7 +474,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
           </ErrorBoundary>,
         )
       : null,
-    panelVisibility.watch
+    visiblePanels.watch
       ? panelSlot(
           'watch',
           <ErrorBoundary
@@ -484,7 +496,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
           </ErrorBoundary>,
         )
       : null,
-    panelVisibility.callStack && Boolean(run)
+    visiblePanels.callStack && Boolean(run)
       ? panelSlot(
           'callStack',
           <ErrorBoundary
@@ -502,7 +514,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
           </ErrorBoundary>,
         )
       : null,
-    panelVisibility.explainer
+    visiblePanels.explainer
       ? panelSlot(
           'explainer',
           <ErrorBoundary
@@ -521,7 +533,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
           </ErrorBoundary>,
         )
       : null,
-    panelVisibility.console
+    visiblePanels.console
       ? panelSlot(
           'console',
           <ErrorBoundary
@@ -561,12 +573,14 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
         <Fragment key={slot.id}>
           <div
             className="panel-slot"
+            data-panel-id={slot.id}
+            hidden={mobile && panelMobileTab[slot.id] !== mobileTab}
             ref={(node) => registerPanelSlot(slot.id, node)}
             style={{ flex: panelWeights[slot.id] }}
           >
             {slot.content}
           </div>
-          {index < slots.length - 1 ? (
+          {!mobile && index < slots.length - 1 ? (
             <div
               aria-label={`Resize ${slot.id} and ${slots[index + 1].id}`}
               aria-orientation="horizontal"
@@ -596,7 +610,9 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
   );
 
   return (
-    <div className={`app-shell dashboard-instrument${embedMode ? ' app-shell-embed' : ''}`}>
+    <div
+      className={`app-shell dashboard-instrument${embedMode ? ' app-shell-embed' : ''}${mobile ? ' mobile-workspace' : ''}`}
+    >
       <section className="dashboard-stage" aria-label="Code Visualizer dashboard">
         {embedMode ? (
           <header className="embed-bar">
@@ -615,6 +631,25 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
           </header>
         ) : (
           <TopBar
+            mobile={mobile}
+            storageControls={
+              <>
+                <strong className="workspace-menu-heading">Saving and privacy</strong>
+                <label className="panel-menu-item">
+                  <input
+                    type="checkbox"
+                    checked={historySyncEnabled}
+                    onChange={(event) => setHistorySyncEnabled(event.target.checked)}
+                  />
+                  Save runs to account history
+                </label>
+                <p className="account-note">
+                  {historySyncEnabled
+                    ? 'Successful runs send source code and inputs to your signed-in account. Turn off to keep future runs local.'
+                    : 'Local only. Running code does not send it to account history. AI explanations send code only when requested.'}
+                </p>
+              </>
+            }
             canExport={Boolean(session.result?.run)}
             embedLabel={embedLabel}
             exampleId={exampleId}
@@ -644,6 +679,48 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
           />
         )}
 
+        {!embedMode &&
+          (draftStatus !== 'idle' || (historySyncEnabled && historySaveStatus !== 'idle')) && (
+            <div className="persistence-status">
+              {!embedMode && draftStatus !== 'idle' && (
+                <div className="save-status" role={draftStatus === 'failed' ? 'alert' : 'status'}>
+                  <span>
+                    {draftStatus === 'pending'
+                      ? 'Saving draft…'
+                      : draftStatus === 'saved'
+                        ? 'Draft saved on this device'
+                        : draftStatus === 'cleared'
+                          ? 'Draft cleared on this device'
+                          : 'Draft not saved. Storage may be full or unavailable, or code exceeds 100,000 characters.'}
+                  </span>
+                  {draftStatus === 'failed' && (
+                    <button type="button" onClick={flushDraft}>
+                      Retry draft save
+                    </button>
+                  )}
+                </div>
+              )}
+              {!embedMode && historySyncEnabled && historySaveStatus !== 'idle' && (
+                <div
+                  className="save-status"
+                  role={historySaveStatus === 'failed' ? 'alert' : 'status'}
+                >
+                  <span>
+                    {historySaveStatus === 'saving'
+                      ? 'Saving run to account…'
+                      : historySaveStatus === 'saved'
+                        ? 'Run saved to account history'
+                        : `History save failed: ${historyError}`}
+                  </span>
+                  {historySaveStatus === 'failed' && (
+                    <button type="button" onClick={retryHistorySave}>
+                      Retry history save
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         {importError ? (
           <div className="dashboard-onboarding" role="alert">
             <span>Import failed: {importError}</span>
@@ -653,18 +730,50 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
           </div>
         ) : null}
 
-        {!embedMode && showDashboardOnboarding ? (
+        {!embedMode && !mobile && showDashboardOnboarding ? (
           <DashboardOnboardingBar onDismiss={dismissDashboardOnboarding} />
         ) : null}
 
-        <p className="viewport-note">Best on desktop or tablet.</p>
+        {mobile && <MobileWorkspaceTabs active={mobileTab} onChange={setMobileTab} />}
+        {mobile && session.currentStep && (
+          <button
+            type="button"
+            className="mobile-source-context"
+            onClick={() => setMobileTab('Code')}
+            title="Show current source line"
+          >
+            <span>
+              Line {session.currentStep.line} ·{' '}
+              {session.currentStep.phase === 'before'
+                ? 'before'
+                : session.currentStep.phase === 'after'
+                  ? 'after'
+                  : session.currentStep.event}
+            </span>
+            <code>{session.code.split('\n')[session.currentStep.line - 1] ?? ''}</code>
+          </button>
+        )}
 
-        <main className="workbench" style={workbenchStyle}>
+        <main
+          id="workspace-content"
+          className="workbench"
+          style={workbenchStyle}
+          role={mobile ? 'tabpanel' : undefined}
+          aria-labelledby={mobile ? `mobile-tab-${mobileTab}` : undefined}
+        >
+          {mobile && mobileTab === 'Inputs' && !showInputs && (
+            <section className="panel mobile-empty-panel">
+              <p>
+                Function inputs and saved cases appear here for Python function examples. Scripts
+                run directly from Code.
+              </p>
+            </section>
+          )}
           {visibleColumns.length > 0 ? (
             visibleColumns.map((columnId, index) => (
               <Fragment key={columnId}>
                 {renderPanelStack(columnId, columnSlots[columnId])}
-                {index < visibleColumns.length - 1 ? (
+                {!mobile && index < visibleColumns.length - 1 ? (
                   <div
                     aria-label={`Resize ${columnId} and ${visibleColumns[index + 1]} columns`}
                     aria-orientation="vertical"

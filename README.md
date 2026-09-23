@@ -181,6 +181,17 @@ Because commercial use is restricted, this project is **source-available**, not
 open source as defined by the Open Source Initiative. The licenses do not grant
 permission to imply endorsement or ownership by anyone else.
 
+## Local reliability and account rollout
+
+Phones use Code / Visualize / Inputs / Inspect views with a persistent transport.
+Typing saves a local draft, with visible errors and retry when browser storage
+fails. Account-history uploads are opt-in under Workspace → Saving and privacy;
+turning them on sends successful-run source and inputs to the signed-in account.
+
+Verified email-code accounts and safe legacy linking are available behind an
+explicit deployment flag. Follow [the managed-auth rollout guide](docs/MANAGED-AUTH-ROLLOUT.md)
+before changing a hosted deployment. No live accounts have been migrated.
+
 ## Project Notes
 
 - Custom Python class instances render as attribute tables unless they match

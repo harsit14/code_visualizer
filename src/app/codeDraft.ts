@@ -25,19 +25,23 @@ export function loadStoredCodeDraft(): CodeDraft | null {
 }
 
 /** Empty code clears the draft; oversized code keeps the previous draft. */
-export function saveStoredCodeDraft(code: string, language: Language) {
+export function saveStoredCodeDraft(
+  code: string,
+  language: Language,
+): 'saved' | 'cleared' | 'failed' {
   try {
     if (code.trim().length === 0) {
       window.localStorage.removeItem(STORAGE_KEY);
-      return;
+      return 'cleared';
     }
     if (code.length > MAX_DRAFT_CHARS) {
-      return;
+      return 'failed';
     }
     const draft: CodeDraft = { code, language, savedAt: new Date().toISOString() };
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
+    return 'saved';
   } catch {
-    /* local storage may be disabled or full */
+    return 'failed';
   }
 }
 
@@ -46,7 +50,11 @@ function normalizeCodeDraft(value: unknown): CodeDraft | null {
     return null;
   }
   const record = value as Record<string, unknown>;
-  if (typeof record.code !== 'string' || record.code.trim().length === 0) {
+  if (
+    typeof record.code !== 'string' ||
+    record.code.length > MAX_DRAFT_CHARS ||
+    record.code.trim().length === 0
+  ) {
     return null;
   }
   const language = LANGUAGES.includes(record.language as Language)
