@@ -718,6 +718,8 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
           onExampleChange={handleExampleChange}
           onJump={session.jumpToStep}
           onRun={() => void session.run()}
+          onStop={session.stopExecution}
+          onRetryRuntime={session.retryRuntime}
           onRunToBreakpoint={runToBreakpoint}
           onRunToCursor={runToCursor}
           onSpeedChange={session.setSpeed}

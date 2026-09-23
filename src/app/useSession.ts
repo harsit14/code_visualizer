@@ -133,6 +133,8 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
   );
 
   const revisionRef = useRef(0);
+  const stoppedRevisionRef = useRef(-1);
+  const jsAbortRef = useRef<AbortController | null>(null);
   const operationPendingRef = useRef(false);
   const mountedRef = useRef(true);
   const [operationBusy, setOperationBusy] = useState(false);
@@ -168,6 +170,8 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
       mountedRef.current = false;
       revisionRef.current += 1;
       if (analyzeTimer.current) window.clearTimeout(analyzeTimer.current);
+      clientRef.current?.cancel();
+      jsAbortRef.current?.abort();
       clearPythonRuntimeStatusHandler(clientRef.current);
     };
   }, []);
@@ -511,7 +515,9 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
             progress: 0.74,
             stage: 'trace-generating',
           });
-          data = await runJavaScriptInWorker(code, runLanguage, RUN_TIMEOUT_MS);
+          const controller = new AbortController();
+          jsAbortRef.current = controller;
+          data = await runJavaScriptInWorker(code, runLanguage, RUN_TIMEOUT_MS, controller.signal);
           if (!isCurrent()) return;
           setStatus({
             phase: 'ready',
@@ -566,8 +572,9 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
       } finally {
         operationPendingRef.current = false;
         if (mountedRef.current) {
+          jsAbortRef.current = null;
           setOperationBusy(false);
-          if (!isCurrent()) {
+          if (!isCurrent() && stoppedRevisionRef.current !== revisionRef.current) {
             setStatus(idleStatus(languageRef.current));
             scheduleAnalyze(codeRef.current, languageRef.current);
           }
@@ -588,6 +595,29 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
       testCasesBusy,
     ],
   );
+
+  const stopExecution = useCallback(() => {
+    revisionRef.current += 1;
+    stoppedRevisionRef.current = revisionRef.current;
+    analyzeSerial.current += 1;
+    if (analyzeTimer.current) window.clearTimeout(analyzeTimer.current);
+    analyzeTimer.current = null;
+    setPlaying(false);
+    clientRef.current?.cancel();
+    jsAbortRef.current?.abort();
+    setStatus({
+      phase: 'idle',
+      stage: 'idle',
+      interruptSupported: false,
+      message: 'Stopped. Run when you’re ready.',
+    });
+  }, [setPlaying]);
+
+  const retryRuntime = useCallback(() => {
+    if (operationPendingRef.current || languageRef.current !== 'python') return;
+    getClient().retry();
+    scheduleAnalyze(codeRef.current, languageRef.current);
+  }, [getClient, scheduleAnalyze]);
 
   const regenerateInputs = useCallback(() => {
     const freshSeed = Math.floor(Math.random() * 1_000_000);
@@ -769,7 +799,8 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
           setTestCases((current) =>
             current.map((item) => (item.status === 'running' ? { ...item, status: 'idle' } : item)),
           );
-          if (!isCurrent()) scheduleAnalyze(codeRef.current, languageRef.current);
+          if (!isCurrent() && stoppedRevisionRef.current !== revisionRef.current)
+            scheduleAnalyze(codeRef.current, languageRef.current);
         }
       }
     },
@@ -839,7 +870,8 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
       operationPendingRef.current = false;
       if (mountedRef.current) {
         setComplexityBusy(false);
-        if (!isCurrent()) scheduleAnalyze(codeRef.current, languageRef.current);
+        if (!isCurrent() && stoppedRevisionRef.current !== revisionRef.current)
+          scheduleAnalyze(codeRef.current, languageRef.current);
       }
     }
   }, [code, complexityBusy, functionOverride, getClient, isBusy, scheduleAnalyze, seed]);
@@ -882,6 +914,8 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
   );
 
   return {
+    stopExecution,
+    retryRuntime,
     language,
     setLanguage,
     code,

@@ -62,30 +62,39 @@ async function ensurePyodide(): Promise<PyodideAPI> {
       progress: 0.18,
       stage: 'runtime-loading',
     });
-    pyodidePromise = loadPyodide({ indexURL: getPyodideBaseUrl() }).then((pyodide) => {
-      emitStatus('loading', 'Preparing trace engine...', {
-        progress: 0.46,
-        stage: 'engine-preparing',
+    pyodidePromise = loadPyodide({ indexURL: getPyodideBaseUrl() })
+      .then((pyodide) => {
+        emitStatus('loading', 'Preparing trace engine...', {
+          progress: 0.46,
+          stage: 'engine-preparing',
+        });
+        if (interruptBuffer) {
+          pyodide.setInterruptBuffer(interruptBuffer);
+        }
+
+        pyodide.FS.mkdirTree('/codeviz_engine/codeviz');
+        for (const [name, contents] of Object.entries(ENGINE_FILES)) {
+          pyodide.FS.writeFile(`/codeviz_engine/codeviz/${name}`, contents);
+        }
+        pyodide.runPython(
+          [
+            'import sys',
+            "sys.path.insert(0, '/codeviz_engine')",
+            'import codeviz.api as _codeviz_api',
+          ].join('\n'),
+        );
+
+        emitStatus('ready', 'Python ready', { progress: 1, stage: 'ready' });
+        return pyodide;
+      })
+      .catch((error: unknown) => {
+        pyodidePromise = null;
+        post({
+          type: 'runtime-error',
+          message: error instanceof Error ? error.message : 'Python runtime failed to load.',
+        });
+        throw error;
       });
-      if (interruptBuffer) {
-        pyodide.setInterruptBuffer(interruptBuffer);
-      }
-
-      pyodide.FS.mkdirTree('/codeviz_engine/codeviz');
-      for (const [name, contents] of Object.entries(ENGINE_FILES)) {
-        pyodide.FS.writeFile(`/codeviz_engine/codeviz/${name}`, contents);
-      }
-      pyodide.runPython(
-        [
-          'import sys',
-          "sys.path.insert(0, '/codeviz_engine')",
-          'import codeviz.api as _codeviz_api',
-        ].join('\n'),
-      );
-
-      emitStatus('ready', 'Python ready', { progress: 1, stage: 'ready' });
-      return pyodide;
-    });
   }
 
   return pyodidePromise;
@@ -160,13 +169,17 @@ self.addEventListener('message', (event: MessageEvent<WorkerInbound>) => {
   if (message.type === 'setInterruptBuffer') {
     interruptBuffer = message.interruptBuffer;
     if (pyodidePromise) {
-      void pyodidePromise.then((pyodide) => pyodide.setInterruptBuffer(message.interruptBuffer));
+      void pyodidePromise
+        .then((pyodide) => pyodide.setInterruptBuffer(message.interruptBuffer))
+        .catch(() => {});
     }
     return;
   }
 
   if (message.type === 'prewarm') {
-    void ensurePyodide();
+    void ensurePyodide().catch(() => {
+      /* runtime-error is already reported */
+    });
     return;
   }
 

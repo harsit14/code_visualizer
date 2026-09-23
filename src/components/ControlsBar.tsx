@@ -15,6 +15,7 @@ import {
   RotateCcw,
   SkipBack,
   SkipForward,
+  Square,
 } from 'lucide-react';
 import { CUSTOM_CODE_ID, examples } from '../examples/examples';
 import type { RuntimeStatus, TraceStep } from '../engine/types';
@@ -22,6 +23,8 @@ import type { RuntimeStatus, TraceStep } from '../engine/types';
 type ControlsBarProps = {
   isBusy: boolean;
   onRun: () => void;
+  onStop: () => void;
+  onRetryRuntime: () => void;
   exampleId: string | null;
   onExampleChange: (id: string) => void;
   playing: boolean;
@@ -94,6 +97,8 @@ function RuntimeProgress({ status }: { status: RuntimeStatus }) {
 export function ControlsBar({
   isBusy,
   onRun,
+  onStop,
+  onRetryRuntime,
   exampleId,
   onExampleChange,
   playing,
@@ -122,7 +127,12 @@ export function ControlsBar({
     typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform)
       ? 'Cmd Enter'
       : 'Ctrl Enter';
-  const runTitle = isBusy ? 'Runtime is working' : 'Run the current code with the current inputs';
+  const runtimeFailed = status.phase === 'error';
+  const runTitle = isBusy
+    ? 'Stop execution and keep your code and saved cases'
+    : runtimeFailed
+      ? 'Reload the Python runtime without running your code'
+      : 'Run the current code with the current inputs';
   const startTitle = hasTrace ? 'Jump to the first recorded step' : 'Run code first';
   const backTitle = hasTrace ? 'Move one recorded step backward' : 'Run code first';
   const playTitle = playing
@@ -164,10 +174,20 @@ export function ControlsBar({
       aria-label="Playback controls"
     >
       <ControlTip text={runTitle}>
-        <button className="run-button" disabled={isBusy} onClick={onRun} type="button">
-          <Play size={14} />
-          {isBusy ? 'Working…' : 'Run'}
-          {!hasTrace && !isBusy ? (
+        <button
+          className="run-button"
+          onClick={isBusy ? onStop : runtimeFailed ? onRetryRuntime : onRun}
+          type="button"
+        >
+          {isBusy ? (
+            <Square size={14} />
+          ) : runtimeFailed ? (
+            <RotateCcw size={14} />
+          ) : (
+            <Play size={14} />
+          )}
+          {isBusy ? 'Stop' : runtimeFailed ? 'Retry runtime' : 'Run'}
+          {!hasTrace && !isBusy && !runtimeFailed ? (
             <span className="run-shortcut-badge">{runShortcutLabel}</span>
           ) : null}
         </button>

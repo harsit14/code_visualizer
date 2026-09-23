@@ -35,6 +35,8 @@ function renderControls(overrides: Partial<Parameters<typeof ControlsBar>[0]> = 
       onExampleChange={() => {}}
       onJump={() => {}}
       onRun={() => {}}
+      onStop={() => {}}
+      onRetryRuntime={() => {}}
       onRunToBreakpoint={() => {}}
       onRunToCursor={() => {}}
       onSpeedChange={() => {}}
@@ -79,6 +81,26 @@ describe('ControlsBar', () => {
     expect(html).toContain('role="progressbar"');
     expect(html).toContain('aria-valuenow="18"');
     expect(html).toContain('Loading Python runtime...');
+  });
+
+  it('provides an enabled Stop control while work is pending', () => {
+    const html = renderControls({ isBusy: true });
+    expect(html).toContain('Stop</button>');
+    expect(html).not.toContain('Working');
+    expect(html).not.toMatch(/class="run-button"[^>]*disabled/);
+  });
+
+  it('offers Retry runtime after initialization failure', () => {
+    const html = renderControls({
+      status: {
+        phase: 'error',
+        stage: 'error',
+        message: 'Could not load Python',
+        interruptSupported: false,
+      },
+    });
+    expect(html).toContain('Retry runtime</button>');
+    expect(html).toContain('without running your code');
   });
 
   it('reveals transport controls after a trace exists', () => {

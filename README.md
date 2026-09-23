@@ -24,6 +24,7 @@ or understanding how state mutates one line at a time.
 
 - Trace Python snippets in the browser, with experimental JavaScript and TypeScript modes.
 - Step forward and backward through a recorded execution timeline.
+- Stop running code or runtime loading, and retry a failed Python startup.
 - See active lines, changed variables, call stack frames, stdout, return values,
   and runtime errors in sync.
 - Visualize arrays, strings, dictionaries, binary trees, linked lists, object
@@ -67,6 +68,19 @@ without opening a separate workspace.
 
 Python tracing runs through Pyodide and WebAssembly inside a Web Worker.
 JavaScript and TypeScript run in a separate browser worker.
+
+## Runtime recovery
+
+The primary Run control becomes **Stop** while a worker is loading, running a
+program, checking practice cases or measuring complexity. Stop keeps source and
+saved cases; unfinished execution is discarded. The next Python run starts a
+fresh interpreter. A startup failure offers **Retry runtime**, which reloads and
+analyzes without executing your program.
+
+Python startup is bounded to 45 seconds. Execution uses a separate deadline;
+timeouts interrupt when possible and terminate the worker if it does not respond.
+The recovery work does not isolate untrusted code from app accounts; see the
+[runtime and authentication migration design](docs/RUNTIME-AND-AUTH-MIGRATION.md).
 
 ## Trace and practice behavior
 

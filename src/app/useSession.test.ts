@@ -3,12 +3,15 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { EncodedValue, SessionResult, TraceStep } from '../engine/types';
 
-const { prewarmMock, requestMock, runJavaScriptMock, setStatusHandlerMock } = vi.hoisted(() => ({
-  prewarmMock: vi.fn(),
-  requestMock: vi.fn(),
-  runJavaScriptMock: vi.fn(),
-  setStatusHandlerMock: vi.fn(),
-}));
+const { cancelMock, retryMock, prewarmMock, requestMock, runJavaScriptMock, setStatusHandlerMock } =
+  vi.hoisted(() => ({
+    cancelMock: vi.fn(),
+    retryMock: vi.fn(),
+    prewarmMock: vi.fn(),
+    requestMock: vi.fn(),
+    runJavaScriptMock: vi.fn(),
+    setStatusHandlerMock: vi.fn(),
+  }));
 
 // Replace the Pyodide worker client with a controllable stub so the hook's
 // state machine can be tested without a real Worker.
@@ -24,6 +27,8 @@ vi.mock('../engine/runtimeClient', () => {
     request = requestMock;
     setStatusHandler = setStatusHandlerMock;
     dispose = vi.fn();
+    cancel = cancelMock;
+    retry = retryMock;
   }
   return { RuntimeClient, TimeoutError };
 });
@@ -178,6 +183,8 @@ beforeEach(() => {
     configurable: true,
     value: localStorageMock,
   });
+  cancelMock.mockReset();
+  retryMock.mockReset();
   requestMock.mockReset();
   prewarmMock.mockReset();
   runJavaScriptMock.mockReset();
@@ -291,6 +298,93 @@ describe('useSession', () => {
     unmount();
   });
 
+  it('stops Python execution without an error result or automatic restart', async () => {
+    let reject!: (error: Error) => void;
+    requestMock.mockReturnValueOnce(
+      new Promise((_, r) => {
+        reject = r;
+      }),
+    );
+    cancelMock.mockImplementationOnce(() => reject(new Error('stopped')));
+    const { result, unmount } = renderHook(() => useSession('while True: pass'));
+    let pending!: Promise<void>;
+    act(() => {
+      pending = result.current.run();
+    });
+    await act(async () => {
+      result.current.stopExecution();
+      await pending;
+    });
+    expect(result.current.isBusy).toBe(false);
+    expect(result.current.result).toBeNull();
+    expect(result.current.code).toBe('while True: pass');
+    expect(result.current.status.message).toContain('Stopped');
+    await act(async () => {
+      vi.advanceTimersByTime(2000);
+    });
+    expect(requestMock).toHaveBeenCalledTimes(1);
+    act(() => result.current.retryRuntime());
+    expect(retryMock).toHaveBeenCalledOnce();
+    unmount();
+  });
+
+  it('stops JavaScript through its abort signal and permits the next run', async () => {
+    runJavaScriptMock.mockImplementationOnce(
+      (_code, _language, _timeout, signal: AbortSignal) =>
+        new Promise((_, reject) => {
+          signal.addEventListener('abort', () => reject(new Error('stopped')));
+        }),
+    );
+    const { result, unmount } = renderHook(() =>
+      useSession('while(true) {}', { language: 'javascript' }),
+    );
+    let pending!: Promise<void>;
+    act(() => {
+      pending = result.current.run();
+    });
+    await act(async () => {
+      result.current.stopExecution();
+      await pending;
+    });
+    expect(result.current.isBusy).toBe(false);
+    expect(result.current.result).toBeNull();
+    runJavaScriptMock.mockResolvedValueOnce(scriptResult(1));
+    await act(async () => {
+      await result.current.run();
+    });
+    expect(result.current.totalSteps).toBe(1);
+    unmount();
+  });
+
+  it('stops the remaining practice batch while retaining case inputs', async () => {
+    const code = 'def solve(nums):\n    return 21';
+    let reject!: (error: Error) => void;
+    requestMock.mockReturnValueOnce(
+      new Promise((_, r) => {
+        reject = r;
+      }),
+    );
+    cancelMock.mockImplementationOnce(() => reject(new Error('stopped')));
+    const { result, unmount } = renderHook(() => useSession(code));
+    act(() => result.current.importSession(code, functionResult()));
+    act(() => result.current.addTestCase());
+    act(() => result.current.addTestCase());
+    let pending!: Promise<void>;
+    act(() => {
+      pending = result.current.runTestCases();
+    });
+    await act(async () => {
+      result.current.stopExecution();
+      await pending;
+    });
+    expect(requestMock).toHaveBeenCalledOnce();
+    expect(result.current.testCases).toHaveLength(2);
+    expect(result.current.testCases.every((c) => c.status === 'idle')).toBe(true);
+    expect(result.current.testCasesBusy).toBe(false);
+    expect(result.current.result).not.toBeNull();
+    unmount();
+  });
+
   it('clamps jumpToStep within the trace bounds', async () => {
     requestMock.mockResolvedValueOnce(scriptResult(3));
     const { result, unmount } = renderHook(() => useSession('print(1)'));
@@ -377,7 +471,12 @@ describe('useSession', () => {
     await act(async () => {
       await result.current.run();
     });
-    expect(runJavaScriptMock).toHaveBeenCalledWith('console.log(1)', 'javascript', 15000);
+    expect(runJavaScriptMock).toHaveBeenCalledWith(
+      'console.log(1)',
+      'javascript',
+      15000,
+      expect.any(AbortSignal),
+    );
     expect(requestMock).not.toHaveBeenCalled();
     expect(result.current.language).toBe('javascript');
     expect(result.current.totalSteps).toBe(2);

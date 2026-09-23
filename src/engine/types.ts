@@ -204,7 +204,14 @@ export type EngineRequest =
   | { op: 'analyze'; source: string }
   | { op: 'complexity'; source: string; function?: string; seed?: number };
 
-export type RuntimePhase = 'idle' | 'loading' | 'ready' | 'running' | 'interrupting' | 'restarting';
+export type RuntimePhase =
+  | 'idle'
+  | 'loading'
+  | 'ready'
+  | 'running'
+  | 'interrupting'
+  | 'restarting'
+  | 'error';
 
 export type RuntimeStage =
   | 'idle'
@@ -216,7 +223,8 @@ export type RuntimeStage =
   | 'executing'
   | 'ready'
   | 'interrupting'
-  | 'restarting';
+  | 'restarting'
+  | 'error';
 
 export type RuntimeStatus = {
   phase: RuntimePhase;
@@ -232,6 +240,7 @@ export type WorkerInbound =
   | { type: 'request'; requestId: string; request: EngineRequest };
 
 export type WorkerOutbound =
+  | { type: 'runtime-error'; message: string }
   | { type: 'status'; status: RuntimeStatus }
   | {
       type: 'response';

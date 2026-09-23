@@ -22,6 +22,20 @@ Still planned: isolated runtime origin, authentication/password migration, full 
 
 Batch validation: `npm run ci` passes typecheck, lint, 200 frontend/server tests in 36 files, build and production packaging smoke; `npm run test:engine` passes 136 tests. Local browser checks covered Python execution, a whitespace-sensitive failing case, adopting actual output and rerunning to pass, pre-line playback labels, successful Python trace import, malformed import preserving the current replay with a visible dismissible error, and the experimental JS worker/after-line label. Hosted AI, deployed accounts and production configuration were not exercised. The table below records the original audit baseline.
 
+## Second batch: runtime recovery and migration design
+
+Implemented Stop for Python startup/execution, practice batches, complexity and
+JS/TS workers; explicit Retry runtime; startup/execution watchdogs; rejection of
+pending promises on disposal; and protection against callbacks from replaced
+workers. Source, case inputs and completed results survive Stop; unfinished work
+does not produce a passing verdict. This implements recovery prerequisites while
+runtime origin separation and managed auth remain outstanding.
+
+The [runtime and auth design](RUNTIME-AND-AUTH-MIGRATION.md) specifies the dedicated
+origin/message boundary, delivered-header tests, managed identity linking without
+email-only account takeover, durable throttling, staged rollout and rollback.
+No live configuration, schema, account or deployment was changed.
+
 ## Evidence and limits
 
 | Check                                       | Result                                                                                                                                  |
