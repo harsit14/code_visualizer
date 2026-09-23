@@ -1,9 +1,10 @@
 import type { Language } from '../engine/types';
+import { lessons } from '../lessons/lessonData';
 
 export type Example = {
   id: string;
   title: string;
-  category: 'LeetCode style' | 'Scripts' | 'JavaScript / TypeScript';
+  category: 'LeetCode style' | 'Scripts' | 'JavaScript / TypeScript' | 'Guided lessons';
   language: Language;
   code: string;
 };
@@ -169,6 +170,16 @@ for (const value of nums) {
 console.log(total);
 `,
   },
+  // Guided lessons pause at checkpoints and ask the learner to predict a value.
+  ...lessons.map(
+    (lesson): Example => ({
+      id: lesson.id,
+      title: lesson.title,
+      category: 'Guided lessons',
+      language: 'python',
+      code: lesson.code,
+    }),
+  ),
 ];
 
 export const DEFAULT_EXAMPLE_ID = 'two-sum';

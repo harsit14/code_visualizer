@@ -168,6 +168,31 @@ and "just ran" mark, searching `lookup` and jumping to a result, bookmarking wit
 `B`, a note surviving a workspace save, reload and reopen, a failing case's
 "different order" hint, and the phone layout (card, finder and scrubber ticks).
 
+## Eighth batch: guided lessons
+
+- Added six guided lessons (two pointers, sliding window, binary search, recursion,
+  BFS and dynamic programming) as a **Guided lessons** example group. Each is a
+  deterministic Python script with an explicit goal and invariant.
+- Checkpoints name a line and visit to pause before, plus a variable, `name[key]`
+  or `<return>` target. Playback pauses once at each unanswered checkpoint; the
+  learner predicts, checks (equivalent Python literals and unquoted strings count)
+  or reveals the answer, reads the explanation and can jump to the step where the
+  value appears. A summary reports correct predictions. On phones a banner points
+  to the Inspect tab when a prediction is waiting.
+- Answers are read from the real trace. `engine/tests/test_lessons.py` runs every
+  lesson through the Python engine and checks each authored answer, so lesson text
+  cannot drift from what learners see.
+
+This completes the Stage C list (explain-change card, bookmarks, workspaces and
+backups, lessons, case feedback). Lesson progress is not saved between sessions,
+and lessons exist only for Python.
+
+Validation: full CI passes typecheck, lint, 455 tests in 59 files, app build/smoke
+and runner build/smoke; the engine suite passes 143 tests, including all 22 lesson
+checkpoints. Browser checks ran the DP lesson end to end (automatic pauses, a
+correct, a revealed and a wrong answer, "See it happen" and the summary) and the
+BFS lesson (string and dictionary answers).
+
 ## Evidence and limits (original audit)
 
 | Check                                       | Result                                                                                                                                  |
@@ -375,4 +400,4 @@ A practical first batch is: (1) privilege protection, (2) practice equality repa
 - Test replay with 100, 1,000 and 3,000 steps and several structure sizes. Agree budgets after measuring baseline; a reasonable initial target is p95 step-to-render under 100 ms on a named reference device.
 - Measure first successful run, meaningful stepping after a run, successful failure-case debugging, saved-work recovery and return visits. Use privacy-preserving events; exclude code, inputs, locals, notebook text and full share URLs.
 
-Next remaining milestones: stage the isolated runner and managed accounts, verify the real browser/device matrix, add a real TypeScript transform and JS/TS highlighting, and implement the remaining learning features (run comparison, algorithm views, guided lessons, teaching mode), workspace autosave/search and cloud sync. Phone navigation, save-failure recovery, explicit local workspace revisions/backups, parser-based JavaScript tracing, step explanations, trace search/bookmarks and failing-case explanations are implemented locally.
+Next remaining milestones: stage the isolated runner and managed accounts, verify the real browser/device matrix, add a real TypeScript transform and JS/TS highlighting, and implement the Stage D features (run comparison, algorithm views, teaching mode), workspace autosave/search and cloud sync. Phone navigation, save-failure recovery, explicit local workspace revisions/backups, parser-based JavaScript tracing, step explanations, trace search/bookmarks, failing-case explanations and guided lessons are implemented locally.

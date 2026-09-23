@@ -1,0 +1,238 @@
+[
+  {
+    "id": "lesson-two-pointers",
+    "title": "Two pointers: reverse in place",
+    "pattern": "Two pointers",
+    "goal": "Reverse a list without extra space by swapping from both ends toward the middle.",
+    "invariant": "Items before left and after right are already in their final positions.",
+    "code": "chars = ['c', 'o', 'd', 'e']\nleft, right = 0, len(chars) - 1\nwhile left < right:\n    chars[left], chars[right] = chars[right], chars[left]\n    left += 1\n    right -= 1\nprint(''.join(chars))\n",
+    "checkpoints": [
+      {
+        "line": 4,
+        "visit": 1,
+        "target": "chars",
+        "prompt": "The first swap exchanges chars[0] and chars[3]. What is chars after this line?",
+        "expected": "['e', 'o', 'd', 'c']",
+        "explanation": "Swapping the outer pair puts both ends in their final places, so everything outside left..right is finished."
+      },
+      {
+        "line": 5,
+        "visit": 1,
+        "target": "left",
+        "prompt": "What is left after this line?",
+        "expected": "1",
+        "explanation": "left steps inward past the position it just finished."
+      },
+      {
+        "line": 4,
+        "visit": 2,
+        "target": "chars",
+        "prompt": "Now left is 1 and right is 2. What is chars after this swap?",
+        "expected": "['e', 'd', 'o', 'c']",
+        "explanation": "The pointers cross after two swaps: a list of n items needs only n // 2 swaps."
+      }
+    ]
+  },
+  {
+    "id": "lesson-sliding-window",
+    "title": "Sliding window: best sum of k items",
+    "pattern": "Sliding window",
+    "goal": "Find the largest sum of 3 neighbouring numbers without re-adding every window.",
+    "invariant": "window is always the sum of the k items ending at index i.",
+    "code": "nums = [2, 1, 5, 1, 3, 2]\nk = 3\nwindow = sum(nums[:k])\nbest = window\nfor i in range(k, len(nums)):\n    window += nums[i] - nums[i - k]\n    best = max(best, window)\nprint(best)\n",
+    "checkpoints": [
+      {
+        "line": 3,
+        "visit": 1,
+        "target": "window",
+        "prompt": "What is the sum of the first window, nums[0:3]?",
+        "expected": "8",
+        "explanation": "The first window is added up once: 2 + 1 + 5."
+      },
+      {
+        "line": 6,
+        "visit": 1,
+        "target": "window",
+        "prompt": "The window slides right: it gains nums[3] and loses nums[0]. What is window now?",
+        "expected": "7",
+        "explanation": "One addition and one subtraction replace re-adding three numbers: 8 + 1 - 2."
+      },
+      {
+        "line": 6,
+        "visit": 2,
+        "target": "window",
+        "prompt": "Slide again with i = 4. What is window?",
+        "expected": "9",
+        "explanation": "7 + 3 - 1 = 9. Each slide costs O(1), so the whole scan is O(n)."
+      },
+      {
+        "line": 7,
+        "visit": 2,
+        "target": "best",
+        "prompt": "What is best after comparing it with the new window?",
+        "expected": "9",
+        "explanation": "best keeps the largest window sum seen so far."
+      }
+    ]
+  },
+  {
+    "id": "lesson-binary-search",
+    "title": "Binary search: halve the range",
+    "pattern": "Two pointers",
+    "goal": "Find 7 in a sorted list by discarding half of the remaining range at every step.",
+    "invariant": "If the target is in nums, it is always within nums[lo..hi].",
+    "code": "nums = [1, 3, 5, 7, 9, 11]\ntarget = 7\nlo, hi = 0, len(nums) - 1\nwhile lo <= hi:\n    mid = (lo + hi) // 2\n    if nums[mid] == target:\n        break\n    if nums[mid] < target:\n        lo = mid + 1\n    else:\n        hi = mid - 1\nprint(mid)\n",
+    "checkpoints": [
+      {
+        "line": 5,
+        "visit": 1,
+        "target": "mid",
+        "prompt": "lo is 0 and hi is 5. What is mid?",
+        "expected": "2",
+        "explanation": "(0 + 5) // 2 = 2: integer division rounds down."
+      },
+      {
+        "line": 9,
+        "visit": 1,
+        "target": "lo",
+        "prompt": "nums[2] is 5, which is less than 7. What does lo become?",
+        "expected": "3",
+        "explanation": "Everything up to mid is too small, so the search continues to the right of mid."
+      },
+      {
+        "line": 11,
+        "visit": 1,
+        "target": "hi",
+        "prompt": "Now mid is 4 and nums[4] is 9. What does hi become?",
+        "expected": "3",
+        "explanation": "9 is too big, so mid and everything after it are ruled out."
+      },
+      {
+        "line": 5,
+        "visit": 3,
+        "target": "mid",
+        "prompt": "lo and hi are both 3. What is mid?",
+        "expected": "3",
+        "explanation": "The range has shrunk to a single index, and nums[3] is the target."
+      }
+    ]
+  },
+  {
+    "id": "lesson-recursion",
+    "title": "Recursion: sum a list",
+    "pattern": "Recursion",
+    "goal": "Add up a list by handling its first item and letting a smaller call handle the rest.",
+    "invariant": "total(nums) returns the sum of nums; each call trusts the smaller call for everything after nums[0].",
+    "code": "def total(nums):\n    if not nums:\n        return 0\n    return nums[0] + total(nums[1:])\n\nprint(total([4, 2, 3]))\n",
+    "checkpoints": [
+      {
+        "line": 4,
+        "visit": 1,
+        "target": "<return>",
+        "prompt": "The first call has nums = [4, 2, 3] and is about to recurse. What will it finally return?",
+        "expected": "9",
+        "explanation": "4 + total([2, 3]) = 4 + 5. The calls finish in the reverse order they started."
+      },
+      {
+        "line": 4,
+        "visit": 2,
+        "target": "<return>",
+        "prompt": "The second call has nums = [2, 3]. What will it return?",
+        "expected": "5",
+        "explanation": "2 + total([3]) = 2 + 3: each call trusts the smaller call's answer."
+      },
+      {
+        "line": 4,
+        "visit": 3,
+        "target": "<return>",
+        "prompt": "The third call has nums = [3]. What will it return?",
+        "expected": "3",
+        "explanation": "3 + total([]) = 3 + 0."
+      },
+      {
+        "line": 3,
+        "visit": 1,
+        "target": "<return>",
+        "prompt": "Base case: the list is empty. What does this call return?",
+        "expected": "0",
+        "explanation": "An empty list sums to 0, which stops the recursion."
+      }
+    ]
+  },
+  {
+    "id": "lesson-bfs",
+    "title": "Breadth-first search: shortest hops",
+    "pattern": "BFS",
+    "goal": "Find how many edges each node is from A by exploring the graph level by level with a queue.",
+    "invariant": "Nodes leave the queue in order of distance from A, so the first distance recorded for a node is the shortest.",
+    "code": "from collections import deque\n\ngraph = {'A': ['B', 'C'], 'B': ['D'], 'C': ['D', 'E'], 'D': ['F'], 'E': ['F'], 'F': []}\ndist = {'A': 0}\nqueue = deque(['A'])\nwhile queue:\n    node = queue.popleft()\n    for nxt in graph[node]:\n        if nxt not in dist:\n            dist[nxt] = dist[node] + 1\n            queue.append(nxt)\nprint(dist)\n",
+    "checkpoints": [
+      {
+        "line": 7,
+        "visit": 2,
+        "target": "node",
+        "prompt": "The queue holds B, then C. Which node is removed next?",
+        "expected": "'B'",
+        "explanation": "A queue is first in, first out: B was added before C."
+      },
+      {
+        "line": 10,
+        "visit": 3,
+        "target": "dist['D']",
+        "prompt": "B's neighbour D has not been seen yet. What is dist['D']?",
+        "expected": "2",
+        "explanation": "D is one edge past B, and dist['B'] is 1."
+      },
+      {
+        "line": 7,
+        "visit": 4,
+        "target": "node",
+        "prompt": "After C, which node leaves the queue?",
+        "expected": "'D'",
+        "explanation": "D was queued (from B) before E (from C), so it comes out first."
+      },
+      {
+        "line": 10,
+        "visit": 5,
+        "target": "dist['F']",
+        "prompt": "What is dist['F'] the first time F is reached?",
+        "expected": "3",
+        "explanation": "F is first reached from D: 2 + 1 = 3. Any later path to F cannot be shorter."
+      }
+    ]
+  },
+  {
+    "id": "lesson-dp",
+    "title": "Dynamic programming: climbing stairs",
+    "pattern": "Dynamic programming",
+    "goal": "Count the ways to climb 5 steps taking 1 or 2 at a time, reusing smaller answers.",
+    "invariant": "ways[i] counts the ways to reach step i; the last move came from step i - 1 or i - 2.",
+    "code": "n = 5\nways = [0] * (n + 1)\nways[0] = 1\nways[1] = 1\nfor i in range(2, n + 1):\n    ways[i] = ways[i - 1] + ways[i - 2]\nprint(ways[n])\n",
+    "checkpoints": [
+      {
+        "line": 6,
+        "visit": 1,
+        "target": "ways[2]",
+        "prompt": "ways[0] and ways[1] are both 1. What is ways[2]?",
+        "expected": "2",
+        "explanation": "To reach step 2 you come from step 1 or from step 0: 1 + 1."
+      },
+      {
+        "line": 6,
+        "visit": 2,
+        "target": "ways[3]",
+        "prompt": "What is ways[3]?",
+        "expected": "3",
+        "explanation": "ways[2] + ways[1] = 2 + 1: each answer reuses the two before it."
+      },
+      {
+        "line": 6,
+        "visit": 4,
+        "target": "ways[5]",
+        "prompt": "ways[4] is 5. What is ways[5]?",
+        "expected": "8",
+        "explanation": "5 + 3 = 8. Filling the table once makes this O(n) instead of exponential recursion."
+      }
+    ]
+  }
+]

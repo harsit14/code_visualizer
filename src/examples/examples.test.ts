@@ -19,6 +19,12 @@ describe('examples', () => {
     expect(new Set(examples.map((example) => example.id)).size).toBe(examples.length);
   });
 
+  it('lists every guided lesson as a Python example', () => {
+    const guided = examples.filter((example) => example.category === 'Guided lessons');
+    expect(guided.length).toBeGreaterThanOrEqual(5);
+    expect(guided.every((example) => example.language === 'python')).toBe(true);
+  });
+
   it('includes JavaScript and TypeScript examples', () => {
     expect(getExample('js-loop-accumulator')?.language).toBe('javascript');
     expect(getExample('ts-running-sum')?.language).toBe('typescript');

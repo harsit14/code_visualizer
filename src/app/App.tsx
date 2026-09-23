@@ -18,6 +18,7 @@ import { EditorPanel } from '../components/EditorPanel';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { ExplainerPanel } from '../components/ExplainerPanel';
 import { InputsPanel } from '../components/InputsPanel';
+import { LessonCard } from '../components/LessonCard';
 import { TraceFinder } from '../components/TraceFinder';
 import { LandingPage } from '../components/LandingPage';
 import { LogoMark } from '../components/LogoMark';
@@ -28,6 +29,12 @@ import { describeStepChange } from '../engine/stepChange';
 import { normalizeBookmarks, type TraceBookmark } from '../engine/traceSearch';
 import type { Language, SessionResult } from '../engine/types';
 import { CUSTOM_CODE_ID, DEFAULT_EXAMPLE_ID, getExample } from '../examples/examples';
+import {
+  getLesson,
+  isCorrectPrediction,
+  resolveCheckpoints,
+  type LessonAnswer,
+} from '../lessons/lessons';
 import { loadStoredCodeDraft } from './codeDraft';
 import { useDraftPersistence } from './useDraftPersistence';
 import { pairPercentage, type ColumnId, type PanelId } from './layoutState';
@@ -113,6 +120,7 @@ type DashboardAppProps = {
 };
 
 const NO_BOOKMARKS: TraceBookmark[] = [];
+const NO_ANSWERS: Record<number, LessonAnswer> = {};
 
 function DashboardApp({ onOpenLanding }: DashboardAppProps) {
   const { mobile, mobileTab, setMobileTab } = useMobileWorkspace();
@@ -240,6 +248,46 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
     },
     [session.result],
   );
+  // A guided lesson is active while its unedited example is loaded.
+  const lesson = session.language === 'python' ? getLesson(exampleId) : undefined;
+  const lessonCheckpoints = useMemo(
+    () => (lesson && session.result?.run ? resolveCheckpoints(lesson, session.steps) : null),
+    [lesson, session.result, session.steps],
+  );
+  const [lessonState, setLessonState] = useState<{
+    owner: SessionResult | null;
+    answers: Record<number, LessonAnswer>;
+  }>({ owner: null, answers: NO_ANSWERS });
+  const lessonAnswers =
+    lessonState.owner === session.result && session.result ? lessonState.answers : NO_ANSWERS;
+  const answerCheckpoint = useCallback(
+    (index: number, prediction: string) => {
+      const checkpoint = lessonCheckpoints?.find((item) => item.index === index);
+      if (!checkpoint || !session.result) return;
+      setLessonState((state) => ({
+        owner: session.result,
+        answers: {
+          ...(state.owner === session.result ? state.answers : NO_ANSWERS),
+          [index]: { prediction, correct: isCorrectPrediction(prediction, checkpoint.answer) },
+        },
+      }));
+    },
+    [lessonCheckpoints, session.result],
+  );
+  const openCheckpoint = lessonCheckpoints?.find(
+    (item) => item.step === session.step && !lessonAnswers[item.index],
+  );
+  // Playback pauses once at each unanswered checkpoint; pressing Play again continues.
+  const pausedCheckpoint = useRef<{ result: SessionResult | null; step: number } | null>(null);
+  const { playing, togglePlay } = session;
+  useEffect(() => {
+    if (!playing || !openCheckpoint) return;
+    const last = pausedCheckpoint.current;
+    if (last && last.result === session.result && last.step === openCheckpoint.step) return;
+    pausedCheckpoint.current = { result: session.result, step: openCheckpoint.step };
+    togglePlay();
+  }, [openCheckpoint, playing, session.result, togglePlay]);
+
   const [finderRequest, setFinderRequest] = useState(0);
   const [editorFocus, setEditorFocus] = useState<{ line: number; token: number } | null>(null);
   const focusEditorLine = useCallback(
@@ -634,6 +682,18 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
               code={session.code}
               currentStep={session.currentStep}
               frameIndex={session.selectedFrameIndex}
+              lessonCard={
+                lesson ? (
+                  <LessonCard
+                    answers={lessonAnswers}
+                    checkpoints={lessonCheckpoints}
+                    lesson={lesson}
+                    onAnswer={answerCheckpoint}
+                    onJump={session.jumpToStep}
+                    step={session.step}
+                  />
+                ) : null
+              }
               onFocusLine={focusEditorLine}
               onToggleWatch={toggleWatchedVariable}
               previousStep={previousStep}
@@ -924,6 +984,15 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
             <code>{session.code.split('\n')[session.currentStep.line - 1] ?? ''}</code>
           </button>
         )}
+        {mobile && openCheckpoint && mobileTab !== 'Inspect' ? (
+          <button
+            className="mobile-lesson-prompt"
+            onClick={() => setMobileTab('Inspect')}
+            type="button"
+          >
+            Lesson checkpoint: make your prediction in Inspect
+          </button>
+        ) : null}
 
         <main
           id="workspace-content"

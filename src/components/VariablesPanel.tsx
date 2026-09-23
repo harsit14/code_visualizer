@@ -4,6 +4,7 @@
  * new, what disappeared this step.
  */
 import { Pin, Plus } from 'lucide-react';
+import type { ReactNode } from 'react';
 import type { StepChange } from '../engine/stepChange';
 import { diffLocals, expandSelf, formatValue, typeNameOf } from '../engine/trace';
 import { effectiveFrame } from '../engine/traceNavigation';
@@ -20,6 +21,8 @@ type VariablesPanelProps = {
   change?: StepChange | null;
   code?: string;
   onFocusLine?: (line: number) => void;
+  /** Guided lesson prompt shown above the variables, even before a run. */
+  lessonCard?: ReactNode;
 };
 
 type RowProps = {
@@ -68,6 +71,7 @@ export function VariablesPanel({
   change = null,
   code = '',
   onFocusLine,
+  lessonCard = null,
 }: VariablesPanelProps) {
   const frame = effectiveFrame(currentStep, frameIndex);
   const previousFrame = previousStep?.stack.find((candidate) => candidate.id === frame?.id);
@@ -100,9 +104,17 @@ export function VariablesPanel({
       </header>
 
       {!frame ? (
-        <p className="panel-empty">Run code to inspect variables.</p>
+        lessonCard ? (
+          <div className="panel-scroll">
+            {lessonCard}
+            <p className="panel-empty">Run code to inspect variables.</p>
+          </div>
+        ) : (
+          <p className="panel-empty">Run code to inspect variables.</p>
+        )
       ) : (
         <div className="panel-scroll">
+          {lessonCard}
           <StepChangeCard
             change={change}
             code={code}

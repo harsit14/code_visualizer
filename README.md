@@ -31,6 +31,9 @@ or understanding how state mutates one line at a time.
   editor), each value it changed such as `lookup[11]: absent → 0`, and its output.
 - Search the trace for a variable, a value (`total = 6`), a line, a function,
   returns, exceptions or printed text, and bookmark confusing steps with notes.
+- Work through guided lessons (two pointers, sliding window, binary search,
+  recursion, BFS and dynamic programming) that pause to ask you to predict the
+  next value, then reveal it with the invariant behind it.
 - Visualize arrays, strings, dictionaries, binary trees, linked lists, object
   references, aliases, and heap state.
 - Generate editable Python function inputs for LeetCode-style snippets.
@@ -65,6 +68,18 @@ lists, trees, heap references, call stack frames, console output, and complexity
 hints. For interview practice, the test inputs panel also keeps saved cases,
 edge-case generation, failure reruns, and a local notebook close to the trace
 without opening a separate workspace.
+
+## Guided lessons
+
+Pick a lesson from **Guided lessons** in the example list and press **Run**. Playback
+pauses at each checkpoint before the important line runs and asks you to predict a
+value, such as `ways[2]` or what a recursive call returns. **Check** compares your
+answer with the real trace (Python literals and unquoted strings are accepted),
+**Show answer** reveals it, and **See it happen** jumps to the step where the value
+appears. Press Play to continue to the next checkpoint. Editing the code ends the
+lesson. Lesson programs and their expected answers live in
+`src/lessons/lessons.json`; `engine/tests/test_lessons.py` checks every checkpoint
+against the Python engine.
 
 ## Local workspace library
 
