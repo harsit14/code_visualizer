@@ -23,6 +23,7 @@
     "check:runner": "node scripts/check-runner-build.mjs"
   },
   "dependencies": {
+    "@codemirror/lang-javascript": "^6.2.5",
     "@codemirror/lang-python": "^6.2.1",
     "@codemirror/lint": "^6.9.7",
     "@fontsource/geist-mono": "^5.1.0",
@@ -35,6 +36,7 @@
     "pyodide": "^0.29.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "sucrase": "^3.35.1",
     "vite-plugin-static-copy": "^4.1.0"
   },
   "devDependencies": {

@@ -364,24 +364,11 @@ class TraceRecorder {
   };
 }
 
-/**
- * Minimal TypeScript erasure used until a full TypeScript transform replaces it.
- * Only simple annotations are supported; anything left over is reported by the parser.
- */
-function stripTypeScript(source: string): string {
-  return source
-    .replace(/^\s*interface\s+\w+\s*{[\s\S]*?}\s*/gm, '')
-    .replace(/^\s*type\s+\w+\s*=[^;]+;\s*/gm, '')
-    .replace(/(\bfunction\s*[\w$]*)\s*<[^>()]*>/g, '$1')
-    .replace(/\)\s*:\s*[A-Za-z_$][\w$<>,\s.[\]|&?]*?\s*(?=\{|=>)/g, ') ')
-    .replace(/\b(const|let|var)\s+([A-Za-z_$][\w$]*)\s*:\s*[^=;]+(?=[=;])/g, '$1 $2 ')
-    .replace(/([(,]\s*[A-Za-z_$][\w$]*)\??\s*:\s*[^=,(){}]+(?=[=,)])/g, '$1')
-    .replace(/\s+as\s+[A-Za-z_$][\w$<>,\s.[\]|&?]*/g, '')
-    .replace(/([\w$\])])!(?=[.[)\s;,])/g, '$1');
-}
+/** Removes TypeScript syntax; supplied by `tsTrace.ts` so JavaScript runs skip loading it. */
+export type TypeStripper = (source: string) => string;
 
-export function instrumentJavaScript(source: string, language: JsLanguage): string {
-  return instrumentScript(language === 'typescript' ? stripTypeScript(source) : source);
+export function instrumentJavaScript(source: string, stripTypes?: TypeStripper): string {
+  return instrumentScript(stripTypes ? stripTypes(source) : source);
 }
 
 function runInfo(recorder: TraceRecorder, runtimeMs: number): RunInfo {
@@ -404,12 +391,41 @@ function runInfo(recorder: TraceRecorder, runtimeMs: number): RunInfo {
   };
 }
 
-export function runJavaScriptTrace(source: string, language: JsLanguage): SessionResult {
+/** A trace result for code that never ran, such as a syntax error. */
+export function sourceErrorResult(sourceError: JsSourceError, durationMs = 0): SessionResult {
+  const analysis = emptyAnalysis();
+  analysis.mode = 'empty';
+  analysis.diagnostics = [
+    {
+      severity: 'error',
+      line: sourceError.line,
+      ...(sourceError.column === null ? {} : { column: sourceError.column }),
+      message: sourceError.message,
+    },
+  ];
+  return {
+    status: 'error',
+    mode: 'script',
+    analysis,
+    run: null,
+    error: { type: sourceError.kind, msg: sourceError.message, line: sourceError.line },
+    durationMs,
+  };
+}
+
+export function runJavaScriptTrace(
+  source: string,
+  language: JsLanguage,
+  stripTypes?: TypeStripper,
+): SessionResult {
   const startedAt = nowMs();
   const analysis = emptyAnalysis();
   let code: string;
   try {
-    code = instrumentJavaScript(source, language);
+    if (language === 'typescript' && !stripTypes) {
+      throw new Error('TypeScript runs need the TypeScript transform.');
+    }
+    code = instrumentJavaScript(source, stripTypes);
   } catch (error) {
     const sourceError =
       error instanceof JsSourceError
@@ -419,23 +435,7 @@ export function runJavaScriptTrace(source: string, language: JsLanguage): Sessio
             error instanceof Error ? error.message : String(error),
             1,
           );
-    analysis.mode = 'empty';
-    analysis.diagnostics = [
-      {
-        severity: 'error',
-        line: sourceError.line,
-        ...(sourceError.column === null ? {} : { column: sourceError.column }),
-        message: sourceError.message,
-      },
-    ];
-    return {
-      status: 'error',
-      mode: 'script',
-      analysis,
-      run: null,
-      error: { type: sourceError.kind, msg: sourceError.message, line: sourceError.line },
-      durationMs: nowMs() - startedAt,
-    };
+    return sourceErrorResult(sourceError, nowMs() - startedAt);
   }
 
   const recorder = new TraceRecorder(new Snapshotter());

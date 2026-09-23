@@ -166,7 +166,7 @@ export function TopBar({
             >
               <option value="python">Python</option>
               <option value="javascript">JavaScript</option>
-              <option value="typescript">TypeScript (experimental)</option>
+              <option value="typescript">TypeScript</option>
             </select>
           </div>
         </div>

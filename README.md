@@ -22,7 +22,7 @@ or understanding how state mutates one line at a time.
 
 ## Highlights
 
-- Trace Python and JavaScript snippets in the browser, with an experimental TypeScript mode.
+- Trace Python, JavaScript and TypeScript snippets in the browser.
 - Step forward and backward through a recorded execution timeline.
 - Stop running code or runtime loading, and retry a failed Python startup.
 - See active lines, changed variables, call stack frames, stdout, return values,
@@ -96,7 +96,7 @@ after a reload. See [local workspace and recovery details](docs/LOCAL-WORKSPACES
 | ---------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | Python     | Richest mode: generated inputs, specialized structures, recursion, complexity sampling, and deep trace panels.                    |
 | JavaScript | Synchronous scripts: statements, loops, functions, recursion, classes and closures with a real call stack and Node-style console. |
-| TypeScript | Experimental: simple annotations are removed before the JavaScript tracing path; richer type syntax may not run.                  |
+| TypeScript | Types are removed with Sucrase, keeping every line in place, then traced like JavaScript; namespaces and decorators are rejected. |
 
 Python tracing runs through Pyodide and WebAssembly inside a Web Worker.
 JavaScript and TypeScript run in a separate browser worker.

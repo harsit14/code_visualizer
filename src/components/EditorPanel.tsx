@@ -1,5 +1,5 @@
 /**
- * Code editor: CodeMirror 6 with Python syntax highlighting, a moving
+ * Code editor: CodeMirror 6 with Python/JavaScript/TypeScript highlighting, a moving
  * "current execution line" indicator, and an error-line marker.
  */
 import { python } from '@codemirror/lang-python';
@@ -14,7 +14,7 @@ import {
   type DecorationSet,
 } from '@codemirror/view';
 import CodeMirror from '@uiw/react-codemirror';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Diagnostic, Language } from '../engine/types';
 
 type LineMarks = { active: number | null; error: number | null; ran: number | null };
@@ -221,13 +221,26 @@ function lineNumberGutter(onRunToLine?: (line: number) => void): Extension {
   });
 }
 
-const baseExtensions = [
-  python(),
-  lineMarksField,
-  focusLineField,
-  lintGutter(),
-  EditorView.lineWrapping,
-];
+const sharedExtensions = [lineMarksField, focusLineField, lintGutter(), EditorView.lineWrapping];
+const pythonSupport = python();
+
+/** Loads JavaScript/TypeScript highlighting only when a JS/TS session needs it. */
+function useScriptLanguage(language: Language): Extension {
+  const typescript = language === 'typescript';
+  const [loaded, setLoaded] = useState<{ typescript: boolean; extension: Extension } | null>(null);
+  useEffect(() => {
+    if (language === 'python' || loaded?.typescript === typescript) return;
+    let cancelled = false;
+    void import('@codemirror/lang-javascript').then(({ javascript }) => {
+      if (!cancelled) setLoaded({ typescript, extension: javascript({ typescript }) });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [language, loaded, typescript]);
+  if (language === 'python') return pythonSupport;
+  return loaded?.typescript === typescript ? loaded.extension : [];
+}
 
 function scrollLineWithinEditor(view: EditorView, lineNumber: number) {
   const scroller = view.scrollDOM;
@@ -306,17 +319,17 @@ export function EditorPanel({
   focusRequest = null,
 }: EditorPanelProps) {
   const viewRef = useRef<EditorView | null>(null);
+  const languageSupport = useScriptLanguage(language);
   const extensions = useMemo(
     () => [
-      ...(language === 'python'
-        ? baseExtensions
-        : [lineMarksField, focusLineField, EditorView.lineWrapping]),
+      languageSupport,
+      ...sharedExtensions,
       lineNumberGutter(onRunToLine),
       breakpointGutter(onToggleBreakpoint),
       executionCountGutter(),
       ...(readOnly ? [EditorView.editable.of(false)] : []),
     ],
-    [language, onRunToLine, onToggleBreakpoint, readOnly],
+    [languageSupport, onRunToLine, onToggleBreakpoint, readOnly],
   );
 
   useEffect(() => {
@@ -345,7 +358,7 @@ export function EditorPanel({
   // Surface analyzer diagnostics inline (underlines + gutter markers + hover).
   useEffect(() => {
     const view = viewRef.current;
-    if (view && language === 'python') {
+    if (view) {
       view.dispatch(setDiagnostics(view.state, toCmDiagnostics(view, diagnostics)));
     }
   }, [diagnostics, code, language]);
@@ -381,10 +394,11 @@ export function EditorPanel({
       </header>
       {language !== 'python' ? (
         <p className="editor-capability-note" role="note">
-          {language === 'typescript'
-            ? 'Experimental TypeScript: simple annotations are removed before tracing; enums, interfaces with nested types and typed class fields may not run. '
-            : 'JavaScript tracing covers synchronous scripts, including functions, recursion, classes and closures. '}
-          Async functions, generators and modules are not supported yet.
+          {language === 'typescript' ? 'TypeScript' : 'JavaScript'} tracing covers synchronous
+          scripts, including functions, recursion, classes and closures
+          {language === 'typescript' ? '; types are removed before running' : ''}. Async functions,
+          generators, modules{language === 'typescript' ? ', namespaces and decorators' : ''} are
+          not supported yet.
         </p>
       ) : null}
       <div className="editor-host">

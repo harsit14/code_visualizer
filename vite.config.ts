@@ -83,6 +83,10 @@ export default defineConfig(({ mode }) => {
             if (!id.includes('node_modules')) {
               return undefined;
             }
+            // The JavaScript/TypeScript grammar loads on demand for JS/TS sessions.
+            if (id.includes('@codemirror/lang-javascript') || id.includes('@lezer/javascript')) {
+              return undefined;
+            }
             if (id.includes('@codemirror') || id.includes('@lezer') || id.includes('@uiw')) {
               return 'codemirror';
             }

@@ -193,6 +193,32 @@ checkpoints. Browser checks ran the DP lesson end to end (automatic pauses, a
 correct, a revealed and a wrong answer, "See it happen" and the summary) and the
 BFS lesson (string and dictionary answers).
 
+## Ninth batch: TypeScript transform and JS/TS editing
+
+- Replaced the stop-gap annotation stripper with Sucrase, which removes TypeScript
+  syntax while keeping every statement on its original line. Interfaces, type
+  aliases, generics, enums, parameter properties, access modifiers, abstract
+  classes, overloads, `declare`, `satisfies`, non-null assertions and type-only
+  imports now trace like JavaScript. Namespaces (which Sucrase would drop) and
+  decorators are rejected with a line-numbered message; syntax errors report
+  their line. TypeScript is no longer labelled experimental.
+- Added JavaScript/TypeScript syntax highlighting with `@codemirror/lang-javascript`,
+  and JS/TS syntax errors are now underlined inline like Python diagnostics.
+- `acorn` is declared directly (it was already installed through ESLint). `npm audit`
+  reports no production vulnerabilities after adding `sucrase` and
+  `@codemirror/lang-javascript`.
+
+- Sucrase lives in its own chunk (207 KB) that the worker loads only for TypeScript
+  runs, so the JavaScript worker stays at 145 KB. The JS/TS grammar (33 KB gzip)
+  loads only when a JS/TS session opens; the shared editor chunk is unchanged.
+
+Validation: full CI passes typecheck, lint, 469 tests in 60 files, app build/smoke
+and runner build/smoke. An 8-program corpus compares traced output and errors with
+compiling the same TypeScript through the TypeScript compiler and running it
+natively, plus line-mapping, rejection and syntax-error tests. Browser checks ran a
+TypeScript program with an enum, an interface and parameter properties (correct
+output, highlighting, structure views) and showed an inline JavaScript syntax error.
+
 ## Evidence and limits (original audit)
 
 | Check                                       | Result                                                                                                                                  |
@@ -400,4 +426,4 @@ A practical first batch is: (1) privilege protection, (2) practice equality repa
 - Test replay with 100, 1,000 and 3,000 steps and several structure sizes. Agree budgets after measuring baseline; a reasonable initial target is p95 step-to-render under 100 ms on a named reference device.
 - Measure first successful run, meaningful stepping after a run, successful failure-case debugging, saved-work recovery and return visits. Use privacy-preserving events; exclude code, inputs, locals, notebook text and full share URLs.
 
-Next remaining milestones: stage the isolated runner and managed accounts, verify the real browser/device matrix, add a real TypeScript transform and JS/TS highlighting, and implement the Stage D features (run comparison, algorithm views, teaching mode), workspace autosave/search and cloud sync. Phone navigation, save-failure recovery, explicit local workspace revisions/backups, parser-based JavaScript tracing, step explanations, trace search/bookmarks, failing-case explanations and guided lessons are implemented locally.
+Next remaining milestones: stage the isolated runner and managed accounts, verify the real browser/device matrix, and implement the Stage D features (run comparison, algorithm views, teaching mode), workspace autosave/search and cloud sync. Phone navigation, save-failure recovery, explicit local workspace revisions/backups, parser-based JavaScript/TypeScript tracing, step explanations, trace search/bookmarks, failing-case explanations and guided lessons are implemented locally.

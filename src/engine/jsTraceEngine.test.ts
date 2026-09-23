@@ -1,6 +1,7 @@
 import { format, inspect } from 'node:util';
 import { describe, expect, it } from 'vitest';
 import { instrumentJavaScript, runJavaScriptTrace } from './jsTraceEngine';
+import { runTypeScriptTrace } from './tsTrace';
 import type { EncodedValue, TraceStep } from './types';
 
 /** Runs the original program without instrumentation, as Node would print it. */
@@ -472,8 +473,8 @@ console.log(value, proxy);`,
     expect(result.error?.line).toBe(line);
   });
 
-  it('strips simple TypeScript annotations without breaking object literals', () => {
-    const result = runJavaScriptTrace(
+  it('strips TypeScript annotations without breaking object literals', () => {
+    const result = runTypeScriptTrace(
       `const nums: number[] = [2, 4];
 let total: number = 0;
 const item = { value: 2 };
@@ -484,17 +485,24 @@ for (const value of nums) {
   total = add(total, value);
 }
 console.log(total, item.value, (total as number) + 1);`,
-      'typescript',
     );
     expect(result.status).toBe('ok');
     expect(result.run?.stdout).toBe('6 2 7\n');
   });
 });
 
+describe('TypeScript without the transform', () => {
+  it('fails clearly instead of parsing TypeScript as JavaScript', () => {
+    const result = runJavaScriptTrace('let x: number = 1;', 'typescript');
+    expect(result.status).toBe('error');
+    expect(result.error?.msg).toContain('TypeScript transform');
+  });
+});
+
 describe('instrumentJavaScript', () => {
   it('keeps user code on its original lines', () => {
     const source = 'let total = 0;\nfor (let i = 0; i < 2; i++) {\n  total += i;\n}';
-    const instrumented = instrumentJavaScript(source, 'javascript');
+    const instrumented = instrumentJavaScript(source);
     expect(instrumented.split('\n')).toHaveLength(source.split('\n').length + 1);
     expect(instrumented).toContain('__cv$.t(3,[["i",()=>i]]);total += i;');
   });

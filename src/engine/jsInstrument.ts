@@ -38,7 +38,7 @@ const HIDDEN_PREFIX = '__cv$';
 const STRICT_PREFIX = '"use strict";';
 const CAUGHT = `${TRACE_RUNTIME}e`;
 
-export type JsSourceErrorKind = 'SyntaxError' | 'NotSupportedError';
+export type JsSourceErrorKind = 'SyntaxError' | 'NotSupportedError' | 'LoadError';
 
 /** A problem found before execution, with a 1-based source line. */
 export class JsSourceError extends Error {
@@ -567,6 +567,14 @@ function sourceError(error: unknown): JsSourceError {
     return new JsSourceError(
       'NotSupportedError',
       'Modules (import/export) are not supported by the JavaScript tracer yet; paste a single script.',
+      line,
+      column,
+    );
+  }
+  if (/Unexpected character '@'/.test(message)) {
+    return new JsSourceError(
+      'NotSupportedError',
+      'Decorators are not supported by the tracer yet.',
       line,
       column,
     );
