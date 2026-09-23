@@ -35,7 +35,7 @@ import { LandingInteractiveDemo } from './LandingInteractiveDemo';
 import { LandingStructurePreview } from './LandingStructurePreview';
 import { LogoMark } from './LogoMark';
 
-const languageBadges = ['Python', 'JavaScript (experimental)', 'TypeScript (experimental)'];
+const languageBadges = ['Python', 'JavaScript', 'TypeScript (experimental)'];
 
 const howItWorks = [
   {

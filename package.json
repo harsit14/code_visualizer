@@ -30,6 +30,7 @@
     "@fontsource/italiana": "^5.1.0",
     "@fontsource/outfit": "^5.1.0",
     "@uiw/react-codemirror": "^4.25.10",
+    "acorn": "^8.16.0",
     "lucide-react": "^0.468.0",
     "pyodide": "^0.29.4",
     "react": "^19.0.0",

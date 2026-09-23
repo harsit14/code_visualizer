@@ -126,3 +126,13 @@
 .editor-diagnostics p {
   margin: 2px 0;
 }
+
+.editor-capability-note {
+  background: var(--accent-soft);
+  border-top: 1px solid var(--border);
+  color: var(--text-dim);
+  flex-shrink: 0;
+  font-size: 12px;
+  margin: 0;
+  padding: 6px 12px;
+}

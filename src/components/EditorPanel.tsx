@@ -324,10 +324,11 @@ export function EditorPanel({
         <span className="panel-hint">{code.split('\n').length} lines</span>
       </header>
       {language !== 'python' ? (
-        <p className="editor-diagnostics" role="note">
-          Experimental {language === 'typescript' ? 'TypeScript' : 'JavaScript'} tracing: simple
-          synchronous scripts only. Multiline expressions and some branches are not supported; call
-          stacks are simplified.
+        <p className="editor-capability-note" role="note">
+          {language === 'typescript'
+            ? 'Experimental TypeScript: simple annotations are removed before tracing; enums, interfaces with nested types and typed class fields may not run. '
+            : 'JavaScript tracing covers synchronous scripts, including functions, recursion, classes and closures. '}
+          Async functions, generators and modules are not supported yet.
         </p>
       ) : null}
       <div className="editor-host">

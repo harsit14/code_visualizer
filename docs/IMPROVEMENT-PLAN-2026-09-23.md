@@ -112,6 +112,37 @@ The browser stalled during a later confirmation dialog; older-revision recovery
 is verified by automated tests. Download payload/wiring is tested; the browser's
 actual download event was not observed. No live deployment changed.
 
+## Sixth batch: parser-based JavaScript tracing (finding 1)
+
+- Replaced regex line rewriting with acorn parsing and position-preserving
+  instrumentation. Every statement and loop iteration is traced on its original
+  line, including multi-line literals, unbraced/one-line bodies, labeled loops,
+  switch cases, ASI-style code, classes, getters, static blocks and closures.
+- JavaScript now follows the Python trace contract: "before execution" line steps,
+  a real bottom-first call stack, call/return events with return values, an
+  exception event in each frame an error leaves, and a final module state step.
+  Variables are read through scope-aware getters, so shadowing and the temporal
+  dead zone behave natively. Locals below the 12 most recent frames are elided.
+- `console` output follows Node's `util.format` (checked against Node in tests);
+  `console.error`/`warn` go to stderr. Snapshots never run getters; proxy traps
+  triggered by the tracer are not recorded. Sets, typed arrays, dates, class names
+  and JS `TreeNode`/`ListNode` shapes use the existing structure views.
+- Async functions, generators, `await` and modules are rejected before running with
+  a line-numbered capability message; syntax errors report their source line.
+  Caught trace-limit errors cannot keep a program running.
+- JavaScript is no longer labelled experimental. TypeScript keeps the label: the
+  stop-gap annotation stripper no longer breaks object literals, but a real
+  TypeScript transform (for example Sucrase, which preserves line numbers) still
+  needs a dependency approval. Editor syntax highlighting for JS/TS likewise
+  needs `@codemirror/lang-javascript`.
+
+Validation: full CI passes typecheck, lint, 359 tests in 52 files, app build/smoke
+and runner build/smoke. A 25-program corpus compares traced stdout, stderr and
+errors with running the same source natively. Browser checks covered a recursive
+tree program (five live frames, tree view of a caller's `node`, Node-style console
+output and the final module step) and the TypeScript example. The JS worker chunk
+grows from about 6 KB to 145 KB (parser included); it loads only for JS/TS runs.
+
 ## Evidence and limits (original audit)
 
 | Check                                       | Result                                                                                                                                  |
@@ -319,4 +350,4 @@ A practical first batch is: (1) privilege protection, (2) practice equality repa
 - Test replay with 100, 1,000 and 3,000 steps and several structure sizes. Agree budgets after measuring baseline; a reasonable initial target is p95 step-to-render under 100 ms on a named reference device.
 - Measure first successful run, meaningful stepping after a run, successful failure-case debugging, saved-work recovery and return visits. Use privacy-preserving events; exclude code, inputs, locals, notebook text and full share URLs.
 
-Next remaining milestones: stage the isolated runner and managed accounts, verify the real browser/device matrix, replace experimental JS/TS instrumentation, and implement the remaining learning features, workspace autosave/search and cloud sync. Phone navigation, save-failure recovery, and explicit local workspace revisions/backups are implemented locally.
+Next remaining milestones: stage the isolated runner and managed accounts, verify the real browser/device matrix, add a real TypeScript transform and JS/TS highlighting, and implement the remaining learning features, workspace autosave/search and cloud sync. Phone navigation, save-failure recovery, explicit local workspace revisions/backups and parser-based JavaScript tracing are implemented locally.

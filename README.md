@@ -22,7 +22,7 @@ or understanding how state mutates one line at a time.
 
 ## Highlights
 
-- Trace Python snippets in the browser, with experimental JavaScript and TypeScript modes.
+- Trace Python and JavaScript snippets in the browser, with an experimental TypeScript mode.
 - Step forward and backward through a recorded execution timeline.
 - Stop running code or runtime loading, and retry a failed Python startup.
 - See active lines, changed variables, call stack frames, stdout, return values,
@@ -71,11 +71,11 @@ after a reload. See [local workspace and recovery details](docs/LOCAL-WORKSPACES
 
 ## Languages
 
-| Language   | Support                                                                                                                   |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------- |
-| Python     | Richest mode: generated inputs, specialized structures, recursion, complexity sampling, and deep trace panels.            |
-| JavaScript | Experimental synchronous script tracing; some multiline expressions/branches are unsupported and the stack is simplified. |
-| TypeScript | Experimental basic annotation stripping before the JavaScript tracing path.                                               |
+| Language   | Support                                                                                                                           |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Python     | Richest mode: generated inputs, specialized structures, recursion, complexity sampling, and deep trace panels.                    |
+| JavaScript | Synchronous scripts: statements, loops, functions, recursion, classes and closures with a real call stack and Node-style console. |
+| TypeScript | Experimental: simple annotations are removed before the JavaScript tracing path; richer type syntax may not run.                  |
 
 Python tracing runs through Pyodide and WebAssembly inside a Web Worker.
 JavaScript and TypeScript run in a separate browser worker.
@@ -95,9 +95,13 @@ The recovery work does not isolate untrusted code from app accounts; see the
 
 ## Trace and practice behavior
 
-Python line snapshots show state **before** the highlighted line executes. JavaScript
-instrumented line snapshots show state **after** it executes. The playback label and
-AI context distinguish those phases.
+Line snapshots show state **before** the highlighted statement executes, in both
+Python and JavaScript. Calls, returns (with the returned value) and exceptions are
+separate events, and the last step shows the program's final state. JavaScript is
+parsed before it runs: each statement and loop iteration is traced on its original
+line, `console` output follows Node's formatting, and async functions, generators
+and modules are rejected with a clear message. Traces exported by older versions,
+where JavaScript steps meant "after execution", keep that label.
 
 Practice expectations are Python literals such as `[0, 1]`, `'a b'`, `True`, or `None`.
 Comparison uses the actual return value and preserves types and string whitespace;
@@ -207,4 +211,5 @@ before changing a hosted deployment. No live accounts have been migrated.
 
 - Custom Python class instances render as attribute tables unless they match
   recognized `TreeNode` or `ListNode` shapes.
-- JavaScript and TypeScript tracing is intentionally lighter than Python mode.
+- JavaScript and TypeScript tracing has no generated inputs, practice cases or
+  complexity sampling yet; those remain Python features.
