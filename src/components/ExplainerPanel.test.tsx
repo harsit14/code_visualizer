@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { EncodedValue, SessionResult, TraceStep } from '../engine/types';
 
@@ -96,6 +96,36 @@ describe('ExplainerPanel', () => {
     );
     expect(container.textContent).not.toContain('Plain-English guide');
     expect(container.textContent).not.toContain('470 tokens');
+  });
+
+  it('aborts and ignores late explanations when the selected snapshot changes', async () => {
+    let resolve!: (value: { text: string; model: string }) => void;
+    explainStepMock.mockReturnValueOnce(
+      new Promise((r) => {
+        resolve = r;
+      }),
+    );
+    const first = step(0, { x: num(1) });
+    const props = {
+      code: 'x = 1',
+      language: 'python' as const,
+      currentStep: first,
+      previousStep: undefined,
+      frameIndex: null,
+      result: result(first),
+    };
+    const view = render(<ExplainerPanel {...props} />);
+    fireEvent.click(screen.getByRole('button', { name: /explain step/i }));
+    const signal = explainStepMock.mock.calls[0][0].signal as AbortSignal;
+    view.rerender(<ExplainerPanel {...props} currentStep={step(1, { x: num(2) })} />);
+    expect(signal.aborted).toBe(true);
+    await act(async () => {
+      resolve({ text: 'Obsolete explanation', model: 'test' });
+    });
+    expect(view.container.textContent).not.toContain('Obsolete explanation');
+    expect(
+      (screen.getByRole('button', { name: /explain step/i }) as HTMLButtonElement).disabled,
+    ).toBe(false);
   });
 
   it('waits for a trace before allowing explanations', () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isAdminEmail, limitForPlan, planForUser } from './usage';
+import { isAdminUserId, limitForPlan, planForUser } from './usage';
 import type { AuthUser, ServerEnv } from './types';
 
 const user = (email: string): AuthUser => ({
@@ -10,25 +10,23 @@ const user = (email: string): AuthUser => ({
 });
 
 describe('admin usage plan', () => {
-  it('promotes only allowlisted emails to admin', () => {
-    const env: ServerEnv = {
-      ADMIN_EMAILS: 'owner@example.com, teammate@example.com\nADMIN@CODEMAPPER.WIN',
-    };
-
+  it('grants admin only to explicitly provisioned account IDs', () => {
+    const env: ServerEnv = { ADMIN_USER_IDS: 'user-owner@example.com, teammate-id\nsecond-id' };
     expect(planForUser(env, user('owner@example.com'))).toBe('admin');
-    expect(planForUser(env, user(' admin@codemapper.win '))).toBe('admin');
     expect(planForUser(env, user('student@example.com'))).toBe('free');
     expect(planForUser(env, null)).toBe('anonymous');
+    expect(isAdminUserId(env, 'teammate-id')).toBe(true);
+    expect(isAdminUserId(env, 'TEAMMATE-ID')).toBe(false);
+    expect(isAdminUserId(env, 'teammate-id.evil')).toBe(false);
   });
 
-  it('keeps admin matching exact after normalization', () => {
-    const env: ServerEnv = {
-      ADMIN_EMAILS: 'admin@example.com',
-    };
-
-    expect(isAdminEmail(env, 'ADMIN@example.com')).toBe(true);
-    expect(isAdminEmail(env, 'not-admin@example.com')).toBe(false);
-    expect(isAdminEmail(env, 'admin@example.com.evil.test')).toBe(false);
+  it('never promotes an account based on its unverified email', () => {
+    expect(planForUser({ ADMIN_EMAILS: 'owner@example.com' }, user('owner@example.com'))).toBe(
+      'free',
+    );
+    expect(planForUser({ ADMIN_USER_IDS: 'verified-owner-id' }, user('owner@example.com'))).toBe(
+      'free',
+    );
   });
 
   it('gives admins an unlimited explainer quota without changing free users', () => {

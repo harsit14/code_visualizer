@@ -1,7 +1,14 @@
 import { formatValue } from '../engine/trace';
 import type { EngineError, FunctionInfo, SessionResult } from '../engine/types';
 
-export type PracticeCaseStatus = 'idle' | 'running' | 'ran' | 'pass' | 'fail' | 'error';
+export type PracticeCaseStatus =
+  | 'idle'
+  | 'running'
+  | 'ran'
+  | 'pass'
+  | 'fail'
+  | 'error'
+  | 'inconclusive';
 
 export type PracticeTestCase = {
   id: string;
@@ -9,6 +16,7 @@ export type PracticeTestCase = {
   inputs: string[];
   expected: string;
   actual: string | null;
+  actualLiteral?: string | null;
   status: PracticeCaseStatus;
   error: string | null;
   runtimeMs: number | null;
@@ -63,13 +71,17 @@ export function createEdgePracticeCases(
 export function summarizePracticeRun(
   result: SessionResult,
   expected: string,
-): Pick<PracticeTestCase, 'actual' | 'error' | 'memoryMb' | 'runtimeMs' | 'status'> {
+): Pick<
+  PracticeTestCase,
+  'actual' | 'actualLiteral' | 'error' | 'memoryMb' | 'runtimeMs' | 'status'
+> {
   const runError = result.run?.exception ?? result.run?.setupError ?? result.error ?? null;
   const actual = result.run?.returnValue ? formatValue(result.run.returnValue) : '';
 
   if (runError) {
     return {
       actual,
+      actualLiteral: null,
       error: formatEngineError(runError),
       memoryMb: result.run?.memoryMb ?? null,
       runtimeMs: result.run?.runtimeMs ?? null,
@@ -77,27 +89,36 @@ export function summarizePracticeRun(
     };
   }
 
+  const assessment = result.run?.assessment;
   const hasExpected = expected.trim().length > 0;
+  const verified =
+    assessment?.expected === expected &&
+    (assessment.status === 'pass' || assessment.status === 'fail');
+  const incomplete = result.run?.truncated || result.status !== 'ok';
   return {
     actual,
-    error: null,
+    actualLiteral: incomplete ? null : (assessment?.actualLiteral ?? null),
+    error: incomplete
+      ? 'Execution did not complete; the result cannot be checked.'
+      : assessment?.status === 'invalid' || assessment?.status === 'inconclusive'
+        ? assessment.message
+        : hasExpected && !verified
+          ? 'No complete typed comparison is available. Run the case again.'
+          : null,
     memoryMb: result.run?.memoryMb ?? null,
     runtimeMs: result.run?.runtimeMs ?? null,
-    status: hasExpected ? (matchesExpected(actual, expected) ? 'pass' : 'fail') : 'ran',
+    status: incomplete
+      ? 'inconclusive'
+      : assessment?.status === 'invalid'
+        ? 'error'
+        : assessment?.status === 'inconclusive'
+          ? 'inconclusive'
+          : hasExpected
+            ? verified
+              ? (assessment.status as 'pass' | 'fail')
+              : 'inconclusive'
+            : 'ran',
   };
-}
-
-function matchesExpected(actual: string, expected: string): boolean {
-  const trimmedActual = actual.trim();
-  const trimmedExpected = expected.trim();
-  return (
-    trimmedActual === trimmedExpected ||
-    normalizeComparable(trimmedActual) === normalizeComparable(trimmedExpected)
-  );
-}
-
-function normalizeComparable(value: string): string {
-  return value.replace(/\s+/g, '');
 }
 
 function formatEngineError(error: EngineError): string {

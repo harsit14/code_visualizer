@@ -15,6 +15,7 @@ import analyzerPy from '../../engine/codeviz/analyzer.py?raw';
 import inputgenPy from '../../engine/codeviz/inputgen.py?raw';
 import tracerPy from '../../engine/codeviz/tracer.py?raw';
 import runnerPy from '../../engine/codeviz/runner.py?raw';
+import assertionsPy from '../../engine/codeviz/assertions.py?raw';
 import apiPy from '../../engine/codeviz/api.py?raw';
 
 const ENGINE_FILES: Record<string, string> = {
@@ -26,6 +27,7 @@ const ENGINE_FILES: Record<string, string> = {
   'tracer.py': tracerPy,
   'runner.py': runnerPy,
   'api.py': apiPy,
+  'assertions.py': assertionsPy,
 };
 
 let pyodidePromise: Promise<PyodideAPI> | null = null;
@@ -89,7 +91,9 @@ async function ensurePyodide(): Promise<PyodideAPI> {
   return pyodidePromise;
 }
 
-function runningStatusFor(request: EngineRequest): Pick<RuntimeStatus, 'message' | 'progress' | 'stage'> {
+function runningStatusFor(
+  request: EngineRequest,
+): Pick<RuntimeStatus, 'message' | 'progress' | 'stage'> {
   if (request.op === 'analyze') {
     return { message: 'Analyzing code...', progress: 0.62, stage: 'analyzing' };
   }

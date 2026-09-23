@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Language, SessionResult } from '../engine/types';
 import { buildIframeEmbedCode, encodeShareState } from './shareState';
+import { MAX_TRACE_FILE_BYTES, parseTraceImport } from './traceImport';
 import { buildTraceSvgExport } from './traceSvgExport';
 
 const EXPORT_VERSION = 2;
@@ -27,10 +28,6 @@ type UseTraceTransferOptions = {
   step: number;
 };
 
-function importedLanguage(language: Language | undefined): Language {
-  return language === 'javascript' || language === 'typescript' ? language : 'python';
-}
-
 export function useTraceTransfer({
   code,
   exampleId,
@@ -44,12 +41,16 @@ export function useTraceTransfer({
 }: UseTraceTransferOptions) {
   const [shareLabel, setShareLabel] = useState('Share');
   const [embedLabel, setEmbedLabel] = useState('Embed');
+  const [importError, setImportError] = useState<string | null>(null);
+  const dismissImportError = useCallback(() => setImportError(null), []);
   const [importLabel, setImportLabel] = useState(DEFAULT_IMPORT_LABEL);
   const [importTitle, setImportTitle] = useState(DEFAULT_IMPORT_TITLE);
+  const importSerial = useRef(0);
   const importStatusTimeoutRef = useRef<number | null>(null);
 
   useEffect(
     () => () => {
+      importSerial.current += 1;
       if (importStatusTimeoutRef.current !== null) {
         window.clearTimeout(importStatusTimeoutRef.current);
       }
@@ -61,6 +62,7 @@ export function useTraceTransfer({
     if (importStatusTimeoutRef.current !== null) {
       window.clearTimeout(importStatusTimeoutRef.current);
     }
+    setImportError(label === 'Import failed' ? title : null);
     setImportLabel(label);
     setImportTitle(title);
     importStatusTimeoutRef.current = window.setTimeout(() => {
@@ -92,7 +94,14 @@ export function useTraceTransfer({
   );
 
   const handleShare = useCallback(async () => {
-    const url = buildShareUrl(false);
+    let url: URL;
+    try {
+      url = buildShareUrl(false);
+    } catch {
+      setShareLabel('Too large — export instead');
+      window.setTimeout(() => setShareLabel('Share'), 3000);
+      return;
+    }
     window.history.replaceState(null, '', url);
     try {
       if (!navigator.clipboard) {
@@ -107,7 +116,14 @@ export function useTraceTransfer({
   }, [buildShareUrl]);
 
   const handleEmbed = useCallback(async () => {
-    const url = buildShareUrl(true);
+    let url: URL;
+    try {
+      url = buildShareUrl(true);
+    } catch {
+      setEmbedLabel('Too large — export instead');
+      window.setTimeout(() => setEmbedLabel('Embed'), 3000);
+      return;
+    }
     const iframeCode = buildIframeEmbedCode(url.toString());
     try {
       if (!navigator.clipboard) {
@@ -166,38 +182,38 @@ export function useTraceTransfer({
 
   const handleImport = useCallback(
     (file: File) => {
+      const serial = ++importSerial.current;
+      setImportError(null);
+      if (file.size > MAX_TRACE_FILE_BYTES) {
+        showImportStatus('Import failed', 'Trace files must be no larger than 20 MB.');
+        return;
+      }
       void file
         .text()
         .then((text) => {
+          if (serial !== importSerial.current) return;
           try {
-            const payload = JSON.parse(text) as {
-              code?: string;
-              language?: Language;
-              result?: SessionResult;
-              step?: number;
-              version?: number;
-            };
-            if (typeof payload.code === 'string' && payload.result) {
-              onImportTrace({
-                code: payload.code,
-                language: importedLanguage(payload.language),
-                result: payload.result,
-                step: payload.step ?? 0,
-              });
-              showImportStatus('Imported', 'Trace imported successfully');
-              return;
-            }
-            showImportStatus('Import failed', 'Selected JSON is not a Code Visualizer trace');
-          } catch {
-            showImportStatus('Import failed', 'Selected file is not valid JSON');
+            const trace = parseTraceImport(text);
+            onImportTrace(trace);
+            showImportStatus('Imported', 'Trace imported successfully');
+          } catch (error) {
+            showImportStatus(
+              'Import failed',
+              error instanceof Error ? error.message : 'Invalid trace file.',
+            );
           }
         })
-        .catch(() => showImportStatus('Import failed', 'Could not read selected file'));
+        .catch(() => {
+          if (serial === importSerial.current)
+            showImportStatus('Import failed', 'Could not read selected file');
+        });
     },
     [onImportTrace, showImportStatus],
   );
 
   return {
+    importError,
+    dismissImportError,
     embedLabel,
     handleEmbed,
     handleExport,

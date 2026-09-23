@@ -6,10 +6,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { runJavaScriptInWorker } from '../engine/jsRuntimeClient';
-import {
-  clearPythonRuntimeStatusHandler,
-  getPythonRuntimeClient,
-} from '../engine/pythonRuntime';
+import { clearPythonRuntimeStatusHandler, getPythonRuntimeClient } from '../engine/pythonRuntime';
 import { TimeoutError, type RuntimeClient } from '../engine/runtimeClient';
 import { firstExceptionStep } from '../engine/trace';
 import {
@@ -124,9 +121,8 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
     initialOptions.functionName ?? null,
   );
   const [inputDrafts, setInputDrafts] = useState<Record<string, string> | null>(null);
-  const [practiceNotebook, setPracticeNotebook] = useState<PracticeNotebook>(
-    EMPTY_PRACTICE_NOTEBOOK,
-  );
+  const [practiceNotebook, setPracticeNotebook] =
+    useState<PracticeNotebook>(EMPTY_PRACTICE_NOTEBOOK);
   const [testCases, setTestCases] = useState<PracticeTestCase[]>([]);
   const [testCasesBusy, setTestCasesBusy] = useState(false);
   const [pendingInitialInputs, setPendingInitialInputs] = useState<string[] | null>(
@@ -136,6 +132,10 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
     Number.isFinite(initialOptions.seed) ? (initialOptions.seed ?? null) : null,
   );
 
+  const revisionRef = useRef(0);
+  const operationPendingRef = useRef(false);
+  const mountedRef = useRef(true);
+  const [operationBusy, setOperationBusy] = useState(false);
   const clientRef = useRef<RuntimeClient | null>(null);
   const analyzeTimer = useRef<number | null>(null);
   const analyzeSerial = useRef(0);
@@ -151,15 +151,26 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
   const preservePracticeNotebookOnNextKeyRef = useRef(false);
 
   const getClient = useCallback(() => {
+    const handleStatus = (next: RuntimeStatus) => {
+      if (mountedRef.current && languageRef.current === 'python') setStatus(next);
+    };
     if (!clientRef.current) {
-      clientRef.current = getPythonRuntimeClient(setStatus);
+      clientRef.current = getPythonRuntimeClient(handleStatus);
     } else {
-      clientRef.current.setStatusHandler(setStatus, true);
+      clientRef.current.setStatusHandler(handleStatus, true);
     }
     return clientRef.current;
   }, []);
 
-  useEffect(() => () => clearPythonRuntimeStatusHandler(clientRef.current), []);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      revisionRef.current += 1;
+      if (analyzeTimer.current) window.clearTimeout(analyzeTimer.current);
+      clearPythonRuntimeStatusHandler(clientRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (language === 'python') {
@@ -172,7 +183,9 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
     status.phase === 'running' ||
     status.phase === 'interrupting' ||
     status.phase === 'restarting' ||
-    testCasesBusy;
+    testCasesBusy ||
+    operationBusy ||
+    complexityBusy;
 
   const steps = result?.run?.steps ?? [];
   const totalSteps = steps.length;
@@ -213,6 +226,7 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
           .then((data) => {
             const payload = data as { analysis?: AnalysisInfo };
             if (
+              mountedRef.current &&
               payload.analysis &&
               serial === analyzeSerial.current &&
               source === codeRef.current &&
@@ -231,8 +245,20 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
 
   const setCode = useCallback(
     (nextCode: string) => {
+      revisionRef.current += 1;
       codeRef.current = nextCode;
       setCodeState(nextCode);
+      setTestCases((current) =>
+        current.map((testCase) => ({
+          ...testCase,
+          status: 'idle',
+          actual: null,
+          actualLiteral: null,
+          error: null,
+          runtimeMs: null,
+          memoryMb: null,
+        })),
+      );
       setResult(null);
       setComplexity(null);
       resetPlayback();
@@ -258,6 +284,7 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
 
   const setLanguage = useCallback(
     (nextLanguage: Language) => {
+      revisionRef.current += 1;
       languageRef.current = nextLanguage;
       setLanguageState(nextLanguage);
       setStatus(idleStatus(nextLanguage));
@@ -280,6 +307,7 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
         window.clearTimeout(analyzeTimer.current);
         analyzeTimer.current = null;
       }
+      revisionRef.current += 1;
       codeRef.current = nextCode;
       languageRef.current = options.language;
       analyzeSerial.current += 1;
@@ -289,7 +317,9 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
       setResult(null);
       setComplexity(null);
       resetPlayback();
-      setFunctionOverrideState(options.language === 'python' ? (options.functionName ?? null) : null);
+      setFunctionOverrideState(
+        options.language === 'python' ? (options.functionName ?? null) : null,
+      );
       setInputDrafts(null);
       setPracticeNotebook(EMPTY_PRACTICE_NOTEBOOK);
       setTestCases([]);
@@ -421,26 +451,36 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
   }, [activeFunction, inputDrafts, result]);
   inputLiteralsRef.current = inputLiterals;
 
-  const setFunctionOverride = useCallback((nextFunction: string | null) => {
-    setFunctionOverrideState(nextFunction);
-    setResult(null);
-    setComplexity(null);
-    resetPlayback();
-    setInputDrafts(null);
-    setPracticeNotebook(EMPTY_PRACTICE_NOTEBOOK);
-    setTestCases([]);
-    setPendingInitialInputs(null);
-  }, [resetPlayback]);
+  const setFunctionOverride = useCallback(
+    (nextFunction: string | null) => {
+      revisionRef.current += 1;
+      setFunctionOverrideState(nextFunction);
+      setResult(null);
+      setComplexity(null);
+      resetPlayback();
+      setInputDrafts(null);
+      setPracticeNotebook(EMPTY_PRACTICE_NOTEBOOK);
+      setTestCases([]);
+      setPendingInitialInputs(null);
+    },
+    [resetPlayback],
+  );
 
   const run = useCallback(
     async (overrides?: { freshInputs?: boolean; inputs?: string[]; seed?: number }) => {
-      if (isBusy || testCasesBusy) {
+      if (isBusy || testCasesBusy || operationPendingRef.current) {
         return;
       }
       if (analyzeTimer.current) {
         window.clearTimeout(analyzeTimer.current);
         analyzeTimer.current = null;
       }
+      const revision = revisionRef.current;
+      const runLanguage = languageRef.current;
+      const isCurrent = () => mountedRef.current && revisionRef.current === revision;
+      operationPendingRef.current = true;
+      setOperationBusy(true);
+      analyzeSerial.current += 1;
       setResult(null);
       setComplexity(null);
       resetPlayback();
@@ -450,7 +490,7 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
 
       try {
         let data: SessionResult;
-        if (languageRef.current === 'python') {
+        if (runLanguage === 'python') {
           data = (await getClient().request(
             {
               op: 'run',
@@ -471,7 +511,8 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
             progress: 0.74,
             stage: 'trace-generating',
           });
-          data = await runJavaScriptInWorker(code, languageRef.current, RUN_TIMEOUT_MS);
+          data = await runJavaScriptInWorker(code, runLanguage, RUN_TIMEOUT_MS);
+          if (!isCurrent()) return;
           setStatus({
             phase: 'ready',
             message: 'Ready',
@@ -481,6 +522,7 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
           });
         }
 
+        if (!isCurrent()) return;
         setResult(data);
         if (data.analysis) {
           setAnalysis(data.analysis);
@@ -502,6 +544,7 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
           setPlaying(runSteps.length > 1);
         }
       } catch (error) {
+        if (!isCurrent()) return;
         if (languageRef.current !== 'python') {
           setStatus(idleStatus(languageRef.current));
         }
@@ -520,6 +563,15 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
             durationMs: 0,
           });
         }
+      } finally {
+        operationPendingRef.current = false;
+        if (mountedRef.current) {
+          setOperationBusy(false);
+          if (!isCurrent()) {
+            setStatus(idleStatus(languageRef.current));
+            scheduleAnalyze(codeRef.current, languageRef.current);
+          }
+        }
       }
     },
     [
@@ -529,6 +581,7 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
       inputLiterals,
       isBusy,
       resetPlayback,
+      scheduleAnalyze,
       seed,
       setPlaying,
       setStep,
@@ -574,6 +627,7 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
               ...(shouldResetResult
                 ? {
                     actual: null,
+                    actualLiteral: null,
                     error: null,
                     memoryMb: null,
                     runtimeMs: null,
@@ -593,11 +647,11 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
   const acceptTestCaseActual = useCallback((id: string) => {
     setTestCases((current) =>
       current.map((testCase) =>
-        testCase.id === id && testCase.actual !== null && !testCase.error
+        testCase.id === id && typeof testCase.actualLiteral === 'string' && !testCase.error
           ? {
               ...testCase,
-              expected: testCase.actual,
-              status: 'pass' as const,
+              expected: testCase.actualLiteral!,
+              status: 'idle' as const,
             }
           : testCase,
       ),
@@ -628,82 +682,108 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
     [activeFunction, run, testCases],
   );
 
-  const runPracticeCaseBatch = useCallback(async (casesToRun: readonly PracticeTestCase[]) => {
-    if (
-      languageRef.current !== 'python' ||
-      isBusy ||
-      testCasesBusy ||
-      !activeFunction ||
-      casesToRun.length === 0
-    ) {
-      return;
-    }
-    if (analyzeTimer.current) {
-      window.clearTimeout(analyzeTimer.current);
-      analyzeTimer.current = null;
-    }
+  const runPracticeCaseBatch = useCallback(
+    async (casesToRun: readonly PracticeTestCase[]) => {
+      if (
+        languageRef.current !== 'python' ||
+        isBusy ||
+        operationPendingRef.current ||
+        testCasesBusy ||
+        !activeFunction ||
+        casesToRun.length === 0
+      ) {
+        return;
+      }
+      if (analyzeTimer.current) {
+        window.clearTimeout(analyzeTimer.current);
+        analyzeTimer.current = null;
+      }
 
-    setTestCasesBusy(true);
-    try {
-      for (const testCase of casesToRun) {
-        setTestCases((current) =>
-          current.map((candidate) =>
-            candidate.id === testCase.id
-              ? { ...candidate, error: null, status: 'running' }
-              : candidate,
-          ),
-        );
-
-        try {
-          const data = (await getClient().request(
-            {
-              op: 'run',
-              source: code,
-              options: {
-                function: functionOverride ?? undefined,
-                inputs: testCase.inputs,
-                seed: seed ?? undefined,
-              },
-            },
-            { timeoutMs: RUN_TIMEOUT_MS },
-          )) as SessionResult;
-          const summary = summarizePracticeRun(data, testCase.expected);
-          setTestCases((current) =>
-            current.map((candidate) =>
-              candidate.id === testCase.id ? { ...candidate, ...summary } : candidate,
-            ),
-          );
-        } catch (error) {
-          const message =
-            error instanceof Error ? error.message : 'Could not run this test case.';
+      const revision = revisionRef.current;
+      const isCurrent = () => mountedRef.current && revisionRef.current === revision;
+      operationPendingRef.current = true;
+      setTestCasesBusy(true);
+      try {
+        for (const testCase of casesToRun) {
+          if (!isCurrent()) break;
           setTestCases((current) =>
             current.map((candidate) =>
               candidate.id === testCase.id
-                ? {
-                    ...candidate,
-                    actual: null,
-                    error: message,
-                    memoryMb: null,
-                    runtimeMs: null,
-                    status: 'error',
-                  }
+                ? { ...candidate, error: null, status: 'running' }
                 : candidate,
             ),
           );
+
+          try {
+            const data = (await getClient().request(
+              {
+                op: 'run',
+                source: code,
+                options: {
+                  function: functionOverride ?? undefined,
+                  inputs: testCase.inputs,
+                  expected: testCase.expected,
+                  seed: seed ?? undefined,
+                },
+              },
+              { timeoutMs: RUN_TIMEOUT_MS },
+            )) as SessionResult;
+            if (!isCurrent()) break;
+            const summary = summarizePracticeRun(data, testCase.expected);
+            setTestCases((current) =>
+              current.map((candidate) =>
+                candidate.id === testCase.id &&
+                candidate.expected === testCase.expected &&
+                JSON.stringify(candidate.inputs) === JSON.stringify(testCase.inputs)
+                  ? { ...candidate, ...summary }
+                  : candidate,
+              ),
+            );
+          } catch (error) {
+            if (!isCurrent()) break;
+            const message =
+              error instanceof Error ? error.message : 'Could not run this test case.';
+            setTestCases((current) =>
+              current.map((candidate) =>
+                candidate.id === testCase.id &&
+                candidate.expected === testCase.expected &&
+                JSON.stringify(candidate.inputs) === JSON.stringify(testCase.inputs)
+                  ? {
+                      ...candidate,
+                      actual: null,
+                      actualLiteral: null,
+                      error: message,
+                      memoryMb: null,
+                      runtimeMs: null,
+                      status: 'error',
+                    }
+                  : candidate,
+              ),
+            );
+          }
+        }
+      } finally {
+        operationPendingRef.current = false;
+        if (mountedRef.current) {
+          setTestCasesBusy(false);
+          setTestCases((current) =>
+            current.map((item) => (item.status === 'running' ? { ...item, status: 'idle' } : item)),
+          );
+          if (!isCurrent()) scheduleAnalyze(codeRef.current, languageRef.current);
         }
       }
-    } finally {
-      setTestCasesBusy(false);
-    }
-  }, [
-    activeFunction,
-    code,
-    functionOverride,
-    getClient,
-    isBusy,
-    seed,
-    testCasesBusy,
-  ]);
+    },
+    [
+      activeFunction,
+      code,
+      functionOverride,
+      getClient,
+      isBusy,
+      seed,
+      scheduleAnalyze,
+      testCasesBusy,
+    ],
+  );
 
   const runTestCases = useCallback(async () => {
     await runPracticeCaseBatch(testCases);
@@ -711,14 +791,27 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
 
   const runFailedTestCases = useCallback(async () => {
     await runPracticeCaseBatch(
-      testCases.filter((testCase) => testCase.status === 'fail' || testCase.status === 'error'),
+      testCases.filter(
+        (testCase) =>
+          testCase.status === 'fail' ||
+          testCase.status === 'error' ||
+          testCase.status === 'inconclusive',
+      ),
     );
   }, [runPracticeCaseBatch, testCases]);
 
   const measureComplexity = useCallback(async () => {
-    if (languageRef.current !== 'python' || isBusy || complexityBusy) {
+    if (
+      languageRef.current !== 'python' ||
+      isBusy ||
+      complexityBusy ||
+      operationPendingRef.current
+    ) {
       return;
     }
+    const revision = revisionRef.current;
+    const isCurrent = () => mountedRef.current && revisionRef.current === revision;
+    operationPendingRef.current = true;
     setComplexityBusy(true);
     try {
       const data = (await getClient().request(
@@ -730,8 +823,9 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
         },
         { timeoutMs: RUN_TIMEOUT_MS * 2 },
       )) as ComplexityResult;
-      setComplexity(data);
+      if (isCurrent()) setComplexity(data);
     } catch (error) {
+      if (!isCurrent()) return;
       setComplexity({
         functionName: null,
         seed: null,
@@ -742,9 +836,13 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
         },
       });
     } finally {
-      setComplexityBusy(false);
+      operationPendingRef.current = false;
+      if (mountedRef.current) {
+        setComplexityBusy(false);
+        if (!isCurrent()) scheduleAnalyze(codeRef.current, languageRef.current);
+      }
     }
-  }, [code, complexityBusy, functionOverride, getClient, isBusy, seed]);
+  }, [code, complexityBusy, functionOverride, getClient, isBusy, scheduleAnalyze, seed]);
 
   /** Restore an exported session (replay without re-running). */
   const importSession = useCallback(
@@ -760,6 +858,7 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
         window.clearTimeout(analyzeTimer.current);
         analyzeTimer.current = null;
       }
+      revisionRef.current += 1;
       codeRef.current = importedCode;
       languageRef.current = importedLanguage;
       analyzeSerial.current += 1;

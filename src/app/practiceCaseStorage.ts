@@ -1,7 +1,15 @@
 import type { PracticeCaseStatus, PracticeTestCase } from './practiceCases';
 
 const STORAGE_PREFIX = 'cv-practice-cases-v1';
-const STATUSES: PracticeCaseStatus[] = ['idle', 'running', 'ran', 'pass', 'fail', 'error'];
+const STATUSES: PracticeCaseStatus[] = [
+  'idle',
+  'running',
+  'ran',
+  'pass',
+  'fail',
+  'error',
+  'inconclusive',
+];
 
 export function buildPracticeCaseStorageKey(source: string, functionName: string): string {
   return `${STORAGE_PREFIX}:${hashSource(source)}:${encodeURIComponent(functionName)}`;
@@ -28,7 +36,10 @@ export function saveStoredPracticeCases(key: string, testCases: readonly Practic
       window.localStorage.removeItem(key);
       return;
     }
-    window.localStorage.setItem(key, JSON.stringify(testCases));
+    window.localStorage.setItem(
+      key,
+      JSON.stringify(testCases.map((testCase) => ({ ...testCase, assertionVersion: 2 }))),
+    );
   } catch {
     /* local storage may be disabled or full */
   }
@@ -53,6 +64,7 @@ function normalizePracticeCase(
 
   const status = isPracticeCaseStatus(value.status) ? value.status : 'idle';
   return {
+    actualLiteral: typeof value.actualLiteral === 'string' ? value.actualLiteral : null,
     actual: typeof value.actual === 'string' ? value.actual : null,
     error: typeof value.error === 'string' ? value.error : null,
     expected: typeof value.expected === 'string' ? value.expected : '',
@@ -64,7 +76,11 @@ function normalizePracticeCase(
         ? value.name
         : `Case ${index + 1}`,
     runtimeMs: finiteNumberOrNull(value.runtimeMs),
-    status: status === 'running' ? 'idle' : status,
+    status:
+      status === 'running' ||
+      (value.assertionVersion !== 2 && (status === 'pass' || status === 'fail'))
+        ? 'idle'
+        : status,
   };
 }
 

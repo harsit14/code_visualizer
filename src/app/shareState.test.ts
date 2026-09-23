@@ -40,3 +40,19 @@ describe('share state', () => {
     );
   });
 });
+
+describe('share payload limits', () => {
+  it('rejects malformed optional fields and oversized links', () => {
+    for (const patch of [
+      { seed: '1' },
+      { language: 'ruby' },
+      { inputs: [123] },
+      { functionName: {} },
+    ]) {
+      const encoded = '#cv=' + btoa(JSON.stringify({ code: 'pass', ...patch }));
+      expect(decodeShareHash(encoded)).toBeNull();
+    }
+    expect(decodeShareHash('#cv=' + 'a'.repeat(300001))).toBeNull();
+    expect(() => encodeShareState({ code: 'a'.repeat(300001) })).toThrow();
+  });
+});

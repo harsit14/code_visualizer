@@ -6,6 +6,11 @@ const USER_FUNC = '__codeviz_user__';
 const MAX_ITEMS = 24;
 const MAX_STRING = 160;
 const MAX_DEPTH = 4;
+const MAX_TRACE_STEPS = 3000;
+const MAX_OUTPUT_CHARS = 100_000;
+const MAX_SNAPSHOT_NODES = 200_000;
+
+class TraceLimitError extends Error {}
 const BYTES_PER_MB = 1024 * 1024;
 
 type HeapPerformance = Performance & {
@@ -19,8 +24,7 @@ function nowMs(): number {
 }
 
 function readHeapUsedBytes(): number | null {
-  const heapBytes = (globalThis.performance as HeapPerformance | undefined)?.memory
-    ?.usedJSHeapSize;
+  const heapBytes = (globalThis.performance as HeapPerformance | undefined)?.memory?.usedJSHeapSize;
   return Number.isFinite(heapBytes) ? (heapBytes as number) : null;
 }
 
@@ -166,10 +170,13 @@ export function instrumentJavaScript(source: string, language: JsLanguage): stri
 class Snapshotter {
   private ids = new WeakMap<object, number>();
   private nextId = 1;
+  private nodes = 0;
 
-  snapshot(value: unknown, depth = 0, active = new WeakSet<object>()): EncodedValue {
+  snapshot(value: unknown, depth = 0, active = new Set<object>()): EncodedValue {
+    if (++this.nodes > MAX_SNAPSHOT_NODES)
+      throw new TraceLimitError('Snapshot size limit reached; execution was stopped.');
     if (value === null || value === undefined) {
-      return { k: value === null ? 'none' : 'repr', t: 'undefined', v: 'undefined' };
+      return { k: 'repr', t: value === null ? 'null' : 'undefined', v: String(value) };
     }
     if (typeof value === 'number') {
       return { k: 'num', t: Number.isInteger(value) ? 'number' : 'number', v: String(value) };
@@ -201,14 +208,10 @@ class Snapshotter {
     }
     const id = existing ?? this.nextId++;
     this.ids.set(value, id);
-    active.add(value);
-
-    if (existing !== undefined && depth > 0) {
-      return { k: 'ref', id: existing };
-    }
+    active = new Set([...active, value]);
 
     if (depth >= MAX_DEPTH) {
-      return { k: 'repr', t: value.constructor?.name ?? 'Object', v: '[Object]', id };
+      return { k: 'repr', t: 'Object', v: '[Object]', id };
     }
 
     if (Array.isArray(value)) {
@@ -223,32 +226,38 @@ class Snapshotter {
     }
 
     if (value instanceof Map) {
+      const entries: [EncodedValue, EncodedValue][] = [];
+      for (const [key, item] of value) {
+        if (entries.length >= MAX_ITEMS) break;
+        entries.push([
+          this.snapshot(key, depth + 1, active),
+          this.snapshot(item, depth + 1, active),
+        ]);
+      }
       return {
         k: 'dict',
         id,
         t: 'Map',
-        entries: [...value.entries()]
-          .slice(0, MAX_ITEMS)
-          .map(([key, item]) => [
-            this.snapshot(key, depth + 1, active),
-            this.snapshot(item, depth + 1, active),
-          ]),
+        entries,
         len: value.size,
         truncated: value.size > MAX_ITEMS,
       };
     }
 
     const attrs: Record<string, EncodedValue> = {};
-    const entries = Object.entries(value as Record<string, unknown>).slice(0, MAX_ITEMS);
-    for (const [key, item] of entries) {
-      attrs[key] = this.snapshot(item, depth + 1, active);
+    const entries = Object.entries(Object.getOwnPropertyDescriptors(value)).slice(0, MAX_ITEMS);
+    for (const [key, descriptor] of entries) {
+      attrs[key] =
+        'value' in descriptor
+          ? this.snapshot(descriptor.value, depth + 1, active)
+          : { k: 'repr', t: 'accessor', v: '[Getter/Setter]' };
     }
     return {
       k: 'obj',
       id,
-      t: value.constructor?.name ?? 'Object',
+      t: 'Object',
       attrs,
-      preview: value.constructor?.name === 'Object' ? '{...}' : `<${value.constructor?.name}>`,
+      preview: '{...}',
     };
   }
 }
@@ -275,10 +284,15 @@ export function runJavaScriptTrace(source: string, language: JsLanguage): Sessio
   let heapEndBytes: number | null = null;
 
   const trace = (line: number, entries: [string, unknown][]) => {
+    if (steps.length >= MAX_TRACE_STEPS)
+      throw new TraceLimitError(
+        `Trace limit of ${MAX_TRACE_STEPS} steps reached; execution was stopped.`,
+      );
     const locals = encodeLocals(snapshotter, entries);
     steps.push({
       i: steps.length,
       event: 'line',
+      phase: 'after',
       line,
       func: USER_FUNC,
       stack: [
@@ -298,7 +312,11 @@ export function runJavaScriptTrace(source: string, language: JsLanguage): Sessio
 
   const consoleShim = {
     log: (...args: unknown[]) => {
-      stdout += `${args.map((arg) => (typeof arg === 'string' ? arg : JSON.stringify(arg))).join(' ')}\n`;
+      const output = `${args.map((arg) => (typeof arg === 'string' ? arg : JSON.stringify(arg))).join(' ')}\n`;
+      const remaining = MAX_OUTPUT_CHARS - stdout.length;
+      stdout += output.slice(0, remaining);
+      if (output.length > remaining)
+        throw new TraceLimitError('Output limit reached; execution was stopped.');
     },
   };
 
@@ -344,6 +362,36 @@ export function runJavaScriptTrace(source: string, language: JsLanguage): Sessio
     };
   } catch (error) {
     heapEndBytes ??= readHeapUsedBytes();
+    if (error instanceof TraceLimitError) {
+      return {
+        status: 'ok',
+        mode: 'script',
+        analysis,
+        error: null,
+        durationMs: nowMs() - startedAt,
+        run: applyMemoryMetric(
+          {
+            functionName: null,
+            inputs: [],
+            seed: null,
+            steps,
+            returnValue: null,
+            exception: null,
+            setupError: null,
+            stdout,
+            stderr: '',
+            opCount,
+            runtimeMs,
+            memoryMb: null,
+            memoryIsEstimate: true,
+            truncated: true,
+            truncationReason: error.message,
+          },
+          heapStartBytes,
+          heapEndBytes,
+        ),
+      };
+    }
     const payload = errorPayload(error);
     const line = steps.at(-1)?.line ?? 1;
     const exceptionStep: TraceStep = {

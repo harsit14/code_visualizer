@@ -50,7 +50,7 @@ function describeStep(step: TraceStep | undefined): string {
     return 'No trace yet';
   }
   const where = step.func === '<module>' ? 'module' : `${step.func}()`;
-  return `${step.event} · line ${step.line} · ${where}`;
+  return `${step.event}${step.phase === 'before' ? ' · before execution' : step.phase === 'after' ? ' · after execution' : ''} · line ${step.line} · ${where}`;
 }
 
 function ControlTip({ children, text }: { children: ReactNode; text: string }) {
@@ -142,17 +142,17 @@ export function ControlsBar({
       ? 'Set a breakpoint in the editor gutter first'
       : !hasTrace
         ? 'Run code first'
-      : canRunToBreakpoint
-        ? `Jump to a breakpoint step (${breakpointCount} set)`
-        : 'No breakpoint line appears elsewhere in this trace';
+        : canRunToBreakpoint
+          ? `Jump to a breakpoint step (${breakpointCount} set)`
+          : 'No breakpoint line appears elsewhere in this trace';
   const cursorTitle =
     cursorLine === null
       ? 'Click a code line first'
       : !hasTrace
         ? 'Run code first'
-      : canRunToCursor
-        ? `Jump to an execution step on line ${cursorLine}`
-        : `Line ${cursorLine} does not appear elsewhere in this trace`;
+        : canRunToCursor
+          ? `Jump to an execution step on line ${cursorLine}`
+          : `Line ${cursorLine} does not appear elsewhere in this trace`;
   const scrubberTitle = hasTrace ? 'Drag to jump through recorded steps' : 'Run code first';
   const stepJumpTitle = hasTrace ? 'Type a recorded step number to jump there' : 'Run code first';
   const speedTitle = `Playback speed: ${speed} steps per second`;
@@ -167,7 +167,9 @@ export function ControlsBar({
         <button className="run-button" disabled={isBusy} onClick={onRun} type="button">
           <Play size={14} />
           {isBusy ? 'Working…' : 'Run'}
-          {!hasTrace && !isBusy ? <span className="run-shortcut-badge">{runShortcutLabel}</span> : null}
+          {!hasTrace && !isBusy ? (
+            <span className="run-shortcut-badge">{runShortcutLabel}</span>
+          ) : null}
         </button>
       </ControlTip>
 

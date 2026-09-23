@@ -68,13 +68,46 @@ describe('/api/explain-step', () => {
       model: string;
       thinking: { type: string };
     };
+    expect(body.messages[1].content).toContain('Snapshot phase: before');
+    expect(body.messages[0].content).toContain('has NOT executed yet');
+    expect(init.signal).toBeInstanceOf(AbortSignal);
     expect(body.model).toBe('deepseek-v4-flash');
     expect(body.thinking).toEqual({ type: 'disabled' });
-    expect(body.messages[1].content).toContain('Current locals after this step: {"total":"1"}');
+    expect(body.messages[1].content).toContain('Current snapshot locals: {"total":"1"}');
     expect(body.messages[1].content).toContain(
-      'Variable changes (before -> after): total: created as 1',
+      'Variable changes (previous snapshot -> current): total: created as 1',
     );
     expect(body.messages[1].content).toContain('=>   1 | total = 1');
+  });
+
+  it('enforces actual streamed body bytes without trusting Content-Length', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const response = await onRequestPost({
+      env: { DEEPSEEK_API_KEY: 'test', DISABLE_USAGE_GATE: '1' },
+      request: new Request('https://example.com/api/explain-step', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ context, padding: 'x'.repeat(24000) }),
+      }),
+    });
+    expect(response.status).toBe(413);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects cross-origin requests before contacting the provider', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const response = await onRequestPost({
+      env: { DEEPSEEK_API_KEY: 'test', DISABLE_USAGE_GATE: '1' },
+      request: new Request('https://example.com/api/explain-step', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Origin: 'https://other.example' },
+        body: JSON.stringify({ context }),
+      }),
+    });
+    expect(response.status).toBe(403);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('does not call DeepSeek when the secret is missing', async () => {

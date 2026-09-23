@@ -163,6 +163,7 @@ class Tracer:
         step: dict[str, Any] = {
             "i": len(self.steps),
             "event": event,
+            "phase": "before" if event == "line" else "event",
             "line": frame.f_lineno,
             "func": frame.f_code.co_name,
             "stack": stack,

@@ -35,7 +35,7 @@ import { LandingInteractiveDemo } from './LandingInteractiveDemo';
 import { LandingStructurePreview } from './LandingStructurePreview';
 import { LogoMark } from './LogoMark';
 
-const languageBadges = ['Python', 'JavaScript', 'TypeScript'];
+const languageBadges = ['Python', 'JavaScript (experimental)', 'TypeScript (experimental)'];
 
 const howItWorks = [
   {
@@ -182,7 +182,8 @@ const snippetPresets = [
     return left + [root.val] + right`,
     id: 'tree-traversal',
     label: 'Tree Traversal',
-    result: '22 trace steps: recursive frames open and close while the active node moves through the tree.',
+    result:
+      '22 trace steps: recursive frames open and close while the active node moves through the tree.',
     stat: 'tree + stack',
   },
   {
@@ -321,8 +322,8 @@ export function LandingPage() {
           <div className="landing-hero-copy">
             <h1>See your code run, line by line.</h1>
             <p className="landing-hero-lede">
-              Watch every variable, pointer, call, and output update as the program moves through
-              a replayable timeline.
+              Watch every variable, pointer, call, and output update as the program moves through a
+              replayable timeline.
             </p>
             <p className="landing-category-line">
               An in-browser visual debugger for Python, JavaScript, and TypeScript.

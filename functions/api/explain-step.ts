@@ -11,65 +11,21 @@ type PagesContext = {
   env: Env;
 };
 
-type ExplainerLanguage = 'python' | 'javascript' | 'typescript';
+import {
+  buildDeepSeekMessages,
+  sanitizeStepExplanationContext,
+  deepSeekCompletionToExplanation,
+  DEEPSEEK_CHAT_COMPLETIONS_URL,
+  DEFAULT_DEEPSEEK_MODEL,
+  type DeepSeekCompletionResponse,
+} from '../../src/engine/deepseekShared';
+import {
+  readLimitedJson,
+  isRequestBodyTooLargeError,
+  rejectCrossOriginStateChange,
+} from '../../src/server/http';
 
-type StepExplanationContext = {
-  language: ExplainerLanguage;
-  codeExcerpt: string;
-  currentLine: number | null;
-  currentLineText: string;
-  event: 'call' | 'line' | 'return' | 'exception';
-  frameName: string;
-  locals: Record<string, string>;
-  added: string[];
-  changed: string[];
-  removed: string[];
-  variableChanges: string[];
-  stdout: string;
-  returnValue: string | null;
-  exception: string | null;
-};
-
-type DeepSeekMessage = {
-  role: 'system' | 'user';
-  content: string;
-};
-
-type DeepSeekCompletionResponse = {
-  model?: string;
-  choices?: Array<{
-    message?: {
-      content?: string | null;
-    };
-  }>;
-  usage?: {
-    prompt_tokens?: number;
-    completion_tokens?: number;
-    total_tokens?: number;
-  };
-  error?: {
-    message?: string;
-    type?: string;
-  };
-};
-
-type DeepSeekStepExplanation = {
-  text: string;
-  model: string;
-  usage?: {
-    promptTokens?: number;
-    completionTokens?: number;
-    totalTokens?: number;
-  };
-};
-
-const DEEPSEEK_CHAT_COMPLETIONS_URL = 'https://api.deepseek.com/chat/completions';
-const DEFAULT_DEEPSEEK_MODEL = 'deepseek-v4-flash';
 const MAX_REQUEST_BYTES = 24_000;
-const MAX_CODE_CHARS = 7000;
-const MAX_STDOUT_CHARS = 1200;
-const MAX_FIELD_CHARS = 500;
-const MAX_LOCALS = 24;
 const JSON_HEADERS = {
   'Cache-Control': 'no-store',
   'Content-Type': 'application/json; charset=utf-8',
@@ -86,6 +42,8 @@ export async function onRequestPost(context: PagesContext): Promise<Response> {
 }
 
 async function handlePost({ env, request }: PagesContext): Promise<Response> {
+  const crossOrigin = rejectCrossOriginStateChange(request);
+  if (crossOrigin) return crossOrigin;
   const apiKey = env.DEEPSEEK_API_KEY?.trim();
   if (!apiKey) {
     return json({ error: 'AI explainer is not configured.' }, 503);
@@ -100,7 +58,14 @@ async function handlePost({ env, request }: PagesContext): Promise<Response> {
     return json({ error: 'Explanation request is too large.' }, 413);
   }
 
-  const body = await readJson(request);
+  let body: unknown;
+  try {
+    body = await readLimitedJson(request, MAX_REQUEST_BYTES);
+  } catch (error) {
+    if (isRequestBodyTooLargeError(error))
+      return json({ error: 'Explanation request is too large.' }, 413);
+    throw error;
+  }
   const context = isRecord(body) ? sanitizeStepExplanationContext(body.context) : null;
   if (!context) {
     return json({ error: 'Invalid explanation context.' }, 400);
@@ -126,6 +91,7 @@ async function handlePost({ env, request }: PagesContext): Promise<Response> {
       'Content-Type': 'application/json',
     },
     method: 'POST',
+    signal: AbortSignal.timeout(20_000),
   });
 
   const payload = await readJson(deepSeekResponse);
@@ -164,93 +130,6 @@ export function onRequest(): Response {
   });
 }
 
-function buildDeepSeekMessages(context: StepExplanationContext): DeepSeekMessage[] {
-  return [
-    {
-      role: 'system',
-      content:
-        'You are the Code Visualizer step explainer. Explain exactly one recorded execution step to a learner using only the trace. Tie the active line to its role in the surrounding code, then explain the observed state change with concrete variable names and values. If the active line is a condition, loop, call, return, or mutation, say what that construct is doing in this run. Keep the answer under 140 words. Do not mention tokens, JSON, or that you are an AI. Do not invent hidden state.',
-    },
-    {
-      role: 'user',
-      content: [
-        'Task: Explain what the active line does in this execution and why the shown state changed.',
-        `Language: ${context.language}`,
-        `Event: ${context.event}`,
-        `Frame: ${context.frameName}`,
-        `Active line: ${context.currentLine ?? 'unknown'}: ${
-          context.currentLineText || '(not available)'
-        }`,
-        `Variable changes (before -> after): ${context.variableChanges.join('; ') || 'none'}`,
-        `Added variables: ${context.added.join(', ') || 'none'}`,
-        `Changed variables: ${context.changed.join(', ') || 'none'}`,
-        `Removed variables: ${context.removed.join(', ') || 'none'}`,
-        `Current locals after this step: ${JSON.stringify(context.locals)}`,
-        `Return value: ${context.returnValue ?? 'none'}`,
-        `Exception: ${context.exception ?? 'none'}`,
-        `Stdout so far: ${context.stdout || 'none'}`,
-        '',
-        'Code excerpt (active line marked with =>):',
-        formatNumberedCodeExcerpt(context.codeExcerpt, context.currentLine),
-      ].join('\n'),
-    },
-  ];
-}
-
-function sanitizeStepExplanationContext(value: unknown): StepExplanationContext | null {
-  if (!isRecord(value)) {
-    return null;
-  }
-  const language = value.language;
-  const event = value.event;
-  if (!isExplainerLanguage(language) || !isTraceEvent(event)) {
-    return null;
-  }
-  const currentLine = value.currentLine;
-  if (currentLine !== null && typeof currentLine !== 'number') {
-    return null;
-  }
-
-  return {
-    added: sanitizeStringArray(value.added),
-    changed: sanitizeStringArray(value.changed),
-    codeExcerpt: clipString(value.codeExcerpt, MAX_CODE_CHARS),
-    currentLine:
-      typeof currentLine === 'number' && Number.isFinite(currentLine) ? currentLine : null,
-    currentLineText: clipString(value.currentLineText, MAX_FIELD_CHARS),
-    event,
-    exception: value.exception === null ? null : clipString(value.exception, MAX_FIELD_CHARS),
-    frameName: clipString(value.frameName, MAX_FIELD_CHARS),
-    language,
-    locals: sanitizeStringMap(value.locals),
-    removed: sanitizeStringArray(value.removed),
-    returnValue: value.returnValue === null ? null : clipString(value.returnValue, MAX_FIELD_CHARS),
-    stdout: clipString(value.stdout, MAX_STDOUT_CHARS),
-    variableChanges: sanitizeStringArray(value.variableChanges),
-  };
-}
-
-function deepSeekCompletionToExplanation(
-  payload: DeepSeekCompletionResponse | null,
-  fallbackModel: string,
-): DeepSeekStepExplanation | null {
-  const text = payload?.choices?.[0]?.message?.content?.trim();
-  if (!text) {
-    return null;
-  }
-  return {
-    model: payload?.model ?? fallbackModel,
-    text,
-    usage: payload?.usage
-      ? {
-          completionTokens: payload.usage.completion_tokens,
-          promptTokens: payload.usage.prompt_tokens,
-          totalTokens: payload.usage.total_tokens,
-        }
-      : undefined,
-  };
-}
-
 function json(value: unknown, status = 200, headers: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(value), {
     headers: { ...JSON_HEADERS, ...headers },
@@ -264,47 +143,6 @@ async function readJson(request: Request | Response): Promise<unknown> {
   } catch {
     return null;
   }
-}
-
-function sanitizeStringMap(value: unknown): Record<string, string> {
-  if (!isRecord(value)) {
-    return {};
-  }
-  return Object.fromEntries(
-    Object.entries(value)
-      .slice(0, MAX_LOCALS)
-      .filter((entry): entry is [string, string] => typeof entry[1] === 'string')
-      .map(([key, item]) => [clipString(key, MAX_FIELD_CHARS), clipString(item, MAX_FIELD_CHARS)]),
-  );
-}
-
-function sanitizeStringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  return value
-    .filter((item): item is string => typeof item === 'string')
-    .slice(0, MAX_LOCALS)
-    .map((item) => clipString(item, MAX_FIELD_CHARS));
-}
-
-function isExplainerLanguage(value: unknown): value is ExplainerLanguage {
-  return value === 'python' || value === 'javascript' || value === 'typescript';
-}
-
-function isTraceEvent(value: unknown): value is StepExplanationContext['event'] {
-  return value === 'call' || value === 'line' || value === 'return' || value === 'exception';
-}
-
-function formatNumberedCodeExcerpt(code: string, activeLine: number | null): string {
-  return code
-    .split(/\r?\n/)
-    .map((line, index) => {
-      const lineNumber = index + 1;
-      const marker = activeLine === lineNumber ? '=>' : '  ';
-      return `${marker} ${String(lineNumber).padStart(3, ' ')} | ${line}`;
-    })
-    .join('\n');
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -323,14 +161,4 @@ function runtimeErrorMessage(error: unknown): string {
   return error instanceof Error
     ? `AI explainer crashed before returning JSON: ${error.message}`
     : 'AI explainer crashed before returning JSON.';
-}
-
-function clipString(value: unknown, maxChars: number): string {
-  if (typeof value !== 'string') {
-    return '';
-  }
-  if (value.length <= maxChars) {
-    return value;
-  }
-  return `${value.slice(0, maxChars)}\n...[truncated]`;
 }

@@ -73,16 +73,16 @@ The migration creates:
 
 Set these Worker variables and secrets:
 
-| Name                        | Type     | Purpose                                                     |
-| --------------------------- | -------- | ----------------------------------------------------------- |
-| `SUPABASE_URL`              | Variable | Supabase project URL, for example `https://...supabase.co`. |
-| `SUPABASE_SERVICE_ROLE_KEY` | Secret   | Server-side Supabase service role key.                      |
-| `SUPABASE_SCHEMA`           | Variable | Optional, default `public`.                                 |
-| `ANON_USAGE_SALT`           | Secret   | Hashes anonymous usage subjects.                            |
-| `ANON_DAILY_EXPLAIN_LIMIT`  | Variable | Optional, default `3`.                                      |
-| `FREE_DAILY_EXPLAIN_LIMIT`  | Variable | Optional, default `5`.                                      |
-| `ADMIN_EMAILS`              | Variable | Optional comma/space-separated admin allowlist.             |
-| `PASSWORD_PEPPER`           | Secret   | Signs password hashes; set before public launch.            |
+| Name                        | Type     | Purpose                                                       |
+| --------------------------- | -------- | ------------------------------------------------------------- |
+| `SUPABASE_URL`              | Variable | Supabase project URL, for example `https://...supabase.co`.   |
+| `SUPABASE_SERVICE_ROLE_KEY` | Secret   | Server-side Supabase service role key.                        |
+| `SUPABASE_SCHEMA`           | Variable | Optional, default `public`.                                   |
+| `ANON_USAGE_SALT`           | Secret   | Hashes anonymous usage subjects.                              |
+| `ANON_DAILY_EXPLAIN_LIMIT`  | Variable | Optional, default `3`.                                        |
+| `FREE_DAILY_EXPLAIN_LIMIT`  | Variable | Optional, default `5`.                                        |
+| `ADMIN_USER_IDS`            | Variable | Optional comma/space-separated verified account ID allowlist. |
+| `PASSWORD_PEPPER`           | Secret   | Signs password hashes; set before public launch.              |
 
 The landing page lives at `/`. The dashboard lives at `/app`. Shared trace links
 with `#cv=` and iframe embeds still open the dashboard directly.
@@ -138,9 +138,15 @@ Optional: add `DEEPSEEK_MODEL` if you want to override the default
 
 The explainer route is gated before the DeepSeek request. Anonymous visitors get
 the anonymous daily limit, signed-in users get the free account daily limit, and
-emails listed in `ADMIN_EMAILS` get an unlimited admin quota. Admin matching is
-case-insensitive and exact after trimming whitespace; no client-side flag can
-promote an account.
+account IDs listed in `ADMIN_USER_IDS` get an unlimited admin quota. IDs are
+matched exactly and case-sensitively; no client-side flag can promote an account.
+
+Migration: `ADMIN_EMAILS` is ignored. Existing email-only admins receive the free
+quota until an operator provisions their account ID. Verify account ownership
+out of band before copying its ID from the account database into `ADMIN_USER_IDS`;
+do not automatically map an unverified signup email to admin access. Remove the
+old variable after migration. This change does not verify email addresses or
+replace the existing authentication/password implementation.
 
 For local testing through Cloudflare's runtime:
 

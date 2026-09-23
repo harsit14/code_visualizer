@@ -85,7 +85,10 @@ export function InputsPanel({
   const params = activeFunction?.params ?? [];
   const caseSummary = formatCaseSummary(testCases);
   const failedCaseCount = testCases.filter(
-    (testCase) => testCase.status === 'fail' || testCase.status === 'error',
+    (testCase) =>
+      testCase.status === 'fail' ||
+      testCase.status === 'error' ||
+      testCase.status === 'inconclusive',
   ).length;
   const notebookSummary = formatNotebookSummary(practiceNotebook);
 
@@ -282,7 +285,7 @@ export function InputsPanel({
                           onChange={(event) =>
                             onUpdateTestCase(testCase.id, { expected: event.target.value })
                           }
-                          placeholder="optional"
+                          placeholder="Python literal, e.g. [0, 1]"
                           spellCheck={false}
                           value={testCase.expected}
                         />
@@ -291,7 +294,13 @@ export function InputsPanel({
 
                     {testCase.error || testCase.actual !== null ? (
                       <div className="test-case-result">
-                        <span>{testCase.error ? 'error' : 'actual'}</span>
+                        <span>
+                          {testCase.status === 'inconclusive'
+                            ? 'unchecked'
+                            : testCase.error
+                              ? 'error'
+                              : 'actual'}
+                        </span>
                         <code>{testCase.error ?? testCase.actual}</code>
                         {testCase.runtimeMs !== null || testCase.memoryMb !== null ? (
                           <em>{formatCaseMetrics(testCase.runtimeMs, testCase.memoryMb)}</em>
@@ -344,9 +353,7 @@ export function InputsPanel({
             <label>
               <span>patterns</span>
               <input
-                onChange={(event) =>
-                  onPracticeNotebookChange({ patterns: event.target.value })
-                }
+                onChange={(event) => onPracticeNotebookChange({ patterns: event.target.value })}
                 placeholder="two pointers, binary search"
                 spellCheck={false}
                 type="text"
@@ -375,6 +382,8 @@ function statusLabel(status: PracticeTestCase['status']): string {
       return 'pass';
     case 'fail':
       return 'fail';
+    case 'inconclusive':
+      return 'unchecked';
     case 'error':
       return 'error';
     case 'running':
@@ -395,26 +404,16 @@ function formatCaseSummary(testCases: PracticeTestCase[]): string {
   const passCount = testCases.filter((testCase) => testCase.status === 'pass').length;
   const failCount = testCases.filter((testCase) => testCase.status === 'fail').length;
   const errorCount = testCases.filter((testCase) => testCase.status === 'error').length;
+  const uncheckedCount = testCases.filter((testCase) => testCase.status === 'inconclusive').length;
   const ranCount = testCases.filter((testCase) => testCase.status === 'ran').length;
   const scoredCount = passCount + failCount;
-
-  if (scoredCount > 0) {
-    return errorCount > 0
-      ? `${passCount}/${scoredCount} pass · ${errorCount} err`
-      : `${passCount}/${scoredCount} pass`;
-  }
-
-  if (errorCount > 0 && ranCount > 0) {
-    return `${ranCount} ran · ${errorCount} err`;
-  }
-
-  if (errorCount > 0) {
-    return `${errorCount} error`;
-  }
-
-  if (ranCount > 0) {
-    return ranCount === testCases.length ? `${ranCount} ran` : `${ranCount}/${testCases.length} ran`;
-  }
+  const parts = [
+    scoredCount ? `${passCount}/${scoredCount} pass` : null,
+    ranCount ? `${ranCount} ran` : null,
+    errorCount ? `${errorCount} err` : null,
+    uncheckedCount ? `${uncheckedCount} unchecked` : null,
+  ].filter(Boolean);
+  if (parts.length) return parts.join(' · ');
 
   return String(testCases.length);
 }
@@ -441,9 +440,9 @@ function formatNotebookSummary(notebook: PracticeNotebook): string {
 
 function canAcceptActual(testCase: PracticeTestCase): boolean {
   return (
-    testCase.actual !== null &&
+    typeof testCase.actualLiteral === 'string' &&
     !testCase.error &&
-    testCase.expected.trim() !== testCase.actual.trim()
+    testCase.expected.trim() !== testCase.actualLiteral.trim()
   );
 }
 

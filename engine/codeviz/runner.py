@@ -18,6 +18,7 @@ from contextlib import redirect_stderr, redirect_stdout
 from typing import Any, Optional
 
 from .analyzer import Analysis, FunctionInfo, analyze
+from .assertions import assess_return
 from .inputgen import GeneratedInput, evaluate_input, generate_inputs
 from .serialize import Snapshotter
 from .structures import ListNode, TreeNode, build_linked_list, build_tree
@@ -149,6 +150,7 @@ def run_session(
     seed: Optional[int] = None,
     max_steps: int = DEFAULT_MAX_STEPS,
     max_seconds: float = 8.0,
+    expected: str | None = None,
 ) -> dict[str, Any]:
     """Analyze and execute ``source``, returning the full session payload.
 
@@ -210,7 +212,7 @@ def run_session(
         result["run"] = _run_script(source, analysis, max_steps, max_seconds)
     else:
         result["run"] = _run_function(
-            source, analysis, function, inputs, seed, max_steps, max_seconds
+            source, analysis, function, inputs, seed, max_steps, max_seconds, expected
         )
         if result["run"].get("setupError"):
             result["status"] = "error"
@@ -283,6 +285,7 @@ def _run_function(
     seed: Optional[int],
     max_steps: int,
     max_seconds: float,
+    expected: str | None,
 ) -> dict[str, Any]:
     stdout, stderr = io.StringIO(), io.StringIO()
     run: dict[str, Any] = {
@@ -385,6 +388,7 @@ def _run_function(
                 finally:
                     _finish_run_metrics(run, metric_started_at, tracemalloc_was_tracing)
         run["returnValue"] = snapshotter.snapshot(return_value)
+        run["assessment"] = assess_return(return_value, expected)
     except TraceLimitError:
         pass
     except BaseException as exc:

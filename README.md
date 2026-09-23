@@ -22,7 +22,7 @@ or understanding how state mutates one line at a time.
 
 ## Highlights
 
-- Trace Python, JavaScript, and TypeScript snippets in the browser.
+- Trace Python snippets in the browser, with experimental JavaScript and TypeScript modes.
 - Step forward and backward through a recorded execution timeline.
 - See active lines, changed variables, call stack frames, stdout, return values,
   and runtime errors in sync.
@@ -59,14 +59,33 @@ without opening a separate workspace.
 
 ## Languages
 
-| Language   | Support                                                                                                        |
-| ---------- | -------------------------------------------------------------------------------------------------------------- |
-| Python     | Richest mode: generated inputs, specialized structures, recursion, complexity sampling, and deep trace panels. |
-| JavaScript | Browser-worker script tracing with line steps, locals, arrays, stdout, and runtime errors.                     |
-| TypeScript | Basic annotation stripping before the JavaScript tracing path.                                                 |
+| Language   | Support                                                                                                                   |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Python     | Richest mode: generated inputs, specialized structures, recursion, complexity sampling, and deep trace panels.            |
+| JavaScript | Experimental synchronous script tracing; some multiline expressions/branches are unsupported and the stack is simplified. |
+| TypeScript | Experimental basic annotation stripping before the JavaScript tracing path.                                               |
 
 Python tracing runs through Pyodide and WebAssembly inside a Web Worker.
 JavaScript and TypeScript run in a separate browser worker.
+
+## Trace and practice behavior
+
+Python line snapshots show state **before** the highlighted line executes. JavaScript
+instrumented line snapshots show state **after** it executes. The playback label and
+AI context distinguish those phases.
+
+Practice expectations are Python literals such as `[0, 1]`, `'a b'`, `True`, or `None`.
+Comparison uses the actual return value and preserves types and string whitespace;
+`True`, `1`, and `1.0` are distinct. Lists/tuples compare in order, dictionaries and
+sets independent of order. Custom objects, cycles, non-finite numbers and values
+beyond assertion limits are unchecked. Invalid expected literals report an error.
+Visualization truncation alone does not change the comparison; an incomplete run
+cannot pass. “Use actual” copies a complete parseable literal and requires a rerun.
+
+Trace import supports version 1 and 2 exports up to 20 MiB, 10,000 snapshots,
+500,000 encoded values and depth 40. Invalid files leave the current session intact.
+Overlarge share links should be replaced with a trace export. JS traces stop after
+3,000 steps, 200,000 encoded snapshot values or 100,000 output characters and preserve the available replay.
 
 ## Privacy Model
 
@@ -93,13 +112,13 @@ notes locally for that exact snippet.
 
 ## Examples To Try
 
-| Example                       | What to watch                                                                |
-| ----------------------------- | ---------------------------------------------------------------------------- |
+| Example                       | What to watch                                                                   |
+| ----------------------------- | ------------------------------------------------------------------------------- |
 | Two Sum                       | Dictionary updates, generated `nums` and `target`, saved cases, and edge cases. |
-| Reverse Linked List           | `prev`, `curr`, and `nxt` aliases as each `next` link flips.                 |
-| Binary Tree Inorder Traversal | Recursive frames opening and closing around a rendered tree.                 |
-| Binary Search                 | `lo`, `mid`, and `hi` converging on the answer.                              |
-| Loop accumulator              | Plain script execution with stdout and variable changes.                     |
+| Reverse Linked List           | `prev`, `curr`, and `nxt` aliases as each `next` link flips.                    |
+| Binary Tree Inorder Traversal | Recursive frames opening and closing around a rendered tree.                    |
+| Binary Search                 | `lo`, `mid`, and `hi` converging on the answer.                                 |
+| Loop accumulator              | Plain script execution with stdout and variable changes.                        |
 
 ## Development
 

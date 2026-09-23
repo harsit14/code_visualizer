@@ -323,6 +323,13 @@ export function EditorPanel({
         <h2>Code</h2>
         <span className="panel-hint">{code.split('\n').length} lines</span>
       </header>
+      {language !== 'python' ? (
+        <p className="editor-diagnostics" role="note">
+          Experimental {language === 'typescript' ? 'TypeScript' : 'JavaScript'} tracing: simple
+          synchronous scripts only. Multiline expressions and some branches are not supported; call
+          stacks are simplified.
+        </p>
+      ) : null}
       <div className="editor-host">
         <CodeMirror
           value={code}

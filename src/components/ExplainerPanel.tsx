@@ -52,9 +52,15 @@ export function ExplainerPanel({
   );
 
   useEffect(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setBusy(false);
     setExplanation(null);
     setError(null);
-  }, [contextKey]);
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, [contextKey, result]);
 
   useEffect(
     () => () => {
@@ -85,7 +91,9 @@ export function ExplainerPanel({
         result,
         signal: controller.signal,
       });
-      setExplanation(nextExplanation);
+      if (!controller.signal.aborted && abortRef.current === controller) {
+        setExplanation(nextExplanation);
+      }
     } catch (requestError) {
       if (!controller.signal.aborted) {
         setError(errorMessage(requestError));

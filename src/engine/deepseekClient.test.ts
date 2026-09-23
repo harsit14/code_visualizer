@@ -48,6 +48,20 @@ function result(currentStep: TraceStep): SessionResult {
 }
 
 describe('buildStepExplanationContext', () => {
+  it('includes the active line far into a file with original line numbers', () => {
+    const currentStep = { ...step(0, {}), line: 401 };
+    const context = buildStepExplanationContext({
+      code: Array.from({ length: 450 }, (_, i) => `value = ${i}`).join('\n'),
+      currentStep,
+      frameIndex: null,
+      language: 'python',
+      previousStep: undefined,
+      result: result(currentStep),
+    });
+    expect(context!.codeStartLine).toBe(389);
+    expect(buildDeepSeekMessages(context!)[1].content).toContain('=> 401 | value = 400');
+  });
+
   it('summarizes the current line and variable diff', () => {
     const previousStep = step(0, { total: num(1) });
     const currentStep = step(1, { total: num(3), i: num(2) });
@@ -61,6 +75,7 @@ describe('buildStepExplanationContext', () => {
       result: result(currentStep),
     });
 
+    expect(context?.statePhase).toBe('before');
     expect(context?.currentLineText).toBe('total += i');
     expect(context?.changed).toEqual(['total']);
     expect(context?.added).toEqual(['i']);
@@ -87,7 +102,9 @@ describe('buildDeepSeekMessages', () => {
     expect(messages[0].content).toContain('Tie the active line to its role');
     expect(messages[1].content).toContain('Changed variables: x');
     expect(messages[1].content).toContain('Active line: 2: x += 1');
-    expect(messages[1].content).toContain('Variable changes (before -> after): x: 1 -> 2');
+    expect(messages[1].content).toContain(
+      'Variable changes (previous snapshot -> current): x: 1 -> 2',
+    );
     expect(messages[1].content).toContain('=>   2 | x += 1');
   });
 });

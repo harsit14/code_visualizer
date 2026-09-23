@@ -41,19 +41,22 @@ function result(returnValue: EncodedValue): SessionResult {
 }
 
 describe('practiceCases', () => {
-  it('compares expected values against visualizer-formatted return values', () => {
-    const returnValue: EncodedValue = {
-      id: 1,
-      items: [num(0), num(1)],
-      k: 'seq',
-      len: 2,
-      t: 'list',
-      truncated: false,
-    };
+  it('uses a typed engine verdict instead of display equality', () => {
+    const data = result(num(1));
+    data.run!.assessment = { expected: '1', actualLiteral: '1', status: 'pass', message: null };
+    expect(summarizePracticeRun(data, '1').status).toBe('pass');
+    expect(summarizePracticeRun(data, '2').status).toBe('inconclusive');
+    data.run!.assessment = { expected: '2', actualLiteral: '1', status: 'fail', message: null };
+    expect(summarizePracticeRun(data, '2').status).toBe('fail');
+  });
 
-    expect(summarizePracticeRun(result(returnValue), '[0,1]').status).toBe('pass');
-    expect(summarizePracticeRun(result(returnValue), '[1,0]').status).toBe('fail');
-    expect(summarizePracticeRun(result(returnValue), '').status).toBe('ran');
+  it('cannot score legacy display-only traces or incomplete runs', () => {
+    const data = result(num(1));
+    expect(summarizePracticeRun(data, '1').status).toBe('inconclusive');
+    expect(summarizePracticeRun(data, '').status).toBe('ran');
+    data.run!.assessment = { expected: '1', actualLiteral: '1', status: 'pass', message: null };
+    data.run!.truncated = true;
+    expect(summarizePracticeRun(data, '1').status).toBe('inconclusive');
   });
 
   it('creates a small edge-case set from inferred parameter types', () => {

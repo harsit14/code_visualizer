@@ -55,6 +55,7 @@ const caseTwo: PracticeTestCase = {
 };
 
 const exploratoryCase: PracticeTestCase = {
+  actualLiteral: '21',
   ...caseOne,
   actual: '21',
   expected: '',
@@ -95,7 +96,7 @@ function renderInputsPanel(testCases: PracticeTestCase[] = []) {
       seed={null}
       testCases={testCases}
       testCasesBusy={false}
-    />
+    />,
   );
 }
 

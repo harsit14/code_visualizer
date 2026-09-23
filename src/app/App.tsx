@@ -203,6 +203,8 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
     [clearHistoryItemId, importSession, resetTraceNavigation],
   );
   const {
+    importError,
+    dismissImportError,
     embedLabel,
     handleEmbed,
     handleExport,
@@ -641,6 +643,15 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
             theme={theme}
           />
         )}
+
+        {importError ? (
+          <div className="dashboard-onboarding" role="alert">
+            <span>Import failed: {importError}</span>
+            <button type="button" onClick={dismissImportError}>
+              Dismiss
+            </button>
+          </div>
+        ) : null}
 
         {!embedMode && showDashboardOnboarding ? (
           <DashboardOnboardingBar onDismiss={dismissDashboardOnboarding} />

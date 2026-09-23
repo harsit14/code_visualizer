@@ -1,3 +1,5 @@
+import type { TracePhase } from './types';
+
 export const DEEPSEEK_CHAT_COMPLETIONS_URL = 'https://api.deepseek.com/chat/completions';
 export const DEFAULT_DEEPSEEK_MODEL = 'deepseek-v4-flash';
 export const DEEPSEEK_EXPLAINER_ENDPOINT = '/api/explain-step';
@@ -22,6 +24,8 @@ export type DeepSeekStepExplanation = {
 export type StepExplanationContext = {
   language: ExplainerLanguage;
   codeExcerpt: string;
+  codeStartLine?: number;
+  statePhase?: TracePhase;
   currentLine: number | null;
   currentLineText: string;
   event: 'call' | 'line' | 'return' | 'exception';
@@ -64,7 +68,7 @@ export function buildDeepSeekMessages(context: StepExplanationContext): DeepSeek
     {
       role: 'system',
       content:
-        'You are the Code Visualizer step explainer. Explain exactly one recorded execution step to a learner using only the trace. Tie the active line to its role in the surrounding code, then explain the observed state change with concrete variable names and values. If the active line is a condition, loop, call, return, or mutation, say what that construct is doing in this run. Keep the answer under 140 words. Do not mention tokens, JSON, or that you are an AI. Do not invent hidden state.',
+        'You are the Code Visualizer step explainer. Explain exactly one recorded execution step to a learner using only the trace. Tie the active line to its role in the surrounding code, then explain the observed state change with concrete variable names and values. If the active line is a condition, loop, call, return, or mutation, say what that construct is doing in this run. Keep the answer under 140 words. Do not mention tokens, JSON, or that you are an AI. Do not invent hidden state. For a before-line snapshot, the highlighted line has NOT executed yet: changes since the previous snapshot must not be attributed to that line. Describe upcoming behavior separately from observed changes.',
     },
     {
       role: 'user',
@@ -72,21 +76,26 @@ export function buildDeepSeekMessages(context: StepExplanationContext): DeepSeek
         'Task: Explain what the active line does in this execution and why the shown state changed.',
         `Language: ${context.language}`,
         `Event: ${context.event}`,
+        `Snapshot phase: ${context.statePhase ?? (context.event === 'line' ? (context.language === 'python' ? 'before' : 'after') : 'event')}`,
         `Frame: ${context.frameName}`,
         `Active line: ${context.currentLine ?? 'unknown'}: ${
           context.currentLineText || '(not available)'
         }`,
-        `Variable changes (before -> after): ${context.variableChanges.join('; ') || 'none'}`,
+        `Variable changes (previous snapshot -> current): ${context.variableChanges.join('; ') || 'none'}`,
         `Added variables: ${context.added.join(', ') || 'none'}`,
         `Changed variables: ${context.changed.join(', ') || 'none'}`,
         `Removed variables: ${context.removed.join(', ') || 'none'}`,
-        `Current locals after this step: ${JSON.stringify(context.locals)}`,
+        `Current snapshot locals: ${JSON.stringify(context.locals)}`,
         `Return value: ${context.returnValue ?? 'none'}`,
         `Exception: ${context.exception ?? 'none'}`,
         `Stdout so far: ${context.stdout || 'none'}`,
         '',
         'Code excerpt (active line marked with =>):',
-        formatNumberedCodeExcerpt(context.codeExcerpt, context.currentLine),
+        formatNumberedCodeExcerpt(
+          context.codeExcerpt,
+          context.currentLine,
+          context.codeStartLine ?? 1,
+        ),
       ].join('\n'),
     },
   ];
@@ -109,6 +118,20 @@ export function sanitizeStepExplanationContext(value: unknown): StepExplanationC
   return {
     language,
     codeExcerpt: clipString(value.codeExcerpt, MAX_CODE_CHARS),
+    codeStartLine:
+      typeof value.codeStartLine === 'number' &&
+      Number.isSafeInteger(value.codeStartLine) &&
+      value.codeStartLine > 0
+        ? value.codeStartLine
+        : 1,
+    statePhase:
+      value.statePhase === 'before' || value.statePhase === 'after' || value.statePhase === 'event'
+        ? value.statePhase
+        : event === 'line'
+          ? language === 'python'
+            ? 'before'
+            : 'after'
+          : 'event',
     currentLine:
       typeof currentLine === 'number' && Number.isFinite(currentLine) ? currentLine : null,
     currentLineText: clipString(value.currentLineText, MAX_FIELD_CHARS),
@@ -195,11 +218,15 @@ function isTraceEvent(value: unknown): value is StepExplanationContext['event'] 
   return value === 'call' || value === 'line' || value === 'return' || value === 'exception';
 }
 
-function formatNumberedCodeExcerpt(code: string, activeLine: number | null): string {
+function formatNumberedCodeExcerpt(
+  code: string,
+  activeLine: number | null,
+  startLine: number,
+): string {
   return code
     .split(/\r?\n/)
     .map((line, index) => {
-      const lineNumber = index + 1;
+      const lineNumber = index + startLine;
       const marker = activeLine === lineNumber ? '=>' : '  ';
       return `${marker} ${String(lineNumber).padStart(3, ' ')} | ${line}`;
     })

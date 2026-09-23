@@ -16,7 +16,9 @@ export type ServerEnv = {
   ANON_DAILY_EXPLAIN_LIMIT?: string;
   FREE_DAILY_EXPLAIN_LIMIT?: string;
   PRO_DAILY_EXPLAIN_LIMIT?: string;
+  /** Legacy configuration is ignored; email ownership is not yet verified. */
   ADMIN_EMAILS?: string;
+  ADMIN_USER_IDS?: string;
   ANON_USAGE_SALT?: string;
   PASSWORD_PEPPER?: string;
   PBKDF2_VERIFY_ITERATIONS_LIMIT?: string;

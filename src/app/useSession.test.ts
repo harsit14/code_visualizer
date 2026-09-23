@@ -95,7 +95,7 @@ function scriptResult(
   };
 }
 
-function functionResult(returnValue: EncodedValue = num(21)): SessionResult {
+function functionResult(returnValue: EncodedValue = num(21), expected = ''): SessionResult {
   const step: TraceStep = {
     event: 'return',
     func: 'solve',
@@ -140,6 +140,16 @@ function functionResult(returnValue: EncodedValue = num(21)): SessionResult {
     run: {
       exception: null,
       functionName: 'solve',
+      assessment: {
+        expected,
+        actualLiteral: returnValue.k === 'num' ? returnValue.v : null,
+        message: null,
+        status: !expected
+          ? 'unscored'
+          : returnValue.k === 'num' && returnValue.v === expected
+            ? 'pass'
+            : 'fail',
+      },
       inputs: [{ literal: '[1, 2, 3]', name: 'nums', type: 'list[int]' }],
       memoryMb: 0.25,
       opCount: 1,
@@ -222,6 +232,62 @@ describe('useSession', () => {
     });
     expect(result.current.result?.status).toBe('timeout');
     expect(result.current.result?.error?.type).toBe('ExecutionTimeout');
+    unmount();
+  });
+
+  it('discards a delayed run after switching source or importing a trace', async () => {
+    let resolve!: (value: SessionResult) => void;
+    requestMock.mockReturnValueOnce(
+      new Promise<SessionResult>((r) => {
+        resolve = r;
+      }),
+    );
+    const { result, unmount } = renderHook(() => useSession('print(1)'));
+    let pending!: Promise<void>;
+    act(() => {
+      pending = result.current.run();
+    });
+    expect(result.current.isBusy).toBe(true);
+    act(() => result.current.setCode('print(2)'));
+    const imported = scriptResult(2);
+    act(() => result.current.importSession('print(3)', imported));
+    await act(async () => {
+      resolve(scriptResult(5));
+      await pending;
+    });
+    expect(result.current.code).toBe('print(3)');
+    expect(result.current.result).toBe(imported);
+    expect(result.current.isBusy).toBe(false);
+    unmount();
+  });
+
+  it('does not attach a late case verdict to edited inputs', async () => {
+    const code = 'def solve(nums):\n    return 21';
+    let resolve!: (value: SessionResult) => void;
+    requestMock.mockReturnValueOnce(
+      new Promise<SessionResult>((r) => {
+        resolve = r;
+      }),
+    );
+    const { result, unmount } = renderHook(() => useSession(code));
+    act(() => result.current.importSession(code, functionResult()));
+    act(() => result.current.addTestCase());
+    const id = result.current.testCases[0].id;
+    act(() => result.current.updateTestCase(id, { expected: '21' }));
+    let pending!: Promise<void>;
+    act(() => {
+      pending = result.current.runTestCases();
+    });
+    act(() => result.current.updateTestCase(id, { inputs: ['[99]'] }));
+    await act(async () => {
+      resolve(functionResult(num(21), '21'));
+      await pending;
+    });
+    expect(result.current.testCases[0]).toMatchObject({
+      inputs: ['[99]'],
+      status: 'idle',
+      actual: null,
+    });
     unmount();
   });
 
@@ -329,7 +395,7 @@ describe('useSession', () => {
       result.current.updateTestCase(id, { expected: '21' });
     });
 
-    requestMock.mockResolvedValueOnce(functionResult(num(21)));
+    requestMock.mockResolvedValueOnce(functionResult(num(21), '21'));
     await act(async () => {
       await result.current.runTestCases();
     });
@@ -347,12 +413,52 @@ describe('useSession', () => {
         options: {
           function: 'solve',
           inputs: ['[1, 2, 3]'],
+          expected: '21',
           seed: 1,
         },
       },
       { timeoutMs: 15000 },
     );
     unmount();
+  });
+
+  it('clears previous verdicts when source changes while preserving cases', async () => {
+    const code = 'def solve(nums):\n    return 21';
+    const { result, unmount } = renderHook(() => useSession(code));
+    act(() => result.current.importSession(code, functionResult()));
+    act(() => result.current.addTestCase());
+    act(() => result.current.updateTestCase(result.current.testCases[0].id, { expected: '21' }));
+    requestMock.mockResolvedValueOnce(functionResult(num(21), '21'));
+    await act(async () => {
+      await result.current.runTestCases();
+    });
+    expect(result.current.testCases[0].status).toBe('pass');
+    act(() => result.current.setCode('def solve(nums):\n    return 22'));
+    expect(result.current.testCases[0]).toMatchObject({
+      expected: '21',
+      status: 'idle',
+      actual: null,
+    });
+    unmount();
+  });
+
+  it('requires rerunning legacy saved display-based verdicts', async () => {
+    const code = 'def solve(nums):\n    return 21';
+    const first = renderHook(() => useSession(code));
+    act(() => first.result.current.importSession(code, functionResult()));
+    act(() => first.result.current.addTestCase());
+    first.unmount();
+    for (const [key, raw] of localStorageItems) {
+      if (!key.startsWith('cv-practice-cases')) continue;
+      const cases = JSON.parse(raw);
+      cases[0].status = 'pass';
+      delete cases[0].assertionVersion;
+      localStorageItems.set(key, JSON.stringify(cases));
+    }
+    const second = renderHook(() => useSession(code));
+    act(() => second.result.current.importSession(code, functionResult()));
+    expect(second.result.current.testCases[0].status).toBe('idle');
+    second.unmount();
   });
 
   it('restores practice cases from local storage for the same code and function', async () => {
@@ -429,15 +535,15 @@ describe('useSession', () => {
       });
     });
 
-    requestMock.mockResolvedValueOnce(functionResult(num(21)));
-    requestMock.mockResolvedValueOnce(functionResult(num(21)));
+    requestMock.mockResolvedValueOnce(functionResult(num(21), '21'));
+    requestMock.mockResolvedValueOnce(functionResult(num(21), '99'));
     await act(async () => {
       await result.current.runTestCases();
     });
     expect(result.current.testCases.map((testCase) => testCase.status)).toEqual(['pass', 'fail']);
 
     requestMock.mockClear();
-    requestMock.mockResolvedValueOnce(functionResult(num(99)));
+    requestMock.mockResolvedValueOnce(functionResult(num(99), '99'));
     await act(async () => {
       await result.current.runFailedTestCases();
     });
@@ -450,6 +556,7 @@ describe('useSession', () => {
         options: {
           function: 'solve',
           inputs: ['[9]'],
+          expected: '99',
           seed: 1,
         },
       },
@@ -484,7 +591,7 @@ describe('useSession', () => {
     expect(result.current.testCases[0]).toMatchObject({
       actual: '21',
       expected: '21',
-      status: 'pass',
+      status: 'idle',
     });
     unmount();
   });

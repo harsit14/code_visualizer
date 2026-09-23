@@ -62,9 +62,18 @@ export function buildStepExplanationContext({
   const exception = currentStep.exc ?? result?.run?.exception ?? result?.error ?? null;
   const stdout = result?.run ? stdoutAtStep(result.run.stdout, currentStep) : '';
 
+  const codeLines = code.split(/\r?\n/);
+  const excerptStart = Math.max(0, currentStep.line - 13);
   return {
     language,
-    codeExcerpt: clipText(code, MAX_CODE_CHARS),
+    statePhase:
+      currentStep.phase ??
+      (currentStep.event === 'line' ? (language === 'python' ? 'before' : 'after') : 'event'),
+    codeStartLine: excerptStart + 1,
+    codeExcerpt: clipText(
+      codeLines.slice(excerptStart, currentStep.line + 12).join('\n'),
+      MAX_CODE_CHARS,
+    ),
     currentLine: currentStep.line > 0 ? currentStep.line : null,
     currentLineText: currentLineText.trim(),
     event: currentStep.event,

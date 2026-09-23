@@ -140,15 +140,14 @@ export function planForUser(env: ServerEnv, user: AuthUser | null): AccountPlan 
   if (!user) {
     return 'anonymous';
   }
-  return isAdminEmail(env, user.email) ? 'admin' : 'free';
+  return isAdminUserId(env, user.id) ? 'admin' : 'free';
 }
 
-export function isAdminEmail(env: ServerEnv, email: string): boolean {
-  const normalized = email.trim().toLowerCase();
-  if (!normalized) {
-    return false;
-  }
-  return adminEmailSet(env).has(normalized);
+/** Privileges are provisioned by immutable database ID, never signup email. */
+export function isAdminUserId(env: ServerEnv, id: string): boolean {
+  return (
+    Boolean(id) && new Set((env.ADMIN_USER_IDS ?? '').split(/[\s,;]+/).filter(Boolean)).has(id)
+  );
 }
 
 async function anonymousSubject(env: ServerEnv, request: Request): Promise<string> {
@@ -164,15 +163,6 @@ async function anonymousSubject(env: ServerEnv, request: Request): Promise<strin
 function readLimit(value: string | undefined, fallback: number): number {
   const parsed = Number(value);
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : fallback;
-}
-
-function adminEmailSet(env: ServerEnv): Set<string> {
-  return new Set(
-    (env.ADMIN_EMAILS ?? '')
-      .split(/[\s,;]+/)
-      .map((email) => email.trim().toLowerCase())
-      .filter(Boolean),
-  );
 }
 
 function nextUtcMidnightSeconds(): string {

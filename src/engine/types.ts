@@ -59,7 +59,10 @@ export type FrameSnapshot = {
   elided?: boolean;
 };
 
+export type TracePhase = 'before' | 'after' | 'event';
+
 export type TraceStep = {
+  phase?: TracePhase;
   i: number;
   event: 'call' | 'line' | 'return' | 'exception';
   line: number;
@@ -139,7 +142,15 @@ export type EngineError = {
   line?: number;
 };
 
+export type ReturnAssessment = {
+  status: 'pass' | 'fail' | 'invalid' | 'inconclusive' | 'unscored';
+  message: string | null;
+  actualLiteral: string | null;
+  expected: string | null;
+};
+
 export type RunInfo = {
+  assessment?: ReturnAssessment;
   functionName: string | null;
   inputs: GeneratedInputInfo[];
   seed: number | null;
@@ -185,6 +196,7 @@ export type RunOptions = {
   seed?: number;
   maxSteps?: number;
   maxSeconds?: number;
+  expected?: string;
 };
 
 export type EngineRequest =

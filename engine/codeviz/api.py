@@ -38,6 +38,7 @@ def handle_request(request_json: str) -> str:
                 seed=options.get("seed"),
                 max_steps=options.get("maxSteps", 3000),
                 max_seconds=options.get("maxSeconds", 8.0),
+                expected=options.get("expected"),
             )
         elif op == "complexity":
             payload = measure_complexity(
