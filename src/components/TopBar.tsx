@@ -29,6 +29,7 @@ type PanelControl = {
 };
 
 type TopBarProps = {
+  workspaceLibrary?: ReactNode;
   storageControls?: ReactNode;
   mobile?: boolean;
   exampleId: string | null;
@@ -71,6 +72,7 @@ const SHORTCUTS = [
 ];
 
 export function TopBar({
+  workspaceLibrary,
   storageControls,
   mobile = false,
   exampleId,
@@ -180,6 +182,7 @@ export function TopBar({
               <span className="top-action-label">{shareLabel}</span>
             </button>
             <HistoryMenu onOpen={onOpenHistoryItem} refreshToken={historyRefreshToken} />
+            {workspaceLibrary}
             <details className="panel-menu workspace-menu">
               <summary aria-label="Open workspace menu" title="Layout, trace files, and shortcuts">
                 <Columns3 size={14} />

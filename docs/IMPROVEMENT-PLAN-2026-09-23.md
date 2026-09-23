@@ -86,6 +86,32 @@ runs, inputs, inspection, More/Less transport, draft restore, history save failu
 and retry, and restoring the desktop panel layout. Real email delivery and hosted
 account changes were not exercised. The CI workflow now checks the runner build.
 
+## Fifth batch: local workspace revisions and complete exercise backups
+
+- Added a named IndexedDB library with stable IDs, immutable revisions, rename by
+  saving, copies, and opening older revisions. Atomic writes and optimistic
+  concurrency prevent a stale tab from overwriting a newer save.
+- Explicit saves include source/language, function/inputs/seed, cases, notebook,
+  watches, breakpoints and replay position. Saved workspace edits preserve notes
+  and cases even while the source is invalid. Unsaved state and failures are visible.
+- Added bounded versioned workspace export/restore, fresh IDs for restored files,
+  validation before replacing the editor, and protection for edits during reads.
+  Local replay restore disables account-history upload and does not run saved code.
+- Replacing an open workspace (example, draft, history item, trace import or
+  language change) asks first, then detaches the Library so later saves create a
+  new workspace, and returns practice cases/notes to per-source storage without
+  overwriting existing records.
+- Added [workspace instructions and limits](LOCAL-WORKSPACES.md). These are explicit
+  revision saves and single-exercise backups. Full workspace autosave, all-library
+  archives, searchable/tag-filtered library UI and idempotent cloud sync remain future work.
+
+Validation: full CI passes typecheck, lint, 285 tests in 51 files, app build/smoke
+and runner build/smoke. Browser checks covered reload/reopen of a complete Python
+exercise, valid backup restore, future-version rejection and phone library layout.
+The browser stalled during a later confirmation dialog; older-revision recovery
+is verified by automated tests. Download payload/wiring is tested; the browser's
+actual download event was not observed. No live deployment changed.
+
 ## Evidence and limits (original audit)
 
 | Check                                       | Result                                                                                                                                  |
@@ -293,4 +319,4 @@ A practical first batch is: (1) privilege protection, (2) practice equality repa
 - Test replay with 100, 1,000 and 3,000 steps and several structure sizes. Agree budgets after measuring baseline; a reasonable initial target is p95 step-to-render under 100 ms on a named reference device.
 - Measure first successful run, meaningful stepping after a run, successful failure-case debugging, saved-work recovery and return visits. Use privacy-preserving events; exclude code, inputs, locals, notebook text and full share URLs.
 
-Next remaining milestones: stage the isolated runner and managed accounts, verify the real browser/device matrix, replace experimental JS/TS instrumentation, and implement stable workspaces/backups and the learning features. Phone navigation and save-failure recovery are implemented locally; the full workspace model remains outstanding.
+Next remaining milestones: stage the isolated runner and managed accounts, verify the real browser/device matrix, replace experimental JS/TS instrumentation, and implement the remaining learning features, workspace autosave/search and cloud sync. Phone navigation, save-failure recovery, and explicit local workspace revisions/backups are implemented locally.

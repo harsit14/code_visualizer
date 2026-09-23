@@ -34,6 +34,8 @@ or understanding how state mutates one line at a time.
   only failed cases, and promote trusted actual output into expected output.
 - Keep a local practice notebook with pattern tags, review status, and notes for
   each code/function pair.
+- Save named local workspace revisions with cases, notes, inputs, watches,
+  breakpoints and replay; export and restore a complete exercise backup.
 - Track pointer variables such as `i`, `left`, `right`, `lo`, `hi`, `prev`,
   `curr`, and `nxt`.
 - Inspect recursive execution with a persistent call tree.
@@ -57,6 +59,15 @@ lists, trees, heap references, call stack frames, console output, and complexity
 hints. For interview practice, the test inputs panel also keeps saved cases,
 edge-case generation, failure reruns, and a local notebook close to the trace
 without opening a separate workspace.
+
+## Local workspace library
+
+Use **Library → Save revision** to keep a named exercise on this device. Revisions
+include code, inputs, cases, notebook, watches, breakpoints and replay. Edits and
+renames preserve the workspace identity; older revisions remain available.
+**Export workspace** backs up the current exercise, and **Restore backup** opens
+it as a new local workspace. Saves are explicit; reopen saved work from Library
+after a reload. See [local workspace and recovery details](docs/LOCAL-WORKSPACES.md).
 
 ## Languages
 

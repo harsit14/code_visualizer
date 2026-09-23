@@ -91,6 +91,10 @@ export function useTraceNavigation({
     executionCounts,
     nextBreakpointTarget,
     resetTraceNavigation,
+    restoreBreakpoints: (lines: number[]) => {
+      setBreakpoints(new Set(lines));
+      setCursorLine(null);
+    },
     runToBreakpoint,
     runToCursor,
     runToLine,

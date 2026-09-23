@@ -39,6 +39,7 @@ vi.mock('../engine/jsRuntimeClient', () => ({
 
 import { TimeoutError } from '../engine/runtimeClient';
 import { useSession } from './useSession';
+import { workspaceContent } from './workspaceTestFixtures';
 
 const localStorageItems = new Map<string, string>();
 const localStorageMock = {
@@ -693,5 +694,75 @@ describe('useSession', () => {
       status: 'idle',
     });
     unmount();
+  });
+});
+
+describe('workspace session restore', () => {
+  it('restores replay and all practice state without executing code, then preserves notes through syntax edits', async () => {
+    const content = workspaceContent();
+    content.code = 'def solve(nums):\n    return 21';
+    content.result = functionResult();
+    content.functionName = 'solve';
+    const { result, unmount } = renderHook(() => useSession('print(0)'));
+    act(() => result.current.restoreWorkspace(content));
+    expect(result.current.testCases).toEqual(content.cases);
+    expect(result.current.practiceNotebook).toEqual(content.notebook);
+    expect(result.current.inputDrafts).toEqual(content.inputDrafts);
+    expect(result.current.result).toBe(content.result);
+    expect(result.current.playing).toBe(false);
+    expect(requestMock).not.toHaveBeenCalled();
+    requestMock.mockResolvedValueOnce({ ...scriptResult(0), analysis: null });
+    act(() => result.current.setCode('def solve('));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(701);
+    });
+    expect(result.current.practiceNotebook).toEqual(content.notebook);
+    expect(result.current.testCases[0]).toMatchObject({ expected: '1', status: 'idle' });
+    expect(result.current.result).toBeNull();
+    unmount();
+  });
+
+  it('returns to source-keyed practice storage after leaving a workspace without overwriting it', async () => {
+    const code = 'def solve(nums):\n    return 21';
+    const imported = functionResult();
+    const seeded = renderHook(() => useSession(code));
+    act(() => seeded.result.current.importSession(code, imported, 0));
+    await act(async () => {});
+    act(() => seeded.result.current.addTestCase());
+    act(() => {
+      seeded.result.current.updateTestCase(seeded.result.current.testCases[0].id, {
+        expected: '21',
+      });
+    });
+    await act(async () => {});
+    seeded.unmount();
+
+    const { result, unmount } = renderHook(() => useSession(code));
+    act(() => result.current.importSession(code, imported, 0));
+    await act(async () => {});
+    expect(result.current.testCases[0]).toMatchObject({ expected: '21' });
+    const content = workspaceContent();
+    content.code = code;
+    content.result = imported;
+    content.functionName = 'solve';
+    act(() => result.current.restoreWorkspace(content));
+    await act(async () => {});
+    expect(result.current.testCases).toEqual(content.cases);
+
+    act(() => {
+      result.current.leaveWorkspace();
+      result.current.importSession(code, imported, 0);
+    });
+    await act(async () => {});
+    expect(result.current.workspaceManaged).toBe(false);
+    expect(result.current.testCases).toHaveLength(1);
+    expect(result.current.testCases[0]).toMatchObject({ expected: '21', inputs: ['[1, 2, 3]'] });
+    unmount();
+
+    const reopened = renderHook(() => useSession(code));
+    act(() => reopened.result.current.importSession(code, imported, 0));
+    await act(async () => {});
+    expect(reopened.result.current.testCases[0]).toMatchObject({ expected: '21' });
+    reopened.unmount();
   });
 });

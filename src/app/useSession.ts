@@ -30,6 +30,7 @@ import {
   type PracticeTestCaseUpdate,
 } from './practiceCases';
 import { useSessionPlayback, type PlaybackSpeed } from './useSessionPlayback';
+import type { WorkspaceContent } from './workspaceFormat';
 import type {
   AnalysisInfo,
   ComplexityResult,
@@ -106,6 +107,8 @@ function hasPracticeNotebookContent(notebook: PracticeNotebook): boolean {
 }
 
 export function useSession(initialCode: string, initialOptions: InitialSessionOptions = {}) {
+  const [workspaceManaged, setWorkspaceManaged] = useState(false);
+  const enableWorkspacePersistence = useCallback(() => setWorkspaceManaged(true), []);
   const [code, setCodeState] = useState(initialCode);
   const [language, setLanguageState] = useState<Language>(initialOptions.language ?? 'python');
   const [status, setStatus] = useState<RuntimeStatus>(
@@ -145,10 +148,11 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
   const languageRef = useRef<Language>(initialOptions.language ?? 'python');
   const activeFunctionRef = useRef<FunctionInfo | null>(null);
   const inputLiteralsRef = useRef<string[] | undefined>(undefined);
-  const practiceCasesStorageKeyRef = useRef<string | null>(null);
+  // `undefined` means the source-keyed storage has not been synced for any key yet.
+  const practiceCasesStorageKeyRef = useRef<string | null | undefined>(null);
   const skipPracticeCaseSaveRef = useRef(false);
   const preservePracticeCasesOnNextKeyRef = useRef(false);
-  const practiceNotebookStorageKeyRef = useRef<string | null>(null);
+  const practiceNotebookStorageKeyRef = useRef<string | null | undefined>(null);
   const skipPracticeNotebookSaveRef = useRef(false);
   const preservePracticeNotebookOnNextKeyRef = useRef(false);
 
@@ -355,6 +359,7 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
   }, [activeFunction, code, language]);
 
   useEffect(() => {
+    if (workspaceManaged) return;
     if (practiceCasesStorageKey === practiceCasesStorageKeyRef.current) {
       return;
     }
@@ -376,9 +381,10 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
       return;
     }
     setTestCases(loadStoredPracticeCases(practiceCasesStorageKey, activeFunction.params.length));
-  }, [activeFunction, practiceCasesStorageKey, testCases]);
+  }, [activeFunction, practiceCasesStorageKey, testCases, workspaceManaged]);
 
   useEffect(() => {
+    if (workspaceManaged) return;
     if (!practiceCasesStorageKey) {
       return;
     }
@@ -387,9 +393,10 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
       return;
     }
     saveStoredPracticeCases(practiceCasesStorageKey, testCases);
-  }, [practiceCasesStorageKey, testCases]);
+  }, [practiceCasesStorageKey, testCases, workspaceManaged]);
 
   useEffect(() => {
+    if (workspaceManaged) return;
     if (practiceNotebookStorageKey === practiceNotebookStorageKeyRef.current) {
       return;
     }
@@ -408,9 +415,10 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
       return;
     }
     setPracticeNotebook(loadStoredPracticeNotebook(practiceNotebookStorageKey));
-  }, [practiceNotebook, practiceNotebookStorageKey]);
+  }, [practiceNotebook, practiceNotebookStorageKey, workspaceManaged]);
 
   useEffect(() => {
+    if (workspaceManaged) return;
     if (!practiceNotebookStorageKey) {
       return;
     }
@@ -419,7 +427,7 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
       return;
     }
     saveStoredPracticeNotebook(practiceNotebookStorageKey, practiceNotebook);
-  }, [practiceNotebook, practiceNotebookStorageKey]);
+  }, [practiceNotebook, practiceNotebookStorageKey, workspaceManaged]);
 
   useEffect(() => {
     if (!activeFunction || !pendingInitialInputs) {
@@ -913,7 +921,45 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
     [setPlaying, setStep],
   );
 
+  const restoreWorkspace = useCallback(
+    (content: WorkspaceContent) => {
+      stopExecution();
+      setWorkspaceManaged(true);
+      if (content.result)
+        importSession(content.code, content.result, content.step, content.language);
+      else
+        loadSource(content.code, {
+          language: content.language,
+          functionName: content.functionName,
+          seed: content.seed,
+        });
+      setSelectedFrameIndex(null);
+      setFunctionOverrideState(content.functionName);
+      setInputDrafts(content.inputDrafts);
+      setPendingInitialInputs(null);
+      setSeed(content.seed);
+      setTestCases(content.cases);
+      setPracticeNotebook(content.notebook);
+    },
+    [importSession, loadSource, setSelectedFrameIndex, stopExecution],
+  );
+
+  /** Hand practice state back to source-keyed storage after replacing a workspace. */
+  const leaveWorkspace = useCallback(() => {
+    // Storage keys were not tracked while the workspace owned cases and notes, so
+    // resync on the next key instead of saving workspace state over legacy records.
+    practiceCasesStorageKeyRef.current = undefined;
+    practiceNotebookStorageKeyRef.current = undefined;
+    preservePracticeCasesOnNextKeyRef.current = false;
+    preservePracticeNotebookOnNextKeyRef.current = false;
+    setWorkspaceManaged(false);
+  }, []);
+
   return {
+    workspaceManaged,
+    enableWorkspacePersistence,
+    leaveWorkspace,
+    restoreWorkspace,
     stopExecution,
     retryRuntime,
     language,

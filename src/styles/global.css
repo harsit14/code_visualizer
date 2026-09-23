@@ -4357,3 +4357,22 @@ input[type='password'] {
     max-height: calc(100dvh - 164px);
   }
 }
+
+.workspace-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 10px 0;
+  min-width: 0;
+}
+.workspace-field input,
+.workspace-field select {
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+}
+.workspace-library .workspace-popover {
+  width: min(390px, calc(100vw - 32px));
+  max-height: min(680px, calc(100dvh - 160px));
+  overflow-y: auto;
+}

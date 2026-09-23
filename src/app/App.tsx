@@ -3,6 +3,9 @@
  * between the session hook and the dashboard panels.
  */
 import { MobileWorkspaceTabs } from '../components/MobileWorkspaceTabs';
+import { WorkspaceLibrary } from '../components/WorkspaceLibrary';
+import { useWorkspaceLibrary } from './useWorkspaceLibrary';
+import type { WorkspaceContent } from './workspaceFormat';
 import { panelMobileTab, useMobileWorkspace } from './useMobileWorkspace';
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
@@ -180,6 +183,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
     executionCounts,
     nextBreakpointTarget,
     resetTraceNavigation,
+    restoreBreakpoints,
     runToBreakpoint,
     runToCursor,
     runToLine,
@@ -194,6 +198,76 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
     steps,
   });
 
+  const workspaceContent = useMemo<WorkspaceContent>(
+    () => ({
+      code: session.code,
+      language: session.language,
+      functionName: session.functionOverride ?? session.activeFunction?.qualname ?? null,
+      inputDrafts:
+        session.inputDrafts ??
+        (session.activeFunction && session.inputLiterals
+          ? Object.fromEntries(
+              session.activeFunction.params.map((param, index) => [
+                param.name,
+                session.inputLiterals![index],
+              ]),
+            )
+          : null),
+      seed: session.seed,
+      cases: session.testCases,
+      notebook: session.practiceNotebook,
+      watches: watchedVariables,
+      breakpoints: breakpointLines,
+      result: session.result,
+      step: session.step,
+    }),
+    [
+      session.code,
+      session.language,
+      session.functionOverride,
+      session.activeFunction,
+      session.inputDrafts,
+      session.inputLiterals,
+      session.seed,
+      session.testCases,
+      session.practiceNotebook,
+      watchedVariables,
+      breakpointLines,
+      session.result,
+      session.step,
+    ],
+  );
+  const library = useWorkspaceLibrary(
+    workspaceContent,
+    (content) => {
+      flushDraft();
+      clearHistoryItemId();
+      // Opening local replay is not a request to upload it to account history.
+      setHistorySyncEnabled(false);
+      userEditedRef.current = false;
+      setExampleId(null);
+      setWatchedVariables(content.watches);
+      restoreBreakpoints(content.breakpoints);
+      session.restoreWorkspace(content);
+    },
+    session.enableWorkspacePersistence,
+    !embedMode,
+  );
+  const {
+    active: activeWorkspace,
+    confirmReplace: confirmWorkspaceReplace,
+    detach: detachWorkspace,
+  } = library;
+  const { leaveWorkspace } = session;
+  /** Confirms replacing an open workspace, then detaches it so later saves start a new one. */
+  const replaceWorkspace = useCallback(() => {
+    if (!activeWorkspace) return true;
+    if (!confirmWorkspaceReplace()) return false;
+    detachWorkspace();
+    leaveWorkspace();
+    return true;
+  }, [activeWorkspace, confirmWorkspaceReplace, detachWorkspace, leaveWorkspace]);
+
   const handleImportedTrace = useCallback(
     ({
       code,
@@ -206,6 +280,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
       result: Parameters<typeof importSession>[1];
       step: number;
     }) => {
+      if (!replaceWorkspace()) return;
       clearHistoryItemId();
       flushDraft();
       userEditedRef.current = false;
@@ -214,7 +289,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
       resetTraceNavigation();
       importSession(code, result, step, language);
     },
-    [clearHistoryItemId, flushDraft, importSession, resetTraceNavigation],
+    [clearHistoryItemId, flushDraft, importSession, resetTraceNavigation, replaceWorkspace],
   );
   const {
     importError,
@@ -261,11 +336,20 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
       userEditedRef.current = true;
       queueDraft(code, session.language);
       setExampleId(null);
-      setWatchedVariables([]);
-      resetTraceNavigation();
+      if (!session.workspaceManaged) {
+        setWatchedVariables([]);
+        resetTraceNavigation();
+      }
       setCode(code);
     },
-    [clearHistoryItemId, queueDraft, resetTraceNavigation, session.language, setCode],
+    [
+      clearHistoryItemId,
+      queueDraft,
+      resetTraceNavigation,
+      session.language,
+      session.workspaceManaged,
+      setCode,
+    ],
   );
 
   const handleExampleChange = useCallback(
@@ -273,7 +357,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
       flushDraft();
       if (id === CUSTOM_CODE_ID) {
         const draft = loadStoredCodeDraft();
-        if (!draft) {
+        if (!draft || !replaceWorkspace()) {
           return;
         }
         clearHistoryItemId();
@@ -286,7 +370,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
         return;
       }
       const example = getExample(id);
-      if (!example) {
+      if (!example || !replaceWorkspace()) {
         return;
       }
       clearHistoryItemId();
@@ -297,11 +381,20 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
       setLanguage(example.language);
       setCode(example.code);
     },
-    [clearHistoryItemId, flushDraft, resetTraceNavigation, session, setCode, setLanguage],
+    [
+      clearHistoryItemId,
+      flushDraft,
+      replaceWorkspace,
+      resetTraceNavigation,
+      session,
+      setCode,
+      setLanguage,
+    ],
   );
 
   const handleLanguageChange = useCallback(
     (nextLanguage: Language) => {
+      if (!replaceWorkspace()) return;
       flushDraft();
       if (userEditedRef.current) queueDraft(session.code, nextLanguage);
       clearHistoryItemId();
@@ -310,11 +403,20 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
       resetTraceNavigation();
       setLanguage(nextLanguage);
     },
-    [clearHistoryItemId, flushDraft, queueDraft, resetTraceNavigation, session.code, setLanguage],
+    [
+      clearHistoryItemId,
+      flushDraft,
+      queueDraft,
+      resetTraceNavigation,
+      replaceWorkspace,
+      session.code,
+      setLanguage,
+    ],
   );
 
   const handleOpenHistoryItem = useCallback(
     (item: CodeHistoryItem) => {
+      if (!replaceWorkspace()) return;
       setHistoryItemId(item.id);
       flushDraft();
       userEditedRef.current = false;
@@ -328,7 +430,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
         seed: item.seed,
       });
     },
-    [flushDraft, resetTraceNavigation, session, setHistoryItemId],
+    [flushDraft, replaceWorkspace, resetTraceNavigation, session, setHistoryItemId],
   );
 
   const toggleWatchedVariable = useCallback((name: string) => {
@@ -632,6 +734,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
         ) : (
           <TopBar
             mobile={mobile}
+            workspaceLibrary={<WorkspaceLibrary library={library} disabled={session.isBusy} />}
             storageControls={
               <>
                 <strong className="workspace-menu-heading">Saving and privacy</strong>
@@ -664,7 +767,9 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
             onImport={handleImport}
             onOpenHistoryItem={handleOpenHistoryItem}
             onLanguageChange={handleLanguageChange}
-            onOpenLanding={onOpenLanding}
+            onOpenLanding={() => {
+              if (!activeWorkspace || confirmWorkspaceReplace()) onOpenLanding();
+            }}
             onResetLayout={resetLayout}
             onShare={() => void handleShare()}
             onShowAllPanels={showAllPanels}
