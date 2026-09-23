@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { runnerUrl } from './src/runner/protocol';
 import react from '@vitejs/plugin-react';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const PYODIDE_ASSETS = [
@@ -16,6 +16,9 @@ const PYODIDE_ASSETS = [
 
 const appBase =
   process.env.VITE_BASE ?? (process.env.GITHUB_PAGES === 'true' ? '/code_visualizer/' : '/');
+// GitHub Pages serves files only: no account, history or AI API.
+const staticHost =
+  process.env.VITE_STATIC_HOST ?? (process.env.GITHUB_PAGES === 'true' ? 'true' : 'false');
 
 const crossOriginIsolationHeaders = {
   'Cross-Origin-Opener-Policy': 'same-origin',
@@ -36,11 +39,16 @@ function copyPyodideAssets() {
   });
 }
 
+let buildOutDir = 'dist';
+
 export default defineConfig(({ mode }) => {
   const configured = process.env.VITE_RUNNER_URL ?? loadEnv(mode, process.cwd()).VITE_RUNNER_URL;
   const runnerOrigin = configured ? runnerUrl(configured).origin : null;
   return {
     base: appBase,
+    define: {
+      'import.meta.env.VITE_STATIC_HOST': JSON.stringify(staticHost),
+    },
     optimizeDeps: {
       exclude: ['pyodide'],
       // Force the CodeMirror core into a single pre-bundle so addons (lint,
@@ -52,6 +60,21 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       copyPyodideAssets(),
+      {
+        // Static hosts answer unknown paths with 404.html; serving the app there
+        // makes deep links such as /code_visualizer/app survive a reload.
+        name: 'spa-fallback',
+        configResolved(config) {
+          buildOutDir = resolve(config.root, config.build.outDir);
+        },
+        closeBundle() {
+          if (appBase === '/') return;
+          writeFileSync(
+            join(buildOutDir, '404.html'),
+            readFileSync(join(buildOutDir, 'index.html')),
+          );
+        },
+      },
       {
         name: 'runner-frame-policy',
         closeBundle() {

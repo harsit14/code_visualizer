@@ -20,7 +20,6 @@ import { ExplainerPanel } from '../components/ExplainerPanel';
 import { InputsPanel } from '../components/InputsPanel';
 import { LessonCard } from '../components/LessonCard';
 import { TraceFinder } from '../components/TraceFinder';
-import { LandingPage } from '../components/LandingPage';
 import { LogoMark } from '../components/LogoMark';
 import { TopBar } from '../components/TopBar';
 import { VariablesPanel } from '../components/VariablesPanel';
@@ -42,6 +41,7 @@ import type { CodeHistoryItem } from './historyClient';
 import { decodeShareHash } from './shareState';
 import { useTheme } from './theme';
 import { useCodeHistorySync } from './useCodeHistorySync';
+import { useHostCapabilities } from './hostCapabilities';
 import { useResizableLayout } from './useResizableLayout';
 import { useSession } from './useSession';
 import { useTraceNavigation } from './useTraceNavigation';
@@ -83,36 +83,8 @@ function initialDashboardOnboarding(embedMode: boolean) {
   }
 }
 
-function shouldShowDashboard(): boolean {
-  return (
-    initialEmbedMode() ||
-    window.location.pathname.startsWith('/app') ||
-    window.location.hash.startsWith('#cv=')
-  );
-}
-
 function initialLanguage(exampleId: string | null, sharedLanguage: Language | undefined): Language {
   return sharedLanguage ?? (exampleId ? (getExample(exampleId)?.language ?? 'python') : 'python');
-}
-
-export function App() {
-  const [showDashboard, setShowDashboard] = useState(shouldShowDashboard);
-  const openLanding = useCallback(() => {
-    window.history.pushState(null, '', '/');
-    setShowDashboard(false);
-  }, []);
-
-  useEffect(() => {
-    const syncRoute = () => setShowDashboard(shouldShowDashboard());
-    window.addEventListener('popstate', syncRoute);
-    window.addEventListener('hashchange', syncRoute);
-    return () => {
-      window.removeEventListener('popstate', syncRoute);
-      window.removeEventListener('hashchange', syncRoute);
-    };
-  }, []);
-
-  return showDashboard ? <DashboardApp onOpenLanding={openLanding} /> : <LandingPage />;
 }
 
 type DashboardAppProps = {
@@ -122,8 +94,9 @@ type DashboardAppProps = {
 const NO_BOOKMARKS: TraceBookmark[] = [];
 const NO_ANSWERS: Record<number, LessonAnswer> = {};
 
-function DashboardApp({ onOpenLanding }: DashboardAppProps) {
+export function DashboardApp({ onOpenLanding }: DashboardAppProps) {
   const { mobile, mobileTab, setMobileTab } = useMobileWorkspace();
+  const capabilities = useHostCapabilities();
   const [shared] = useState(initialShare);
   // Restore the local draft on boot unless a share link or embed supplies code.
   const [bootDraft] = useState(() => (shared || initialEmbedMode() ? null : loadStoredCodeDraft()));
@@ -754,6 +727,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
             title="Explainer"
           >
             <ExplainerPanel
+              available={capabilities.ai}
               code={session.code}
               currentStep={session.currentStep}
               frameIndex={session.selectedFrameIndex}
@@ -864,22 +838,33 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
           <TopBar
             mobile={mobile}
             workspaceLibrary={<WorkspaceLibrary library={library} disabled={session.isBusy} />}
+            showAccount={capabilities.accounts}
+            showHistory={capabilities.history}
             storageControls={
               <>
                 <strong className="workspace-menu-heading">Saving and privacy</strong>
-                <label className="panel-menu-item">
-                  <input
-                    type="checkbox"
-                    checked={historySyncEnabled}
-                    onChange={(event) => setHistorySyncEnabled(event.target.checked)}
-                  />
-                  Save runs to account history
-                </label>
-                <p className="account-note">
-                  {historySyncEnabled
-                    ? 'Successful runs send source code and inputs to your signed-in account. Turn off to keep future runs local.'
-                    : 'Local only. Running code does not send it to account history. AI explanations send code only when requested.'}
-                </p>
+                {capabilities.history ? (
+                  <>
+                    <label className="panel-menu-item">
+                      <input
+                        type="checkbox"
+                        checked={historySyncEnabled}
+                        onChange={(event) => setHistorySyncEnabled(event.target.checked)}
+                      />
+                      Save runs to account history
+                    </label>
+                    <p className="account-note">
+                      {historySyncEnabled
+                        ? 'Successful runs send source code and inputs to your signed-in account. Turn off to keep future runs local.'
+                        : 'Local only. Running code does not send it to account history. AI explanations send code only when requested.'}
+                    </p>
+                  </>
+                ) : (
+                  <p className="account-note">
+                    This deployment has no accounts or AI service. Code, cases and workspaces stay
+                    in this browser.
+                  </p>
+                )}
               </>
             }
             canExport={Boolean(session.result?.run)}

@@ -28,7 +28,9 @@ import {
 } from 'lucide-react';
 import { encodeShareState } from '../app/shareState';
 import { useTheme } from '../app/theme';
-import { prewarmPythonRuntime } from '../engine/pythonRuntime';
+import { openDashboard } from '../app/routes';
+import { useHostCapabilities } from '../app/hostCapabilities';
+import { canWarmUpWhileIdle, warmUpDashboard, warmUpOnIntent } from '../app/warmup';
 import { AccountMenu } from './AccountMenu';
 import { useMenuDismiss } from './useMenuDismiss';
 import { LandingInteractiveDemo } from './LandingInteractiveDemo';
@@ -208,20 +210,16 @@ export function LandingPage() {
   const [activePreview, setActivePreview] = useState('Variables');
   const [activeSnippetId, setActiveSnippetId] = useState(snippetPresets[0].id);
   const { theme, toggleTheme } = useTheme();
+  const capabilities = useHostCapabilities();
   const [menuOpen, setMenuOpen] = useState(false);
   useMenuDismiss();
   const activeSnippet =
     snippetPresets.find((snippet) => snippet.id === activeSnippetId) ?? snippetPresets[0];
 
-  const openApp = () => {
-    window.history.pushState(null, '', '/app');
-    window.dispatchEvent(new PopStateEvent('popstate'));
-  };
+  const openApp = () => openDashboard();
 
   const openSnippetInApp = (code: string) => {
-    const hash = encodeShareState({ code, language: 'python' });
-    window.history.pushState(null, '', `/app${hash}`);
-    window.dispatchEvent(new PopStateEvent('popstate'));
+    openDashboard(encodeShareState({ code, language: 'python' }));
   };
 
   useEffect(() => {
@@ -232,14 +230,20 @@ export function LandingPage() {
   }, []);
 
   useEffect(() => {
-    const prewarm = () => prewarmPythonRuntime();
-    const requestIdle = window.requestIdleCallback;
-    if (typeof requestIdle === 'function') {
-      const idleId = requestIdle(prewarm, { timeout: 1600 });
-      return () => window.cancelIdleCallback(idleId);
-    }
-    const timeoutId = globalThis.setTimeout(prewarm, 900);
-    return () => globalThis.clearTimeout(timeoutId);
+    if (!canWarmUpWhileIdle()) return;
+    // Let the landing page's own assets load first, then use idle time.
+    let idleId: number | null = null;
+    const timeoutId = globalThis.setTimeout(() => {
+      if (typeof window.requestIdleCallback === 'function') {
+        idleId = window.requestIdleCallback(warmUpDashboard, { timeout: 4000 });
+      } else {
+        warmUpDashboard();
+      }
+    }, 1500);
+    return () => {
+      globalThis.clearTimeout(timeoutId);
+      if (idleId !== null) window.cancelIdleCallback(idleId);
+    };
   }, []);
 
   useEffect(() => {
@@ -296,6 +300,7 @@ export function LandingPage() {
             Try it
           </a>
           <button
+            {...warmUpOnIntent}
             className="landing-nav-cta"
             onClick={() => {
               setMenuOpen(false);
@@ -313,7 +318,7 @@ export function LandingPage() {
           >
             {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
           </button>
-          <AccountMenu compact />
+          {capabilities.accounts ? <AccountMenu compact /> : null}
         </nav>
       </header>
 
@@ -334,7 +339,12 @@ export function LandingPage() {
               ))}
             </div>
             <div className="landing-actions">
-              <button className="landing-primary" onClick={openApp} type="button">
+              <button
+                {...warmUpOnIntent}
+                className="landing-primary"
+                onClick={openApp}
+                type="button"
+              >
                 Start visualizing
                 <ArrowRight size={16} />
               </button>
@@ -454,6 +464,7 @@ export function LandingPage() {
               </div>
               <div className="landing-run-actions">
                 <button
+                  {...warmUpOnIntent}
                   className="landing-primary"
                   onClick={() => openSnippetInApp(activeSnippet.code)}
                   type="button"

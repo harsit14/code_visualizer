@@ -1,4 +1,5 @@
 import { Activity, ChevronDown, ChevronUp, X } from 'lucide-react';
+import { useMemo } from 'react';
 import { expandSelf, formatValue, variableTimeline } from '../engine/trace';
 import { effectiveFrame } from '../engine/traceNavigation';
 import type {
@@ -98,6 +99,18 @@ export function WatchPanel({
   const frame = effectiveFrame(currentStep, frameIndex);
   const assignmentHints = assignmentHintsForFrame(analysis, frame);
   const functionInfo = functionInfoForFrame(analysis, frame);
+  const frameId = frame?.id;
+  // A timeline covers the whole trace, so it only changes with the frame or watch list.
+  const timelines = useMemo(
+    () =>
+      new Map(
+        watchedVariables.map((name) => [
+          name,
+          frameId ? variableTimeline(steps, frameId, name) : [],
+        ]),
+      ),
+    [frameId, steps, watchedVariables],
+  );
 
   return (
     <section className="panel watch-panel" aria-label="Watch variables">
@@ -123,7 +136,7 @@ export function WatchPanel({
         <div className="panel-scroll watch-list">
           {watchedVariables.map((name) => {
             const value = currentValue(frame, name);
-            const entries = variableTimeline(steps, frame.id, name);
+            const entries = timelines.get(name) ?? [];
             const activeEntries = entries.filter((entry) => entry.step <= step);
             const visibleEntries = activeEntries.slice(-MAX_VISIBLE_EVENTS);
             const hiddenCount = Math.max(0, activeEntries.length - visibleEntries.length);

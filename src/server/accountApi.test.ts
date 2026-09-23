@@ -17,6 +17,22 @@ describe('account API', () => {
     resetRateLimitsForTests();
   });
 
+  it('reports which features the deployment offers', async () => {
+    const read = async (config: Record<string, string>) =>
+      (await handleAccountApi(new Request('https://example.com/api/capabilities'), config))!.json();
+    expect(await read(env)).toMatchObject({ accounts: true, history: true, ai: false });
+    expect(await read({ DEEPSEEK_API_KEY: 'key' })).toMatchObject({
+      accounts: false,
+      history: false,
+      ai: true,
+    });
+    const post = await handleAccountApi(
+      new Request('https://example.com/api/capabilities', { method: 'POST' }),
+      env,
+    );
+    expect(post?.status).toBe(405);
+  });
+
   it('signs up without rebuilding a consumed POST request', async () => {
     const fetchMock = vi.fn<FetchMock>(async (input) => {
       const url = String(input);

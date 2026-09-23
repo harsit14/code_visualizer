@@ -29,6 +29,9 @@ type PanelControl = {
 };
 
 type TopBarProps = {
+  /** Hide actions the host cannot serve (static deployments have no API). */
+  showHistory?: boolean;
+  showAccount?: boolean;
   workspaceLibrary?: ReactNode;
   storageControls?: ReactNode;
   mobile?: boolean;
@@ -74,6 +77,8 @@ const SHORTCUTS = [
 ];
 
 export function TopBar({
+  showHistory = true,
+  showAccount = true,
   workspaceLibrary,
   storageControls,
   mobile = false,
@@ -183,7 +188,9 @@ export function TopBar({
               <Link2 size={14} />
               <span className="top-action-label">{shareLabel}</span>
             </button>
-            <HistoryMenu onOpen={onOpenHistoryItem} refreshToken={historyRefreshToken} />
+            {showHistory ? (
+              <HistoryMenu onOpen={onOpenHistoryItem} refreshToken={historyRefreshToken} />
+            ) : null}
             {workspaceLibrary}
             <details className="panel-menu workspace-menu">
               <summary aria-label="Open workspace menu" title="Layout, trace files, and shortcuts">
@@ -293,7 +300,7 @@ export function TopBar({
               {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
               <span className="top-action-label">{theme === 'dark' ? 'Light' : 'Dark'}</span>
             </button>
-            <AccountMenu compact />
+            {showAccount ? <AccountMenu compact /> : null}
           </div>
         </div>
 

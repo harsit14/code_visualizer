@@ -57,6 +57,10 @@ export async function handleAccountApi(request: Request, env: ServerEnv): Promis
       return historyResponse;
     }
 
+    if (url.pathname === '/api/capabilities') {
+      return request.method === 'GET' ? capabilities(env) : methodNotAllowed(['GET']);
+    }
+
     if (url.pathname === '/api/me') {
       return request.method === 'GET'
         ? await accountStatus(env, request)
@@ -90,6 +94,17 @@ export async function handleAccountApi(request: Request, env: ServerEnv): Promis
   }
 
   return null;
+}
+
+/** Which server features this deployment offers, so the UI can hide the rest. */
+function capabilities(env: ServerEnv): Response {
+  const database = Boolean(getDatabase(env));
+  return jsonResponse({
+    accounts: database,
+    history: database,
+    ai: Boolean(env.DEEPSEEK_API_KEY?.trim()),
+    authMode: managedAuthEnabled(env) ? 'email-code' : 'password',
+  });
 }
 
 async function accountStatus(env: ServerEnv, request: Request): Promise<Response> {

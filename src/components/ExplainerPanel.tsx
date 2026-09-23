@@ -10,6 +10,8 @@ type ExplainerPanelProps = {
   previousStep: TraceStep | undefined;
   frameIndex: number | null;
   result: SessionResult | null;
+  /** False when this deployment has no AI service. */
+  available?: boolean;
 };
 
 function errorMessage(error: unknown): string {
@@ -32,6 +34,7 @@ export function ExplainerPanel({
   language,
   previousStep,
   result,
+  available = true,
 }: ExplainerPanelProps) {
   const [explanation, setExplanation] = useState<DeepSeekStepExplanation | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -118,13 +121,14 @@ export function ExplainerPanel({
         {!canExplain ? <p className="panel-empty">Run code to explain a step.</p> : null}
 
         <p className="explainer-privacy">
-          Plain-English explanations use the hosted AI service. No API key is stored in this
-          browser.
+          {available
+            ? 'Plain-English explanations use the hosted AI service. No API key is stored in this browser.'
+            : 'AI explanations are not available on this deployment. The "What just happened" card and exception notes still explain each step.'}
         </p>
 
         <button
           className="explainer-action"
-          disabled={!canExplain || busy}
+          disabled={!available || !canExplain || busy}
           onClick={() => void handleExplain()}
           title="Explain the selected trace step in plain English"
           type="button"

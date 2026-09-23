@@ -243,6 +243,35 @@ transitions; component tests cover stack, heap, graph and DP rendering and switc
 views. Browser checks used the BFS lesson (graph coloring, queue) and the DP lesson
 (formula and read cells at every recurrence step).
 
+## Eleventh batch: performance and deployment (finding 11)
+
+- The landing page no longer bundles the dashboard: a small root router keeps the
+  landing page in the entry chunk and lazy-loads the dashboard (panels, editor and
+  runtimes). Landing JavaScript fell from about 297 KB to 78 KB gzip; the smoke
+  check now fails above a 120 KB budget or if the editor chunk is preloaded.
+- Python and the dashboard warm up on intent (hover, focus or touch on a call to
+  action) or, only on a fast connection without data saver, during idle time after
+  the landing page has loaded. Browsers without the Network Information API wait
+  for intent.
+- The call tree is indexed once per trace; each step derives its view from the
+  index instead of replaying the trace prefix, and long sibling lists keep the 24
+  most recent calls with a "+N earlier calls" line (the active path always shows).
+  Watch timelines are computed once per frame and watch list instead of per step.
+- Routes respect Vite's base path, so GitHub Pages navigation, reloads and share
+  links work under `/code_visualizer/`; Pages builds ship `404.html` as the SPA
+  fallback.
+- `/api/capabilities` reports accounts, history and AI availability; Pages builds
+  are marked static. The UI hides the account and history menus and explains that
+  AI is unavailable instead of failing after a click.
+- Replay budgets run in CI for 100, 1,000 and 3,000-step traces (per-step
+  derivation and panel re-render p95), as regression guards alongside the browser
+  measurements planned for the E2E suite.
+
+Validation: full CI passes typecheck, lint, 520 tests in 66 files, app build/smoke (landing
+78 KB gzip) and runner build/smoke; a `GITHUB_PAGES=true` build passes the smoke
+check with its 404 fallback. In the browser, the landing page loaded only its three
+entry chunks and the dashboard opened from "Start visualizing".
+
 ## Evidence and limits (original audit)
 
 | Check                                       | Result                                                                                                                                  |

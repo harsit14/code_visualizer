@@ -3,21 +3,10 @@
  * from the trace up to the selected step.
  */
 import { CornerDownLeft, Layers } from 'lucide-react';
+import { useMemo } from 'react';
+import { callTreeAt, indexCallTree, type CallTreeView } from '../engine/callTree';
 import { formatValue } from '../engine/trace';
-import type { EncodedValue, FrameSnapshot, TraceStep } from '../engine/types';
-
-type CallTreeNode = {
-  id: string;
-  frameId: string;
-  func: string;
-  line: number;
-  children: CallTreeNode[];
-  firstStep: number;
-  lastStep: number;
-  returnStep: number | null;
-  returnValue: EncodedValue | null;
-  exceptionStep: number | null;
-};
+import type { FrameSnapshot, TraceStep } from '../engine/types';
 
 type CallStackPanelProps = {
   currentStep: TraceStep | undefined;
@@ -31,82 +20,8 @@ function frameLabel(frame: Pick<FrameSnapshot, 'func'>): string {
   return frame.func === '<module>' ? 'module' : `${frame.func}()`;
 }
 
-function buildCallTree(
-  steps: readonly TraceStep[],
-  currentIndex: number,
-): { roots: CallTreeNode[]; activeFrameIds: ReadonlySet<string> } {
-  const roots: CallTreeNode[] = [];
-  const nodes = new Map<string, CallTreeNode>();
-  const activeInstances = new Map<string, string>();
-  let nextId = 1;
-
-  for (let index = 0; index <= currentIndex && index < steps.length; index += 1) {
-    const step = steps[index];
-    const stackInstanceIds: string[] = [];
-    const stackFrameIds = new Set<string>();
-
-    for (const frame of step.stack) {
-      stackFrameIds.add(frame.id);
-      let instanceId = activeInstances.get(frame.id);
-      const parentId = stackInstanceIds[stackInstanceIds.length - 1] ?? null;
-
-      if (!instanceId) {
-        instanceId = `call-${nextId++}`;
-        activeInstances.set(frame.id, instanceId);
-        const node: CallTreeNode = {
-          id: instanceId,
-          frameId: frame.id,
-          func: frame.func,
-          line: frame.line,
-          children: [],
-          firstStep: index,
-          lastStep: index,
-          returnStep: null,
-          returnValue: null,
-          exceptionStep: null,
-        };
-        nodes.set(instanceId, node);
-        const parent = parentId ? nodes.get(parentId) : null;
-        if (parent) {
-          parent.children.push(node);
-        } else {
-          roots.push(node);
-        }
-      }
-
-      const node = nodes.get(instanceId);
-      if (node) {
-        node.line = frame.line;
-        node.lastStep = index;
-      }
-      stackInstanceIds.push(instanceId);
-    }
-
-    const topInstanceId = stackInstanceIds[stackInstanceIds.length - 1];
-    const topNode = topInstanceId ? nodes.get(topInstanceId) : null;
-    if (topNode && step.event === 'return') {
-      topNode.returnStep = index;
-      topNode.returnValue = step.ret ?? null;
-    }
-    if (topNode && (step.event === 'exception' || step.exc)) {
-      topNode.exceptionStep = index;
-    }
-
-    for (const frameId of activeInstances.keys()) {
-      if (!stackFrameIds.has(frameId)) {
-        activeInstances.delete(frameId);
-      }
-    }
-  }
-
-  return {
-    roots,
-    activeFrameIds: new Set(steps[currentIndex]?.stack.map((frame) => frame.id) ?? []),
-  };
-}
-
 function nodeStatus(
-  node: CallTreeNode,
+  node: CallTreeView,
   currentStep: TraceStep | undefined,
   isActive: boolean,
 ): string {
@@ -131,13 +46,21 @@ function nodeStatus(
   return 'active';
 }
 
+function earlierCalls(count: number) {
+  return count > 0 ? (
+    <li className="call-tree-more">
+      +{count} earlier call{count === 1 ? '' : 's'}
+    </li>
+  ) : null;
+}
+
 function renderTreeNodes({
   nodes,
   activeFrameIds,
   currentStep,
   onSelectFrame,
 }: {
-  nodes: readonly CallTreeNode[];
+  nodes: readonly CallTreeView[];
   activeFrameIds: ReadonlySet<string>;
   currentStep: TraceStep | undefined;
   onSelectFrame: (index: number | null) => void;
@@ -177,6 +100,7 @@ function renderTreeNodes({
         </button>
         {node.children.length > 0 ? (
           <ol>
+            {earlierCalls(node.hiddenEarlier)}
             {renderTreeNodes({ nodes: node.children, activeFrameIds, currentStep, onSelectFrame })}
           </ol>
         ) : null}
@@ -193,7 +117,13 @@ export function CallStackPanel({
   onSelectFrame,
 }: CallStackPanelProps) {
   const stack = currentStep?.stack ?? [];
-  const callTree = buildCallTree(steps, step);
+  // Indexed once per trace; each step only derives the visible part.
+  const index = useMemo(() => indexCallTree(steps), [steps]);
+  const callTree = useMemo(() => callTreeAt(index, steps, step), [index, steps, step]);
+  const activeFrameIds = useMemo(
+    () => new Set(currentStep?.stack.map((frame) => frame.id) ?? []),
+    [currentStep],
+  );
   const effectiveIndex =
     selectedFrameIndex !== null && selectedFrameIndex < stack.length
       ? selectedFrameIndex
@@ -250,9 +180,10 @@ export function CallStackPanel({
             <div className="call-tree-section">
               <h3>Call tree</h3>
               <ol className="call-tree-list">
+                {earlierCalls(callTree.hiddenEarlier)}
                 {renderTreeNodes({
                   nodes: callTree.roots,
-                  activeFrameIds: callTree.activeFrameIds,
+                  activeFrameIds,
                   currentStep,
                   onSelectFrame,
                 })}

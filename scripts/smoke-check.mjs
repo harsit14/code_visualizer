@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { extname, join, relative } from 'node:path';
+import { gzipSync } from 'node:zlib';
 
 const root = process.cwd();
 const distDir = join(root, 'dist');
@@ -115,10 +116,44 @@ if (existsSync(join(distDir, 'assets/pyodide/node_modules'))) {
   );
 }
 
+if (process.env.GITHUB_PAGES === 'true') {
+  const fallback = join(distDir, '404.html');
+  if (!existsSync(fallback) || readFileSync(fallback, 'utf8') !== indexHtml) {
+    failures.push('GitHub Pages build needs dist/404.html equal to index.html for deep links');
+  }
+}
+
+// The landing page must stay light: the dashboard (editor, panels, runtimes) loads
+// only when opened. Budget covers the entry script and everything it preloads.
+const LANDING_BUDGET_GZIP_BYTES = 120 * 1024;
+const entryAssets = [
+  ...indexHtml.matchAll(/<script[^>]+type="module"[^>]+src="([^"]+)"/g),
+  ...indexHtml.matchAll(/<link[^>]+rel="modulepreload"[^>]+href="([^"]+)"/g),
+].map((match) => match[1].replace(/^.*\/assets\//, 'assets/'));
+let landingBytes = 0;
+for (const asset of entryAssets) {
+  const path = join(distDir, asset);
+  if (!existsSync(path)) {
+    failures.push(`index.html references missing ${asset}`);
+    continue;
+  }
+  landingBytes += gzipSync(readFileSync(path)).length;
+  if (/\/codemirror-/.test(`/${asset}`)) {
+    failures.push(`landing page preloads the editor bundle (${asset}); keep the dashboard lazy`);
+  }
+}
+if (landingBytes > LANDING_BUDGET_GZIP_BYTES) {
+  failures.push(
+    `landing JavaScript is ${Math.round(landingBytes / 1024)} KB gzip; budget is ${LANDING_BUDGET_GZIP_BYTES / 1024} KB`,
+  );
+}
+
 if (failures.length > 0) {
   console.error('Production smoke check failed:');
   failures.forEach((failure) => console.error(`- ${failure}`));
   process.exit(1);
 }
 
-console.log('Production smoke check passed.');
+console.log(
+  `Production smoke check passed. Landing JavaScript: ${Math.round(landingBytes / 1024)} KB gzip.`,
+);
