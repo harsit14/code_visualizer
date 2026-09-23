@@ -74,6 +74,19 @@ export function methodNotAllowed(methods: string[]): Response {
   });
 }
 
+/** Reject browser requests from other origins before account lookup, including GET. */
+export function rejectUntrustedBrowserRequest(request: Request): Response | null {
+  const origin = request.headers.get('Origin');
+  const site = request.headers.get('Sec-Fetch-Site');
+  if (
+    (origin && origin !== new URL(request.url).origin) ||
+    (site && site !== 'same-origin' && site !== 'none')
+  ) {
+    return jsonResponse({ error: 'Cross-origin requests are not allowed.' }, 403);
+  }
+  return null;
+}
+
 export function rejectCrossOriginStateChange(request: Request): Response | null {
   if (request.method === 'GET' || request.method === 'HEAD' || request.method === 'OPTIONS') {
     return null;

@@ -244,3 +244,83 @@ After deployment:
 6. Click `Share`; reload the copied link and confirm the code is restored.
 7. Click `Export`; confirm a JSON trace downloads, then `Import` it back.
 8. Run `while True: pass`; confirm the run truncates with a step-limit note.
+
+## Separate-origin runner (opt-in)
+
+The app keeps its existing worker behavior unless `VITE_RUNNER_URL` is set at
+build time. To stage isolation, use a dedicated credential-free origin, preferably
+on a different registrable domain. Do not share account bindings, secrets, API
+routes, cookies or other applications with this deployment. Only source and
+execution options cross the bridge; no account credentials are included.
+
+Configure these public values explicitly (example domains are placeholders):
+
+| Deployment            | Setting                  | Example                                     |
+| --------------------- | ------------------------ | ------------------------------------------- |
+| Runner build          | `VITE_RUNNER_APP_ORIGIN` | `https://visualizer.example`                |
+| Runner Worker runtime | `RUNNER_APP_ORIGIN`      | `https://visualizer.example`                |
+| App build             | `VITE_RUNNER_URL`        | `https://execution.example.net/runner.html` |
+| App Worker runtime    | `RUNNER_URL`             | `https://execution.example.net/runner.html` |
+
+The two runner allowlists must agree. Origins include the scheme and optional
+port, with no path. Runner URLs must end in `/runner.html`, with no query,
+fragment or credentials. HTTPS is required except on loopback hosts. The app
+rejects a runner on its own origin.
+
+Build the runner separately:
+
+```bash
+VITE_RUNNER_APP_ORIGIN=https://visualizer.example npm run build:runner
+```
+
+Use `wrangler.runner.jsonc` for the dedicated Cloudflare Worker, with the runtime
+variable above. Its assets are `dist-runner`, with no SPA fallback, and
+`run_worker_first: true` is required for every asset response. The handler applies
+CSP to both the document and worker scripts, denies `/api/*`, strips credentials
+at static lookup and refuses asset redirects. Do not bypass this handler by
+publishing the runner folder on a generic static server without equivalent headers.
+Do not attach account or AI secrets to this Worker.
+
+Build the app with its runner URL:
+
+```bash
+VITE_RUNNER_URL=https://execution.example.net/runner.html npm run build
+```
+
+This adds the exact runner origin to `frame-src` in generated `dist/_headers`.
+Set the app Worker’s `RUNNER_URL` as well for its fallback response policy. Keep
+COEP on the runner and app; the runner’s document allows cross-origin embedding,
+while execution assets remain same-origin. The iframe allows scripts and its own
+origin, but no popups, navigation, forms or downloads. This mode intentionally
+uses termination instead of SharedArrayBuffer interruption.
+
+A broken configured runner produces a visible failure, with a 15-second connection
+deadline; it never silently runs code back on the app origin. Stop closes the
+transport and the next run creates a new session. Missing configuration still
+selects the original compatibility mode, so verify build values before rollout.
+
+### Local two-origin preview
+
+Build both outputs, then start each preview in a separate terminal:
+
+```bash
+VITE_RUNNER_APP_ORIGIN=http://127.0.0.1:4173 npm run build:runner
+VITE_RUNNER_URL=http://127.0.0.1:4174/runner.html npm run build
+# Terminal 1
+VITE_RUNNER_APP_ORIGIN=http://127.0.0.1:4173 npm run preview:runner
+# Terminal 2
+npm run preview -- --host 127.0.0.1 --port 4173 --strictPort
+```
+
+Open `http://127.0.0.1:4173/app`. Runner preview serves the same CSP rules, but
+this does not exercise deployed app APIs, production cookies or Cloudflare routing.
+`npm run ci` includes `check:runner`, which replaces `dist-runner` with a build
+allowlisting `https://app.example.invalid`. That artifact is only for checks;
+rebuild with the real app origin before any preview or deployment.
+
+Before production enablement, complete the hostile-code and browser matrix in
+[RUNTIME-AND-AUTH-MIGRATION.md](RUNTIME-AND-AUTH-MIGRATION.md). Current validation
+covers local Chromium workflows and unit tests, not the deployed isolation boundary.
+Schema-valid output can still be dishonest, and termination does not provide a
+hard browser memory quota. The runner permits access to its own static assets for
+Pyodide; it is not a no-network interpreter.

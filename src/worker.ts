@@ -1,3 +1,5 @@
+import { rejectUntrustedBrowserRequest } from './server/http';
+import { runnerUrl } from './runner/protocol';
 import { onRequest, onRequestOptions, onRequestPost } from '../functions/api/explain-step';
 import { handleAccountApi } from './server/accountApi';
 import type { ServerEnv } from './server/types';
@@ -21,6 +23,10 @@ export default {
   async fetch(request: Request, env: ServerEnv): Promise<Response> {
     const url = new URL(request.url);
 
+    if (url.pathname.startsWith('/api/')) {
+      const rejected = rejectUntrustedBrowserRequest(request);
+      if (rejected) return rejected;
+    }
     if (url.pathname === '/api/explain-step') {
       if (request.method === 'POST') {
         return onRequestPost({ env, request });
@@ -45,14 +51,25 @@ export default {
     if (!env.ASSETS) {
       return new Response('Static assets are not configured.', { status: 503 });
     }
-    return withStaticSecurityHeaders(await env.ASSETS.fetch(request));
+    return withStaticSecurityHeaders(await env.ASSETS.fetch(request), env.RUNNER_URL);
   },
 };
 
-function withStaticSecurityHeaders(response: Response): Response {
+function withStaticSecurityHeaders(response: Response, configuredRunner?: string): Response {
   const secured = new Response(response.body, response);
   Object.entries(STATIC_SECURITY_HEADERS).forEach(([header, value]) => {
     secured.headers.set(header, value);
   });
+  if (configuredRunner) {
+    try {
+      secured.headers.set(
+        'Content-Security-Policy',
+        STATIC_SECURITY_HEADERS['Content-Security-Policy'] +
+          `; frame-src ${runnerUrl(configuredRunner).origin}`,
+      );
+    } catch {
+      return new Response('Invalid runner configuration.', { status: 503 });
+    }
+  }
   return secured;
 }

@@ -22,7 +22,7 @@ import {
 import {
   readLimitedJson,
   isRequestBodyTooLargeError,
-  rejectCrossOriginStateChange,
+  rejectUntrustedBrowserRequest,
 } from '../../src/server/http';
 
 const MAX_REQUEST_BYTES = 24_000;
@@ -42,7 +42,7 @@ export async function onRequestPost(context: PagesContext): Promise<Response> {
 }
 
 async function handlePost({ env, request }: PagesContext): Promise<Response> {
-  const crossOrigin = rejectCrossOriginStateChange(request);
+  const crossOrigin = rejectUntrustedBrowserRequest(request);
   if (crossOrigin) return crossOrigin;
   const apiKey = env.DEEPSEEK_API_KEY?.trim();
   if (!apiKey) {

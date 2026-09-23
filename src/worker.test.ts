@@ -2,6 +2,28 @@ import { describe, expect, it, vi } from 'vitest';
 import worker from './worker';
 
 describe('worker', () => {
+  it('blocks cross-origin account reads and writes before touching bindings', async () => {
+    const assetsFetch = vi.fn();
+    for (const path of ['/api/me', '/api/history', '/api/explain-step']) {
+      const response = await worker.fetch(
+        new Request(`https://app.example${path}`, {
+          headers: { Origin: 'https://runner.example', Cookie: 'cv_session=secret' },
+        }),
+        { ASSETS: { fetch: assetsFetch } },
+      );
+      expect(response.status).toBe(403);
+    }
+    expect(
+      (
+        await worker.fetch(
+          new Request('https://app.example/api/me', { headers: { 'Sec-Fetch-Site': 'same-site' } }),
+          {},
+        )
+      ).status,
+    ).toBe(403);
+    expect(assetsFetch).not.toHaveBeenCalled();
+  });
+
   it('handles the explainer API before static assets', async () => {
     const assetsFetch = vi.fn(async () => new Response('asset'));
     const response = await worker.fetch(new Request('https://example.com/api/explain-step'), {

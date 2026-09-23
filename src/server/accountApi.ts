@@ -20,7 +20,7 @@ import {
   methodNotAllowed,
   nowIso,
   readLimitedJson,
-  rejectCrossOriginStateChange,
+  rejectUntrustedBrowserRequest,
   requestBodyTooLargeResponse,
 } from './http';
 import { handleHistoryApi } from './historyApi';
@@ -38,7 +38,7 @@ export async function handleAccountApi(request: Request, env: ServerEnv): Promis
   const url = new URL(request.url);
 
   try {
-    const crossOriginResponse = rejectCrossOriginStateChange(request);
+    const crossOriginResponse = rejectUntrustedBrowserRequest(request);
     if (crossOriginResponse) {
       return crossOriginResponse;
     }

@@ -36,7 +36,26 @@ origin/message boundary, delivered-header tests, managed identity linking withou
 email-only account takeover, durable throttling, staged rollout and rollback.
 No live configuration, schema, account or deployment was changed.
 
-## Evidence and limits
+## Third batch: opt-in runtime origin separation
+
+Implemented a dedicated runner build and Cloudflare handler, an exact-origin
+iframe/MessageChannel bridge, bounded shared request/result validation, fail-closed
+connection errors, termination-based cancellation, and browser-origin checks for
+API reads and writes. No account bindings or API routes exist on the runner.
+Deployment variables and local two-origin instructions are in
+[deployment.md](deployment.md#separate-origin-runner-opt-in).
+
+Local browser checks exercised Python startup/Two Sum, JavaScript tracing, Stop
+and recovery, a blocked Python-to-app network probe and malformed worker output.
+The feature remains opt-in. Deployed adversarial tests and the Safari/Firefox
+matrix are still required; managed authentication and durable throttling remain
+unimplemented. No live deployment was changed.
+
+Batch validation: `npm run ci` passes typecheck, lint, 236 tests in 42 files, the
+app production build/smoke and the separate runner build/smoke. Bootstrap tests
+cover parent/origin checks, replayed sequences, overlapping requests and disposal.
+
+## Evidence and limits (original audit)
 
 | Check                                       | Result                                                                                                                                  |
 | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
@@ -243,4 +262,4 @@ A practical first batch is: (1) privilege protection, (2) practice equality repa
 - Test replay with 100, 1,000 and 3,000 steps and several structure sizes. Agree budgets after measuring baseline; a reasonable initial target is p95 step-to-render under 100 ms on a named reference device.
 - Measure first successful run, meaningful stepping after a run, successful failure-case debugging, saved-work recovery and return visits. Use privacy-preserving events; exclude code, inputs, locals, notebook text and full share URLs.
 
-The next engineering milestone is the runtime isolation and authentication design, followed by the remaining reliability and learning work.
+Next remaining milestones: validate the opt-in runner in staging, implement managed authentication with safe identity linking and durable throttling, then complete responsive workflows, workspace recovery and the learning features. The runtime/auth design is now documented and the runner implementation is available for staging.

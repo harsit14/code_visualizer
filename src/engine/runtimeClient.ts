@@ -1,3 +1,8 @@
+import {
+  configuredRunnerUrl,
+  createExecutionTransport,
+  type ExecutionTransport,
+} from '../runner/iframeTransport';
 /** Python worker lifecycle with bounded startup, execution and explicit recovery. */
 import type { EngineRequest, RuntimeStatus, WorkerInbound, WorkerOutbound } from './types';
 
@@ -43,7 +48,7 @@ export class RuntimeStartupError extends Error {
 }
 
 export class RuntimeClient {
-  private worker: Worker | null = null;
+  private worker: ExecutionTransport | null = null;
   private ready = false;
   private startupTimer?: number;
   private interruptBuffer: Uint8Array | null = null;
@@ -62,7 +67,7 @@ export class RuntimeClient {
 
   request(request: EngineRequest, options: { timeoutMs?: number } = {}): Promise<unknown> {
     if (this.pending) return Promise.reject(new Error('The Python runtime is already busy.'));
-    let worker: Worker;
+    let worker: ExecutionTransport;
     try {
       worker = this.ensureWorker();
     } catch (error) {
@@ -124,9 +129,9 @@ export class RuntimeClient {
     this.currentStatus = status;
     this.onStatus?.(status);
   }
-  private ensureWorker(): Worker {
+  private ensureWorker(): ExecutionTransport {
     if (this.worker) return this.worker;
-    const worker = new Worker(new URL('./pyodideWorker.ts', import.meta.url), { type: 'module' });
+    const worker = createExecutionTransport('python');
     this.worker = worker;
     this.ready = false;
     this.setStatus({
@@ -151,7 +156,7 @@ export class RuntimeClient {
     this.startupTimer = window.setTimeout(() => {
       if (this.worker === worker && !this.ready) this.failRuntime(new RuntimeStartupError());
     }, this.startupTimeoutMs);
-    if (canUseSharedInterruptBuffer()) {
+    if (!configuredRunnerUrl() && canUseSharedInterruptBuffer()) {
       this.interruptBuffer = new Uint8Array(new SharedArrayBuffer(1));
       worker.postMessage({
         type: 'setInterruptBuffer',

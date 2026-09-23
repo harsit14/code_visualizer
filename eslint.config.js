@@ -5,7 +5,7 @@ import reactRefresh from 'eslint-plugin-react-refresh';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['dist', 'coverage', 'Code visualizer logo/**'] },
+  { ignores: ['dist', 'dist-runner', 'coverage', 'Code visualizer logo/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

@@ -1,3 +1,4 @@
+import { createExecutionTransport } from '../runner/iframeTransport';
 import { ExecutionCancelledError, TimeoutError } from './runtimeClient';
 import type { Language, SessionResult } from './types';
 
@@ -11,7 +12,7 @@ export function runJavaScriptInWorker(
 ): Promise<SessionResult> {
   if (signal?.aborted) return Promise.reject(new ExecutionCancelledError());
   return new Promise<SessionResult>((resolve, reject) => {
-    const worker = new Worker(new URL('./jsTraceWorker.ts', import.meta.url), { type: 'module' });
+    const worker = createExecutionTransport(language);
     let settled = false;
     const finish = (error?: Error, data?: SessionResult) => {
       if (settled) return;

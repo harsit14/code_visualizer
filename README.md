@@ -144,6 +144,14 @@ npm run ci
 
 Full deployment and operations notes live in [docs/deployment.md](docs/deployment.md).
 
+An opt-in runner build moves Python and JS/TS execution to a separate origin.
+Set `VITE_RUNNER_URL` for the app and configure the runner’s exact app-origin
+allowlist as described in the deployment guide. A configured runner fails visibly
+if unavailable; it never falls back to app-origin execution. Without this setting,
+the existing same-origin worker mode remains active. Production isolation still
+requires the staging acceptance matrix in
+[the runtime migration notes](docs/RUNTIME-AND-AUTH-MIGRATION.md).
+
 ## Ownership, Use, and Attribution
 
 Code Visualizer was created, designed, and developed by **Harsit Upadhya**.

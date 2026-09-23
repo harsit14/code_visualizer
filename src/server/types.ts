@@ -4,6 +4,7 @@ export type AssetBinding = {
 
 export type ServerEnv = {
   ASSETS?: AssetBinding;
+  RUNNER_URL?: string;
   DEEPSEEK_API_KEY?: string;
   DEEPSEEK_MODEL?: string;
   DISABLE_USAGE_GATE?: string;
