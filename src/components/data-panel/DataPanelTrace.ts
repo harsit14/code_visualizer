@@ -8,6 +8,8 @@ export type TraceOverlay = {
   newPaths: Set<string>;
   pointerLabels: Map<string, string[]>;
   changedObjectIds: Set<number>;
+  /** Cells the statement read, such as `dp[i - 1]` in a recurrence. */
+  readPaths?: Set<string>;
 };
 
 export const EMPTY_TRACE_OVERLAY: TraceOverlay = {
@@ -279,6 +281,7 @@ export function traceClasses(path: string, overlay: TraceOverlay): string {
     overlay.changedPaths.has(path) ? 'is-changed' : '',
     overlay.newPaths.has(path) ? 'is-new' : '',
     overlay.pointerLabels.has(path) ? 'has-trace-pointer' : '',
+    overlay.readPaths?.has(path) ? 'is-read' : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -291,4 +294,3 @@ export function traceTitle(path: string, overlay: TraceOverlay): string {
   }
   return `${path} (${labels.join(', ')})`;
 }
-

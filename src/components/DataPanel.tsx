@@ -22,7 +22,19 @@ import {
   type ArrayPointer,
   type ArrayPointerHints,
 } from '../engine/trace';
+import {
+  adjacencyGraph,
+  dpTransition,
+  graphDecorations,
+  inferView,
+  queueDelta,
+  stackDelta,
+  viewOptions,
+  VIEW_LABELS,
+  type AlgorithmView,
+} from '../engine/algorithmViews';
 import { effectiveFrame } from '../engine/traceNavigation';
+import { GraphView, HeapView, QueueView, StackView } from './data-panel/AlgorithmViews';
 import { HeapGraphView } from './data-panel/DataPanelHeap';
 import { buildHeapGraph } from './data-panel/DataPanelHeapGraph';
 import {
@@ -485,9 +497,31 @@ type DataPanelProps = {
   frameIndex: number | null;
   returnValue: EncodedValue | null;
   atLastStep: boolean;
+  /** Source text of the statement that produced this step (for DP transitions). */
+  sourceLine?: string | null;
 };
 
-type Card = { names: string[]; value: EncodedValue; render: JSX.Element; wide?: boolean };
+type Card = {
+  names: string[];
+  value: EncodedValue;
+  render: JSX.Element;
+  wide?: boolean;
+  view?: AlgorithmView;
+  views?: AlgorithmView[];
+};
+
+type ViewContext = {
+  overrides: Readonly<Record<string, AlgorithmView>>;
+  previousLocals: Record<string, EncodedValue> | undefined;
+  sourceLine: string | null;
+};
+
+function withReads(overlay: TraceOverlay, name: string, reads: number[][]): TraceOverlay {
+  const readPaths = new Set(
+    reads.map((path) => path.reduce((base, index) => pathForIndex(base, index), name)),
+  );
+  return { ...overlay, readPaths };
+}
 
 function pointerHintsForFrame(
   analysis: AnalysisInfo | null,
@@ -528,6 +562,7 @@ function buildCards(
   pointerHints: ArrayPointerHints | null | undefined,
   structures: { trees: TreeValue[]; chains: ChainValue[] },
   overlay: TraceOverlay,
+  context: ViewContext,
 ): Card[] {
   const arrayPointers = findArrayPointers(locals, pointerHints);
 
@@ -567,19 +602,76 @@ function buildCards(
     // Structurally wide cards (grids, trees, chains, long sequences) span the
     // full row; compact ones pack side-by-side to fill the column.
     let wide = false;
+    const views = viewOptions(value);
+    const inferred = inferView(name, value);
+    const view =
+      context.overrides[name] && views.includes(context.overrides[name])
+        ? context.overrides[name]
+        : (inferred ?? undefined);
 
-    if (value.k === 'seq') {
+    if (value.k === 'seq' && view === 'queue') {
+      identity = `seq-${value.id}`;
+      wide = value.items.length > 6;
+      render = (
+        <QueueView
+          basePath={name}
+          delta={queueDelta(context.previousLocals?.[name], value)}
+          overlay={overlay}
+          value={value}
+        />
+      );
+    } else if (value.k === 'seq' && view === 'stack') {
+      identity = `seq-${value.id}`;
+      render = (
+        <StackView
+          basePath={name}
+          delta={stackDelta(context.previousLocals?.[name], value)}
+          overlay={overlay}
+          value={value}
+        />
+      );
+    } else if (value.k === 'seq' && view === 'heap') {
+      identity = `seq-${value.id}`;
+      wide = true;
+      render = <HeapView basePath={name} overlay={overlay} value={value} />;
+    } else if (value.k === 'seq') {
       identity = `seq-${value.id}`;
       const isGrid = value.items.length > 0 && value.items.every((item) => item.k === 'seq');
       wide = isGrid || value.items.length > 8;
-      render = isGrid ? (
-        <GridBoxes basePath={name} overlay={overlay} value={value} />
+      const transition =
+        view === 'dp'
+          ? dpTransition(name, context.sourceLine, context.previousLocals, locals)
+          : null;
+      const cellOverlay = transition ? withReads(overlay, name, transition.reads) : overlay;
+      const boxes = isGrid ? (
+        <GridBoxes basePath={name} overlay={cellOverlay} value={value} />
       ) : (
         <ArrayBoxes
           basePath={name}
-          overlay={overlay}
+          overlay={cellOverlay}
           pointers={arrayPointers.get(name) ?? []}
           value={value}
+        />
+      );
+      render = transition?.formula ? (
+        <>
+          <p className="algo-formula" title="Cells read by this step are outlined">
+            {transition.formula}
+          </p>
+          {boxes}
+        </>
+      ) : (
+        boxes
+      );
+    } else if (value.k === 'dict' && view === 'graph') {
+      const graph = adjacencyGraph(value)!;
+      identity = `dict-${value.id}`;
+      wide = true;
+      render = (
+        <GraphView
+          basePath={name}
+          decorations={graphDecorations(name, graph, locals)}
+          graph={graph}
         />
       );
     } else if (value.k === 'dict') {
@@ -645,7 +737,7 @@ function buildCards(
       existing.names.push(name); // alias of an already-rendered object
       continue;
     }
-    const card: Card = { names: [name], value, render, wide };
+    const card: Card = { names: [name], value, render, wide, view, views };
     byId.set(identity, card);
     cards.push(card);
   }
@@ -659,8 +751,10 @@ export function DataPanel({
   frameIndex,
   returnValue,
   atLastStep,
+  sourceLine = null,
 }: DataPanelProps) {
   const [selectedHeapId, setSelectedHeapId] = useState<number | null>(null);
+  const [viewOverrides, setViewOverrides] = useState<Record<string, AlgorithmView>>({});
   const frame = effectiveFrame(currentStep, frameIndex);
   const previousFrame = previousStep?.stack.find((candidate) => candidate.id === frame?.id);
   const functionInfo = findFunctionInfo(analysis, frame);
@@ -675,7 +769,13 @@ export function DataPanel({
   const traceOverlay = frame
     ? buildTraceOverlay(locals, previousLocals, pointerHints)
     : EMPTY_TRACE_OVERLAY;
-  const cards = frame ? buildCards(locals, pointerHints, structures, traceOverlay) : [];
+  const cards = frame
+    ? buildCards(locals, pointerHints, structures, traceOverlay, {
+        overrides: viewOverrides,
+        previousLocals,
+        sourceLine,
+      })
+    : [];
   const sharedRefs = frame ? findSharedReferences(locals) : [];
   const heapGraph = frame ? buildHeapGraph(locals) : null;
 
@@ -710,10 +810,32 @@ export function DataPanel({
               className={`data-card${card.wide ? ' data-card-wide' : ''}`}
               key={card.names[0]}
             >
-              <h3>
-                {card.names.join(' = ')}
-                {card.names.length > 1 ? <span className="alias-badge">alias</span> : null}
-              </h3>
+              <div className="data-card-header">
+                <h3>
+                  {card.names.join(' = ')}
+                  {card.names.length > 1 ? <span className="alias-badge">alias</span> : null}
+                </h3>
+                {card.views && card.views.length > 1 && card.view ? (
+                  <select
+                    aria-label={`View ${card.names[0]} as`}
+                    className="algo-view-select"
+                    onChange={(event) =>
+                      setViewOverrides((current) => ({
+                        ...current,
+                        [card.names[0]]: event.target.value as AlgorithmView,
+                      }))
+                    }
+                    title="Choose how to draw this value"
+                    value={card.view}
+                  >
+                    {card.views.map((option) => (
+                      <option key={option} value={option}>
+                        {VIEW_LABELS[option]}
+                      </option>
+                    ))}
+                  </select>
+                ) : null}
+              </div>
               {card.render}
             </article>
           ))}

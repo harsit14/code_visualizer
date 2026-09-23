@@ -662,6 +662,9 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
               frameIndex={session.selectedFrameIndex}
               previousStep={previousStep}
               returnValue={run?.returnValue ?? null}
+              sourceLine={
+                stepChange?.line ? (session.code.split('\n')[stepChange.line - 1] ?? null) : null
+              }
             />
           </ErrorBoundary>,
         ),

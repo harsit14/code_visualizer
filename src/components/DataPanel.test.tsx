@@ -183,6 +183,7 @@ describe('DataPanel', () => {
     );
 
     expect(html).toContain('<h3>q</h3>');
+    expect(html).toContain('aria-label="q as a queue, front first"');
     expect(html).toContain('>5</span>');
     expect(html).toContain('>6</span>');
   });

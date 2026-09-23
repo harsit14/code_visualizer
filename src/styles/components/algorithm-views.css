@@ -1,0 +1,184 @@
+/* Algorithm views in the Data panel: queue, stack, heap, graph and DP tables. */
+
+.data-card-header {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  margin: 0 0 8px;
+}
+
+.data-card-header h3 {
+  margin: 0;
+}
+
+.algo-view-select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-dim);
+  font-size: 11px;
+  padding: 2px 4px;
+}
+
+.algo-queue,
+.algo-stack {
+  align-items: center;
+  display: flex;
+  gap: 5px;
+}
+
+.algo-queue {
+  flex-wrap: wrap;
+}
+
+.algo-stack {
+  align-items: stretch;
+  flex-direction: column;
+  max-width: 200px;
+}
+
+.algo-item {
+  background: var(--bg-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  display: inline-flex;
+  flex-direction: column;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  min-width: 34px;
+  padding: 5px 7px;
+  text-align: center;
+}
+
+.algo-item small {
+  color: var(--text-faint);
+  font-size: 9.5px;
+}
+
+.algo-item.is-added,
+.algo-item.is-new {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.algo-item.is-changed {
+  background: var(--green-soft);
+  border-color: var(--green);
+}
+
+.algo-item.is-removed {
+  border-style: dashed;
+  color: var(--text-faint);
+  opacity: 0.75;
+  text-decoration: line-through;
+}
+
+.algo-end {
+  color: var(--text-faint);
+  font-size: 10.5px;
+  text-transform: uppercase;
+}
+
+.algo-empty,
+.algo-note {
+  color: var(--text-faint);
+  font-size: 11.5px;
+  margin: 4px 0 0;
+}
+
+.algo-heap,
+.algo-graph {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.algo-heap svg,
+.algo-graph svg {
+  display: block;
+  max-width: none;
+}
+
+.algo-edge {
+  stroke: var(--border-strong);
+  stroke-width: 1.5;
+}
+
+.algo-arrow {
+  fill: var(--border-strong);
+}
+
+.algo-node circle {
+  fill: var(--bg-raised);
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+
+.algo-node text {
+  fill: var(--text);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  text-anchor: middle;
+}
+
+.algo-node .algo-index,
+.algo-weight {
+  fill: var(--text-faint);
+  font-family: var(--mono);
+  font-size: 10px;
+  text-anchor: middle;
+}
+
+.algo-node.is-visited circle {
+  fill: var(--green-soft);
+  stroke: var(--green);
+}
+
+.algo-node.is-frontier circle {
+  fill: var(--amber-soft);
+  stroke: var(--amber);
+  stroke-width: 2;
+}
+
+.algo-node.is-current circle {
+  fill: var(--accent);
+  stroke: var(--accent);
+  stroke-width: 2.5;
+}
+
+.algo-node.is-current text:not(.algo-index) {
+  fill: #fff;
+  font-weight: 600;
+}
+
+.algo-node.is-changed circle,
+.algo-node.is-new circle {
+  fill: var(--green-soft);
+  stroke: var(--green);
+  stroke-width: 2.5;
+}
+
+.algo-formula {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  margin: 0 0 8px;
+  overflow-wrap: anywhere;
+  padding: 4px 8px;
+}
+
+/* Cells a DP recurrence read in this step. */
+.array-cell.is-read,
+.grid-render td.is-read {
+  outline: 2px dashed var(--accent);
+  outline-offset: -2px;
+}
+
+@media (max-width: 720px) {
+  .algo-view-select {
+    min-height: 44px;
+  }
+}

@@ -219,6 +219,30 @@ natively, plus line-mapping, rejection and syntax-error tests. Browser checks ra
 TypeScript program with an enum, an interface and parameter properties (correct
 output, highlighting, structure views) and showed an inline JavaScript syntax error.
 
+## Tenth batch: algorithm-focused views (Stage D)
+
+- Deques and `queue`/`q`-named lists draw as queues with front/back ends, newly
+  enqueued items and the items dequeued since the previous step; `stack`-named
+  lists draw top-first with popped items; `heap`/`pq` lists draw as binary heaps
+  (index i has children 2i+1 and 2i+2).
+- Dicts whose values are neighbour lists, sets or weight maps draw as graphs with a
+  layout that stays fixed as the search moves. Other variables color the nodes:
+  sets and dicts of nodes mark visited (dict values become labels such as
+  `dist=2`), the queue/stack marks the frontier and `node`/`cur`/`u`-style variables
+  mark the current node. Undirected graphs are detected; weights are shown.
+- `dp`/`memo`/`ways`-named lists and grids are DP tables: the statement that just
+  ran is parsed, its index expressions are evaluated with the values from before it
+  ran, the cells it read are outlined, and a formula shows the substitution.
+- Inference is conservative and every card with more than one fitting view has a
+  **View as** selector, following the plan's manual-adapter guidance. The generic
+  reference map is unchanged.
+
+Validation: unit tests cover graph recognition (including leaf nodes, weights and
+non-graph dicts), decorations, view inference, queue/stack deltas and 1D/2D DP
+transitions; component tests cover stack, heap, graph and DP rendering and switching
+views. Browser checks used the BFS lesson (graph coloring, queue) and the DP lesson
+(formula and read cells at every recurrence step).
+
 ## Evidence and limits (original audit)
 
 | Check                                       | Result                                                                                                                                  |
@@ -426,4 +450,4 @@ A practical first batch is: (1) privilege protection, (2) practice equality repa
 - Test replay with 100, 1,000 and 3,000 steps and several structure sizes. Agree budgets after measuring baseline; a reasonable initial target is p95 step-to-render under 100 ms on a named reference device.
 - Measure first successful run, meaningful stepping after a run, successful failure-case debugging, saved-work recovery and return visits. Use privacy-preserving events; exclude code, inputs, locals, notebook text and full share URLs.
 
-Next remaining milestones: stage the isolated runner and managed accounts, verify the real browser/device matrix, and implement the Stage D features (run comparison, algorithm views, teaching mode), workspace autosave/search and cloud sync. Phone navigation, save-failure recovery, explicit local workspace revisions/backups, parser-based JavaScript/TypeScript tracing, step explanations, trace search/bookmarks, failing-case explanations and guided lessons are implemented locally.
+Next remaining milestones: stage the isolated runner and managed accounts, verify the real browser/device matrix, and implement the remaining Stage D features (run comparison, teaching mode), workspace autosave/search and cloud sync. Phone navigation, save-failure recovery, explicit local workspace revisions/backups, parser-based JavaScript/TypeScript tracing, step explanations, trace search/bookmarks, failing-case explanations, guided lessons and algorithm views are implemented locally.

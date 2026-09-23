@@ -36,6 +36,11 @@ or understanding how state mutates one line at a time.
   next value, then reveal it with the invariant behind it.
 - Visualize arrays, strings, dictionaries, binary trees, linked lists, object
   references, aliases, and heap state.
+- See algorithm views: queues (front/back, dequeued items), stacks (top first,
+  popped items), binary heaps as trees, adjacency lists as graphs colored by
+  visited/frontier/current node, and DP tables that outline the cells a recurrence
+  read (`ways[5] = ways[4] + ways[3] → 5 + 3 = 8`). Each card has a **View as**
+  choice when a guess is wrong.
 - Generate editable Python function inputs for LeetCode-style snippets.
 - Save compact practice cases, add generated edge cases, run all cases, rerun
   only failed cases, and promote trusted actual output into expected output.
