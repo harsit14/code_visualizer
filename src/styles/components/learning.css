@@ -1,0 +1,342 @@
+/* Step explanations, trace search/bookmarks and practice mismatch hints. */
+
+.step-change {
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  font-size: 12px;
+  gap: 4px;
+  margin: 0 0 10px;
+  padding: 8px 10px;
+}
+
+.step-change-exception {
+  background: var(--red-soft);
+  border-color: color-mix(in srgb, var(--red) 35%, var(--border));
+}
+
+.step-change p {
+  margin: 0;
+}
+
+.step-change-source {
+  align-items: baseline;
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+
+.step-change-source code {
+  color: var(--text);
+  font-family: var(--mono);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.step-change-line {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 8px;
+}
+
+.step-change-line:hover,
+.step-change-line:focus-visible {
+  border-color: var(--accent);
+}
+
+.step-change-summary {
+  color: var(--text-dim);
+}
+
+.step-change-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 0;
+}
+
+.step-change-list li {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  font-family: var(--mono);
+  gap: 6px;
+}
+
+.step-change-path {
+  align-items: center;
+  background: none;
+  border: 0;
+  color: var(--text);
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-weight: 600;
+  gap: 3px;
+  padding: 0;
+}
+
+.step-change-path:disabled {
+  cursor: default;
+}
+
+.step-change-path:not(:disabled):hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.step-change-before {
+  color: var(--text-faint);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--text-faint) 60%, transparent);
+}
+
+.step-change-after {
+  color: var(--green);
+  font-weight: 600;
+}
+
+.step-change-absent {
+  color: var(--text-faint);
+  font-style: italic;
+}
+
+.step-change-arrow {
+  color: var(--text-faint);
+}
+
+.step-change-more,
+.step-change-output {
+  color: var(--text-faint);
+}
+
+.step-change-output code {
+  color: var(--text);
+  font-family: var(--mono);
+}
+
+/* Trace finder (opens upward from the transport). */
+.trace-finder {
+  position: relative;
+}
+
+.trace-finder > summary {
+  align-items: center;
+  display: inline-flex;
+  gap: 4px;
+}
+
+.trace-finder-count {
+  background: var(--accent);
+  border-radius: 999px;
+  color: var(--bg);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 2px 5px;
+}
+
+.trace-finder .trace-finder-popover {
+  bottom: calc(100% + 8px);
+  gap: 8px;
+  left: 0;
+  max-height: min(520px, calc(100dvh - 180px));
+  overflow-y: auto;
+  right: auto;
+  top: auto;
+  width: min(380px, calc(100vw - 32px));
+  z-index: 40;
+}
+
+.trace-finder-field {
+  display: flex;
+  flex-direction: column;
+  font-size: 12px;
+  font-weight: 600;
+  gap: 4px;
+}
+
+.trace-finder-field input,
+.trace-finder-bookmark input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font: inherit;
+  font-family: var(--mono);
+  font-weight: 400;
+  min-height: 32px;
+  padding: 4px 8px;
+}
+
+.trace-finder-help,
+.trace-finder-status {
+  color: var(--text-faint);
+  font-size: 11.5px;
+  margin: 0;
+}
+
+.trace-finder-results ul,
+.trace-finder-bookmarks ul {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+}
+
+.trace-finder-hit {
+  align-items: baseline;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  font-size: 12px;
+  gap: 8px;
+  min-width: 0;
+  padding: 4px 6px;
+  text-align: left;
+  width: 100%;
+}
+
+.trace-finder-hit:hover,
+.trace-finder-hit:focus-visible,
+.trace-finder-hit[aria-current='step'] {
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.trace-finder-step {
+  flex-shrink: 0;
+  font-weight: 600;
+}
+
+.trace-finder-line {
+  color: var(--text-faint);
+  flex-shrink: 0;
+  font-family: var(--mono);
+}
+
+.trace-finder-detail {
+  font-family: var(--mono);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trace-finder-bookmarks {
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 8px;
+}
+
+.trace-finder-bookmark-toggle {
+  align-items: center;
+  align-self: flex-start;
+  display: inline-flex;
+  gap: 6px;
+}
+
+.trace-finder-bookmark {
+  align-items: center;
+  display: grid;
+  gap: 6px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.trace-finder-bookmark .trace-finder-hit {
+  width: auto;
+}
+
+/* Bookmark ticks above the scrubber track. */
+.scrubber {
+  position: relative;
+}
+
+.scrubber-bookmarks {
+  height: 0;
+  left: 0;
+  position: absolute;
+  right: 0;
+  top: 0;
+}
+
+.scrubber-bookmark {
+  background: var(--amber);
+  border: 0;
+  border-radius: 2px;
+  cursor: pointer;
+  height: 8px;
+  padding: 0;
+  position: absolute;
+  top: -5px;
+  transform: translateX(-50%);
+  width: 4px;
+}
+
+.scrubber-bookmark.is-current,
+.scrubber-bookmark:hover,
+.scrubber-bookmark:focus-visible {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--amber) 45%, transparent);
+}
+
+/* Practice case mismatch hints. */
+.test-case-hints {
+  color: var(--text-dim);
+  display: flex;
+  flex-direction: column;
+  font-size: 12px;
+  gap: 2px;
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+}
+
+.test-case-hints li::before {
+  color: var(--red);
+  content: '≠ ';
+  font-family: var(--mono);
+}
+
+@media (max-width: 720px) {
+  .trace-finder .trace-finder-popover {
+    left: auto;
+    position: fixed;
+    right: 16px;
+    bottom: 132px;
+  }
+
+  .trace-finder-hit,
+  .trace-finder-field input,
+  .trace-finder-bookmark input,
+  .step-change-line {
+    min-height: 44px;
+  }
+
+  /* Keep ticks small; the controls bar gives other buttons 44px touch targets. */
+  .mobile-workspace .controls-bar .scrubber-bookmark {
+    height: 12px;
+    min-height: 0;
+    min-width: 0;
+    top: -8px;
+    width: 8px;
+  }
+}

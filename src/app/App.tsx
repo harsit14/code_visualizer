@@ -18,12 +18,15 @@ import { EditorPanel } from '../components/EditorPanel';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { ExplainerPanel } from '../components/ExplainerPanel';
 import { InputsPanel } from '../components/InputsPanel';
+import { TraceFinder } from '../components/TraceFinder';
 import { LandingPage } from '../components/LandingPage';
 import { LogoMark } from '../components/LogoMark';
 import { TopBar } from '../components/TopBar';
 import { VariablesPanel } from '../components/VariablesPanel';
 import { WatchPanel } from '../components/WatchPanel';
-import type { Language } from '../engine/types';
+import { describeStepChange } from '../engine/stepChange';
+import { normalizeBookmarks, type TraceBookmark } from '../engine/traceSearch';
+import type { Language, SessionResult } from '../engine/types';
 import { CUSTOM_CODE_ID, DEFAULT_EXAMPLE_ID, getExample } from '../examples/examples';
 import { loadStoredCodeDraft } from './codeDraft';
 import { useDraftPersistence } from './useDraftPersistence';
@@ -108,6 +111,8 @@ export function App() {
 type DashboardAppProps = {
   onOpenLanding: () => void;
 };
+
+const NO_BOOKMARKS: TraceBookmark[] = [];
 
 function DashboardApp({ onOpenLanding }: DashboardAppProps) {
   const { mobile, mobileTab, setMobileTab } = useMobileWorkspace();
@@ -198,6 +203,53 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
     steps,
   });
 
+  // Bookmarks belong to one recorded trace; a new run or edit starts empty.
+  const [bookmarkState, setBookmarkState] = useState<{
+    owner: SessionResult | null;
+    items: TraceBookmark[];
+  }>({ owner: null, items: NO_BOOKMARKS });
+  const bookmarks =
+    bookmarkState.owner === session.result && session.result ? bookmarkState.items : NO_BOOKMARKS;
+  const toggleBookmark = useCallback(
+    (target: number) => {
+      if (!session.result) return;
+      setBookmarkState((state) => {
+        const items = state.owner === session.result ? state.items : NO_BOOKMARKS;
+        return {
+          owner: session.result,
+          items: items.some((bookmark) => bookmark.step === target)
+            ? items.filter((bookmark) => bookmark.step !== target)
+            : normalizeBookmarks([...items, { step: target, note: '' }], session.totalSteps),
+        };
+      });
+    },
+    [session.result, session.totalSteps],
+  );
+  const setBookmarkNote = useCallback(
+    (target: number, note: string) => {
+      setBookmarkState((state) =>
+        state.owner === session.result
+          ? {
+              ...state,
+              items: state.items.map((bookmark) =>
+                bookmark.step === target ? { ...bookmark, note: note.slice(0, 500) } : bookmark,
+              ),
+            }
+          : state,
+      );
+    },
+    [session.result],
+  );
+  const [finderRequest, setFinderRequest] = useState(0);
+  const [editorFocus, setEditorFocus] = useState<{ line: number; token: number } | null>(null);
+  const focusEditorLine = useCallback(
+    (line: number) => {
+      setEditorFocus((current) => ({ line, token: (current?.token ?? 0) + 1 }));
+      if (mobile) setMobileTab('Code');
+    },
+    [mobile, setMobileTab],
+  );
+
   const workspaceContent = useMemo<WorkspaceContent>(
     () => ({
       code: session.code,
@@ -220,8 +272,10 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
       breakpoints: breakpointLines,
       result: session.result,
       step: session.step,
+      bookmarks,
     }),
     [
+      bookmarks,
       session.code,
       session.language,
       session.functionOverride,
@@ -248,6 +302,7 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
       setExampleId(null);
       setWatchedVariables(content.watches);
       restoreBreakpoints(content.breakpoints);
+      setBookmarkState({ owner: content.result, items: content.bookmarks });
       session.restoreWorkspace(content);
     },
     session.enableWorkspacePersistence,
@@ -322,6 +377,8 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
     stepForward: session.stepForward,
     togglePlay: session.togglePlay,
     totalSteps: session.totalSteps,
+    toggleBookmark: () => toggleBookmark(session.step),
+    openSearch: () => setFinderRequest((request) => request + 1),
   });
 
   // Analyze the initial snippet so the inputs panel is ready pre-run.
@@ -453,6 +510,10 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
   }, []);
 
   const run = session.result?.run ?? null;
+  const stepChange = useMemo(
+    () => describeStepChange(session.steps, session.step, run?.stdout ?? ''),
+    [session.steps, session.step, run],
+  );
   const errorLine = useMemo(() => {
     if (session.currentStep?.exc) {
       return session.currentStep.line;
@@ -492,6 +553,8 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
               onCursorLineChange={setCursorLine}
               onRunToLine={embedMode ? undefined : runToLine}
               onToggleBreakpoint={embedMode ? undefined : toggleBreakpoint}
+              focusRequest={editorFocus}
+              ranLine={stepChange?.line ?? null}
               readOnly={embedMode}
               theme={theme}
             />
@@ -567,8 +630,11 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
             title="Variables"
           >
             <VariablesPanel
+              change={stepChange}
+              code={session.code}
               currentStep={session.currentStep}
               frameIndex={session.selectedFrameIndex}
+              onFocusLine={focusEditorLine}
               onToggleWatch={toggleWatchedVariable}
               previousStep={previousStep}
               watchedVariables={watchedVariables}
@@ -946,6 +1012,19 @@ function DashboardApp({ onOpenLanding }: DashboardAppProps) {
           status={session.status}
           step={session.step}
           totalSteps={session.totalSteps}
+          bookmarkSteps={bookmarks.map((bookmark) => bookmark.step)}
+          traceTools={
+            <TraceFinder
+              bookmarks={bookmarks}
+              onBookmarkNote={setBookmarkNote}
+              onJump={session.jumpToStep}
+              onToggleBookmark={toggleBookmark}
+              openRequest={finderRequest}
+              step={session.step}
+              steps={session.steps}
+              stdout={run?.stdout ?? ''}
+            />
+          }
         />
       </section>
     </div>

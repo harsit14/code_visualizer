@@ -4,9 +4,11 @@
  * new, what disappeared this step.
  */
 import { Pin, Plus } from 'lucide-react';
+import type { StepChange } from '../engine/stepChange';
 import { diffLocals, expandSelf, formatValue, typeNameOf } from '../engine/trace';
 import { effectiveFrame } from '../engine/traceNavigation';
 import type { EncodedValue, TraceStep } from '../engine/types';
+import { StepChangeCard } from './StepChangeCard';
 
 type VariablesPanelProps = {
   currentStep: TraceStep | undefined;
@@ -14,6 +16,10 @@ type VariablesPanelProps = {
   frameIndex: number | null;
   onToggleWatch: (name: string) => void;
   watchedVariables: readonly string[];
+  /** Explanation of the statement that produced this step. */
+  change?: StepChange | null;
+  code?: string;
+  onFocusLine?: (line: number) => void;
 };
 
 type RowProps = {
@@ -59,6 +65,9 @@ export function VariablesPanel({
   frameIndex,
   onToggleWatch,
   watchedVariables,
+  change = null,
+  code = '',
+  onFocusLine,
 }: VariablesPanelProps) {
   const frame = effectiveFrame(currentStep, frameIndex);
   const previousFrame = previousStep?.stack.find((candidate) => candidate.id === frame?.id);
@@ -94,6 +103,15 @@ export function VariablesPanel({
         <p className="panel-empty">Run code to inspect variables.</p>
       ) : (
         <div className="panel-scroll">
+          <StepChangeCard
+            change={change}
+            code={code}
+            onFocusLine={onFocusLine}
+            onWatch={(name) => {
+              if (!watchedVariables.includes(name)) onToggleWatch(name);
+            }}
+            watchedVariables={watchedVariables}
+          />
           {frame.elided ? (
             <p className="panel-note">Frame too deep — locals were elided to save memory.</p>
           ) : null}

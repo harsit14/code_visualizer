@@ -67,6 +67,8 @@ const SHORTCUTS = [
   { keys: ['Space'], label: 'Play or pause' },
   { keys: ['Home'], label: 'Jump to start' },
   { keys: ['End'], label: 'Jump to end' },
+  { keys: ['B'], label: 'Bookmark this step' },
+  { keys: ['/'], label: 'Search the trace' },
   { keys: ['Click gutter'], label: 'Toggle breakpoint' },
   { keys: ['Right click line'], label: 'Run to line' },
 ];

@@ -144,6 +144,15 @@ describe('InputsPanel', () => {
     expect(renderInputsPanel([caseOne, caseTwo])).toContain('Run failed');
   });
 
+  it('explains how a failing case differs from its expectation', () => {
+    const html = renderInputsPanel([{ ...caseTwo, actualLiteral: '[1, 0]' }]);
+    expect(html).toContain('How the result differs');
+    expect(html).toContain('Same items in a different order');
+    expect(renderInputsPanel([{ ...caseOne, actualLiteral: '[0, 1]' }])).not.toContain(
+      'How the result differs',
+    );
+  });
+
   it('offers to use actual output as expected when they differ', () => {
     expect(renderInputsPanel([caseOne])).not.toContain('Use actual');
     expect(renderInputsPanel([exploratoryCase])).toContain('Use actual');

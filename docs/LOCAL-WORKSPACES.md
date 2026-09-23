@@ -7,7 +7,9 @@ entry while preserving earlier revisions. **Save as copy** creates another ID.
 
 A revision contains code, language, selected function, input drafts, random seed,
 practice cases and their current verdicts, notebook notes/patterns/review status,
-watched variable names, breakpoint lines, the current trace and playback position.
+watched variable names, breakpoint lines, trace bookmarks with their notes, the
+current trace and playback position. Backups written before bookmarks existed
+restore with no bookmarks.
 Replay opens paused without executing the saved program. Once a workspace is
 saved or restored, source edits keep its cases and notebook even while the source
 has a syntax error; editing resets case verdicts. Existing source-keyed practice

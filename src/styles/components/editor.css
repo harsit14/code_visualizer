@@ -94,6 +94,26 @@
   box-shadow: inset 4px 0 0 var(--red);
 }
 
+/* The statement that produced the current state (Python Tutor's "just executed"). */
+.cv-ran-line {
+  box-shadow: inset 4px 0 0 color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.cv-focus-line {
+  animation: focus-line-flash 1.4s ease-out;
+}
+
+@keyframes focus-line-flash {
+  0%,
+  35% {
+    background: color-mix(in srgb, var(--accent) 30%, transparent);
+  }
+
+  100% {
+    background: transparent;
+  }
+}
+
 @keyframes exec-line-land {
   0% {
     background: color-mix(in srgb, var(--accent) 48%, transparent);
@@ -111,6 +131,11 @@
 @media (prefers-reduced-motion: reduce) {
   .cv-exec-line {
     animation: none;
+  }
+
+  .cv-focus-line {
+    animation: none;
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
   }
 }
 

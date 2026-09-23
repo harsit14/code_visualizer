@@ -17,14 +17,19 @@ import CodeMirror from '@uiw/react-codemirror';
 import { useEffect, useMemo, useRef } from 'react';
 import type { Diagnostic, Language } from '../engine/types';
 
-type LineMarks = { active: number | null; error: number | null };
+type LineMarks = { active: number | null; error: number | null; ran: number | null };
 
 const setLineMarks = StateEffect.define<LineMarks>();
+const setFocusLine = StateEffect.define<number | null>();
 const setBreakpointLines = StateEffect.define<ReadonlySet<number>>();
 const setExecutionCounts = StateEffect.define<ReadonlyMap<number, number>>();
 
 const activeLineDecoration = Decoration.line({ class: 'cv-exec-line' });
 const errorLineDecoration = Decoration.line({ class: 'cv-error-line' });
+const ranLineDecoration = Decoration.line({
+  class: 'cv-ran-line',
+  attributes: { title: 'This line just ran' },
+});
 
 const lineMarksField = StateField.define<DecorationSet>({
   create: () => Decoration.none,
@@ -34,15 +39,39 @@ const lineMarksField = StateField.define<DecorationSet>({
       if (effect.is(setLineMarks)) {
         const marks = [];
         const docLines = transaction.state.doc.lines;
-        const { active, error } = effect.value;
+        const { active, error, ran } = effect.value;
         if (error !== null && error >= 1 && error <= docLines) {
           marks.push(errorLineDecoration.range(transaction.state.doc.line(error).from));
+        }
+        if (ran !== null && ran >= 1 && ran <= docLines && ran !== active && ran !== error) {
+          marks.push(ranLineDecoration.range(transaction.state.doc.line(ran).from));
         }
         if (active !== null && active >= 1 && active <= docLines && active !== error) {
           marks.push(activeLineDecoration.range(transaction.state.doc.line(active).from));
         }
         marks.sort((a, b) => a.from - b.from);
         next = Decoration.set(marks);
+      }
+    }
+    return next;
+  },
+  provide: (field) => EditorView.decorations.from(field),
+});
+
+const focusLineDecoration = Decoration.line({ class: 'cv-focus-line' });
+
+/** A short highlight for a line the user asked to see. */
+const focusLineField = StateField.define<DecorationSet>({
+  create: () => Decoration.none,
+  update(decorations, transaction) {
+    let next = decorations.map(transaction.changes);
+    for (const effect of transaction.effects) {
+      if (effect.is(setFocusLine)) {
+        const line = effect.value;
+        next =
+          line !== null && line >= 1 && line <= transaction.state.doc.lines
+            ? Decoration.set([focusLineDecoration.range(transaction.state.doc.line(line).from)])
+            : Decoration.none;
       }
     }
     return next;
@@ -192,7 +221,13 @@ function lineNumberGutter(onRunToLine?: (line: number) => void): Extension {
   });
 }
 
-const baseExtensions = [python(), lineMarksField, lintGutter(), EditorView.lineWrapping];
+const baseExtensions = [
+  python(),
+  lineMarksField,
+  focusLineField,
+  lintGutter(),
+  EditorView.lineWrapping,
+];
 
 function scrollLineWithinEditor(view: EditorView, lineNumber: number) {
   const scroller = view.scrollDOM;
@@ -247,6 +282,10 @@ type EditorPanelProps = {
   readOnly?: boolean;
   language: Language;
   theme: 'light' | 'dark';
+  /** Line whose execution produced the current state. */
+  ranLine?: number | null;
+  /** Scrolls to and briefly highlights a line; a new token repeats the request. */
+  focusRequest?: { line: number; token: number } | null;
 };
 
 export function EditorPanel({
@@ -263,11 +302,15 @@ export function EditorPanel({
   readOnly = false,
   language,
   theme,
+  ranLine = null,
+  focusRequest = null,
 }: EditorPanelProps) {
   const viewRef = useRef<EditorView | null>(null);
   const extensions = useMemo(
     () => [
-      ...(language === 'python' ? baseExtensions : [lineMarksField, EditorView.lineWrapping]),
+      ...(language === 'python'
+        ? baseExtensions
+        : [lineMarksField, focusLineField, EditorView.lineWrapping]),
       lineNumberGutter(onRunToLine),
       breakpointGutter(onToggleBreakpoint),
       executionCountGutter(),
@@ -279,12 +322,25 @@ export function EditorPanel({
   useEffect(() => {
     const view = viewRef.current;
     if (view) {
-      view.dispatch({ effects: setLineMarks.of({ active: activeLine, error: errorLine }) });
+      view.dispatch({
+        effects: setLineMarks.of({ active: activeLine, error: errorLine, ran: ranLine }),
+      });
       if (activeLine !== null && activeLine >= 1 && activeLine <= view.state.doc.lines) {
         scrollLineWithinEditor(view, activeLine);
       }
     }
-  }, [activeLine, errorLine, code]);
+  }, [activeLine, errorLine, ranLine, code]);
+
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view || !focusRequest) return;
+    const { line } = focusRequest;
+    if (line < 1 || line > view.state.doc.lines) return;
+    scrollLineWithinEditor(view, line);
+    view.dispatch({ effects: setFocusLine.of(line) });
+    const timer = window.setTimeout(() => view.dispatch({ effects: setFocusLine.of(null) }), 1400);
+    return () => window.clearTimeout(timer);
+  }, [focusRequest]);
 
   // Surface analyzer diagnostics inline (underlines + gutter markers + hover).
   useEffect(() => {

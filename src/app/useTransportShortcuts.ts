@@ -7,6 +7,8 @@ type UseTransportShortcutsOptions = {
   stepForward: () => void;
   togglePlay: () => void;
   totalSteps: number;
+  toggleBookmark?: () => void;
+  openSearch?: () => void;
 };
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -27,6 +29,8 @@ export function useTransportShortcuts({
   stepForward,
   togglePlay,
   totalSteps,
+  toggleBookmark,
+  openSearch,
 }: UseTransportShortcutsOptions) {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -60,11 +64,24 @@ export function useTransportShortcuts({
           event.preventDefault();
           jumpToStep(totalSteps - 1);
           break;
+        case 'b':
+        case 'B':
+          if (toggleBookmark && totalSteps > 0) {
+            event.preventDefault();
+            toggleBookmark();
+          }
+          break;
+        case '/':
+          if (openSearch && totalSteps > 0) {
+            event.preventDefault();
+            openSearch();
+          }
+          break;
         default:
           break;
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [jumpToStep, run, stepBack, stepForward, togglePlay, totalSteps]);
+  }, [jumpToStep, openSearch, run, stepBack, stepForward, toggleBookmark, togglePlay, totalSteps]);
 }

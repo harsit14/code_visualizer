@@ -1,5 +1,6 @@
 import type { Language, SessionResult } from '../engine/types';
 import { validateSessionResult } from '../engine/resultSchema';
+import { normalizeBookmarks, type TraceBookmark } from '../engine/traceSearch';
 import type { PracticeNotebook } from './practiceNotebook';
 import type { PracticeTestCase } from './practiceCases';
 
@@ -16,6 +17,8 @@ export type WorkspaceContent = {
   breakpoints: number[];
   result: SessionResult | null;
   step: number;
+  /** Annotated trace steps; absent in backups written before bookmarks existed. */
+  bookmarks: TraceBookmark[];
 };
 export type WorkspaceRevision = {
   id: string;
@@ -87,6 +90,22 @@ export function parseWorkspace(text: string): WorkspaceRevision {
     throw new Error('Invalid workspace source, inputs or replay position.');
   }
   if (
+    c.bookmarks !== undefined &&
+    !(
+      Array.isArray(c.bookmarks) &&
+      c.bookmarks.length <= 500 &&
+      c.bookmarks.every(
+        (bookmark) =>
+          record(bookmark) &&
+          integer(bookmark.step) &&
+          string(bookmark.note) &&
+          bookmark.note.length <= 500,
+      )
+    )
+  ) {
+    throw new Error('Invalid workspace bookmarks.');
+  }
+  if (
     !record(c.notebook) ||
     !string(c.notebook.notes) ||
     !string(c.notebook.patterns) ||
@@ -142,6 +161,10 @@ export function parseWorkspace(text: string): WorkspaceRevision {
       breakpoints: [...new Set(content.breakpoints)],
       result,
       step: Math.min(content.step, Math.max(0, (result?.run?.steps.length ?? 0) - 1)),
+      bookmarks: normalizeBookmarks(
+        (content.bookmarks ?? []).map(({ step, note }) => ({ step, note })),
+        result?.run?.steps.length ?? 0,
+      ),
     },
   };
 }

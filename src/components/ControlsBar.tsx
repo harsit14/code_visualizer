@@ -46,6 +46,10 @@ type ControlsBarProps = {
   onSpeedChange: (speed: number) => void;
   currentStep: TraceStep | undefined;
   status: RuntimeStatus;
+  /** Extra trace tools shown after the step controls, such as search. */
+  traceTools?: ReactNode;
+  /** Steps marked on the scrubber. */
+  bookmarkSteps?: readonly number[];
 };
 
 function describeStep(step: TraceStep | undefined): string {
@@ -128,6 +132,8 @@ export function ControlsBar({
   onSpeedChange,
   currentStep,
   status,
+  traceTools,
+  bookmarkSteps = [],
 }: ControlsBarProps) {
   const [expanded, setExpanded] = useState(false);
   const hasTrace = totalSteps > 0;
@@ -316,6 +322,7 @@ export function ControlsBar({
               </button>
             </ControlTip>
           </div>
+          {traceTools}
 
           <button
             className="mobile-controls-toggle"
@@ -330,6 +337,25 @@ export function ControlsBar({
               {playing ? 'Playing. ' : 'Paused. '}Step {step + 1} of {totalSteps}.{' '}
               {describeStep(currentStep)}
             </span>
+            {bookmarkSteps.length && totalSteps > 1 ? (
+              <div className="scrubber-bookmarks">
+                {bookmarkSteps.map((bookmark) => {
+                  const fraction = bookmark / (totalSteps - 1);
+                  return (
+                    <button
+                      aria-label={`Go to bookmarked step ${bookmark}`}
+                      className={`scrubber-bookmark${bookmark === step ? ' is-current' : ''}`}
+                      key={bookmark}
+                      onClick={() => onJump(bookmark)}
+                      // Offset by the thumb width so ticks line up with thumb positions.
+                      style={{ left: `calc(${fraction * 100}% + ${(0.5 - fraction) * 14}px)` }}
+                      title={`Bookmarked step ${bookmark}`}
+                      type="button"
+                    />
+                  );
+                })}
+              </div>
+            ) : null}
             <input
               aria-label="Trace position"
               disabled={!hasTrace}

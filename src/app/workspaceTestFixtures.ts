@@ -30,6 +30,7 @@ export function workspaceContent(): WorkspaceContent {
     watches: ['nums'],
     breakpoints: [1],
     step: 1,
+    bookmarks: [{ step: 1, note: 'Why is this line reached?' }],
     result: {
       status: 'ok',
       mode: 'script',

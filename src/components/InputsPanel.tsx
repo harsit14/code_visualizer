@@ -17,7 +17,9 @@ import {
   Route,
   Trash2,
 } from 'lucide-react';
+import { useMemo } from 'react';
 import type { PracticeNotebook, PracticeNotebookUpdate } from '../app/practiceNotebook';
+import { explainMismatch } from '../app/pythonLiteral';
 import type { PracticeTestCase, PracticeTestCaseUpdate } from '../app/practiceCases';
 import type { AnalysisInfo, FunctionInfo, GeneratedInputInfo } from '../engine/types';
 
@@ -319,6 +321,9 @@ export function InputsPanel({
                         ) : null}
                       </div>
                     ) : null}
+                    {testCase.status === 'fail' && testCase.actualLiteral ? (
+                      <MismatchHints actual={testCase.actualLiteral} expected={testCase.expected} />
+                    ) : null}
                   </article>
                 ))}
               </div>
@@ -436,6 +441,18 @@ function formatNotebookSummary(notebook: PracticeNotebook): string {
     return 'notes';
   }
   return 'empty';
+}
+
+function MismatchHints({ expected, actual }: { expected: string; actual: string }) {
+  const hints = useMemo(() => explainMismatch(expected, actual), [expected, actual]);
+  if (hints.length === 0) return null;
+  return (
+    <ul aria-label="How the result differs" className="test-case-hints">
+      {hints.map((hint) => (
+        <li key={hint}>{hint}</li>
+      ))}
+    </ul>
+  );
 }
 
 function canAcceptActual(testCase: PracticeTestCase): boolean {

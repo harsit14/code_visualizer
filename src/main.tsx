@@ -22,6 +22,7 @@ import './styles/components/dashboard-onboarding.css';
 import './styles/components/editor.css';
 import './styles/components/variables-watch.css';
 import './styles/components/controls-bar.css';
+import './styles/components/learning.css';
 import './styles/components/visual-refresh.css';
 import './styles/components/mobile-workspace.css';
 import './styles/components/traced-light.css';

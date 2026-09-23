@@ -143,6 +143,31 @@ tree program (five live frames, tree view of a caller's `node`, Node-style conso
 output and the final module step) and the TypeScript example. The JS worker chunk
 grows from about 6 KB to 145 KB (parser included); it loads only for JS/TS runs.
 
+## Seventh batch: explain the change, trace search/bookmarks and case feedback
+
+- **Explain the change (P1).** A card at the top of Variables names the statement
+  that produced the current state (clickable to reveal it in the editor), lists
+  each changed value down to list indices, dict keys, object attributes and set
+  members (`lookup[11]: absent → 0`), and shows printed output. Calls, returns
+  with values, resuming a caller, loop iterations and exceptions have their own
+  wording. The editor also marks the line that just ran, next to the active line.
+- **Trace search and bookmarks (P1).** `/` opens a finder that searches variable
+  changes (`total`, `total = 6`, `seen[4]`), lines, functions, events and printed
+  text; results jump to the step and name the line responsible. `B` bookmarks a
+  step; bookmarks carry notes, appear as scrubber ticks and are saved in workspace
+  revisions and backups (older backups load with none).
+- **Better practice feedback (P1).** Failing cases explain how the actual value
+  differs: the first differing index or key, missing/unexpected items, the same
+  items in a different order, whitespace or capitalization-only differences,
+  off-by-one numbers, float rounding, int/float or list/tuple type changes and a
+  `None` return. "Trace this case" already existed and is unchanged.
+
+Validation: full CI passes typecheck, lint, 437 tests in 57 files, app build/smoke
+and runner build/smoke. Browser checks with Python Two Sum covered the change card
+and "just ran" mark, searching `lookup` and jumping to a result, bookmarking with
+`B`, a note surviving a workspace save, reload and reopen, a failing case's
+"different order" hint, and the phone layout (card, finder and scrubber ticks).
+
 ## Evidence and limits (original audit)
 
 | Check                                       | Result                                                                                                                                  |
@@ -350,4 +375,4 @@ A practical first batch is: (1) privilege protection, (2) practice equality repa
 - Test replay with 100, 1,000 and 3,000 steps and several structure sizes. Agree budgets after measuring baseline; a reasonable initial target is p95 step-to-render under 100 ms on a named reference device.
 - Measure first successful run, meaningful stepping after a run, successful failure-case debugging, saved-work recovery and return visits. Use privacy-preserving events; exclude code, inputs, locals, notebook text and full share URLs.
 
-Next remaining milestones: stage the isolated runner and managed accounts, verify the real browser/device matrix, add a real TypeScript transform and JS/TS highlighting, and implement the remaining learning features, workspace autosave/search and cloud sync. Phone navigation, save-failure recovery, explicit local workspace revisions/backups and parser-based JavaScript tracing are implemented locally.
+Next remaining milestones: stage the isolated runner and managed accounts, verify the real browser/device matrix, add a real TypeScript transform and JS/TS highlighting, and implement the remaining learning features (run comparison, algorithm views, guided lessons, teaching mode), workspace autosave/search and cloud sync. Phone navigation, save-failure recovery, explicit local workspace revisions/backups, parser-based JavaScript tracing, step explanations, trace search/bookmarks and failing-case explanations are implemented locally.

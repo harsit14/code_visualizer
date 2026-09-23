@@ -27,15 +27,21 @@ or understanding how state mutates one line at a time.
 - Stop running code or runtime loading, and retry a failed Python startup.
 - See active lines, changed variables, call stack frames, stdout, return values,
   and runtime errors in sync.
+- Read what each step did: the statement that just ran (also marked in the
+  editor), each value it changed such as `lookup[11]: absent → 0`, and its output.
+- Search the trace for a variable, a value (`total = 6`), a line, a function,
+  returns, exceptions or printed text, and bookmark confusing steps with notes.
 - Visualize arrays, strings, dictionaries, binary trees, linked lists, object
   references, aliases, and heap state.
 - Generate editable Python function inputs for LeetCode-style snippets.
 - Save compact practice cases, add generated edge cases, run all cases, rerun
   only failed cases, and promote trusted actual output into expected output.
+  Failing cases explain the difference, such as a wrong index, items in a
+  different order, whitespace-only changes or a missing `return`.
 - Keep a local practice notebook with pattern tags, review status, and notes for
   each code/function pair.
 - Save named local workspace revisions with cases, notes, inputs, watches,
-  breakpoints and replay; export and restore a complete exercise backup.
+  breakpoints, bookmarks and replay; export and restore a complete exercise backup.
 - Track pointer variables such as `i`, `left`, `right`, `lo`, `hi`, `prev`,
   `curr`, and `nxt`.
 - Inspect recursive execution with a persistent call tree.

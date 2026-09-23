@@ -29,6 +29,9 @@ describe('complete workspace backups', () => {
     (p: ReturnType<typeof JSON.parse>) => {
       p.workspace.content.breakpoints = [-1];
     },
+    (p: ReturnType<typeof JSON.parse>) => {
+      p.workspace.content.bookmarks = [{ step: 1, note: 7 }];
+    },
   ])('rejects malformed/future/nested fields before use', (mutate) => {
     const payload = JSON.parse(serializeWorkspace(workspaceRevision()));
     mutate(payload);
@@ -37,6 +40,18 @@ describe('complete workspace backups', () => {
   it('rejects oversized files and invalid JSON', () => {
     expect(() => parseWorkspace(' '.repeat(MAX_WORKSPACE_BYTES + 1))).toThrow('25 MB');
     expect(() => parseWorkspace('{')).toThrow('valid JSON');
+  });
+  it('restores backups written before bookmarks and drops bookmarks outside the trace', () => {
+    const payload = JSON.parse(serializeWorkspace(workspaceRevision()));
+    delete payload.workspace.content.bookmarks;
+    expect(parseWorkspace(JSON.stringify(payload)).content.bookmarks).toEqual([]);
+    payload.workspace.content.bookmarks = [
+      { step: 9, note: 'gone' },
+      { step: 0, note: 'start' },
+    ];
+    expect(parseWorkspace(JSON.stringify(payload)).content.bookmarks).toEqual([
+      { step: 0, note: 'start' },
+    ]);
   });
   it('stops unfinished cases and clamps replay position', () => {
     const workspace = workspaceRevision();
