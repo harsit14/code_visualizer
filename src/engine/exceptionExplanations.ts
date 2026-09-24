@@ -1,4 +1,4 @@
-import type { EngineError } from './types';
+import type { EngineError, Language } from './types';
 
 export type ExceptionExplanation = {
   title: string;
@@ -87,11 +87,60 @@ const EXPLANATIONS: Record<string, ExceptionExplanation> = {
   },
 };
 
+const SCRIPT_EXPLANATIONS: Record<string, ExceptionExplanation> = {
+  TypeError: {
+    title: 'A value was used in a way its type does not allow.',
+    detail:
+      'Common causes are reading a property of undefined or null, or calling something that is not a function.',
+    checks: [
+      'Inspect the value on the failing line: is it undefined or null?',
+      'Check what the previous call or lookup returned.',
+    ],
+  },
+  ReferenceError: {
+    title: 'A name is used before it exists.',
+    detail:
+      'The variable is not declared in this scope, is misspelled, or is a let/const read before its declaration runs.',
+    checks: ['Check the spelling.', 'Make sure the declaration runs before this line.'],
+  },
+  RangeError: {
+    title: 'A value is outside the allowed range.',
+    detail:
+      'Examples are an invalid array length, too many decimal digits, or recursion deep enough to exceed the call stack.',
+    checks: [
+      'For "Maximum call stack size exceeded", check the base case.',
+      'Inspect the numbers passed on the failing line.',
+    ],
+  },
+  SyntaxError: {
+    title: 'Text could not be parsed.',
+    detail:
+      'While the program runs this usually comes from JSON.parse or a regular expression built from a string. Before running, it means the code itself has a typo.',
+    checks: ['Inspect the string being parsed.', 'Check quotes and brackets.'],
+  },
+  NotSupportedError: {
+    title: 'The tracer does not support this code yet.',
+    detail:
+      'Async functions, generators, modules, TypeScript namespaces and decorators cannot be traced yet.',
+    checks: ['Rewrite the code as one synchronous script.', 'Move helpers into the same file.'],
+  },
+  Uncaught: {
+    title: 'A value that is not an Error was thrown.',
+    detail:
+      'JavaScript allows throwing any value; the program stopped because nothing caught it.',
+    checks: [
+      'Throw an Error object to get a type and message.',
+      'Add a try/catch where the value should be handled.',
+    ],
+  },
+};
+
 export function explainException(
   error: Pick<EngineError, 'type' | 'msg'> | null | undefined,
+  language: Language = 'python',
 ): ExceptionExplanation | null {
   if (!error) {
     return null;
   }
-  return EXPLANATIONS[error.type] ?? null;
+  return (language === 'python' ? EXPLANATIONS : SCRIPT_EXPLANATIONS)[error.type] ?? null;
 }

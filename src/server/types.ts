@@ -20,6 +20,8 @@ export type ServerEnv = {
   ANON_DAILY_EXPLAIN_LIMIT?: string;
   FREE_DAILY_EXPLAIN_LIMIT?: string;
   PRO_DAILY_EXPLAIN_LIMIT?: string;
+  /** Explanations per UTC day across all non-admin users (default 2000). */
+  EXPLAIN_GLOBAL_DAILY_LIMIT?: string;
   /** Legacy configuration is ignored; email ownership is not yet verified. */
   ADMIN_EMAILS?: string;
   ADMIN_USER_IDS?: string;

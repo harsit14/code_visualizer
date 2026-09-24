@@ -5,13 +5,31 @@ import {
   type StepExplanationContext,
   parseDeepSeekExplanationPayload,
 } from './deepseekShared';
-import { diffLocals, expandSelf, formatValue, stdoutAtStep } from './trace';
+import { diffLocals, expandSelf, formatValue, stdoutAtStep, typeNameOf } from './trace';
 import { effectiveFrame } from './traceNavigation';
 import type { EncodedValue, Language, SessionResult, TraceStep } from './types';
 
 const MAX_CODE_CHARS = 7000;
 const MAX_STDOUT_CHARS = 1200;
 const MAX_LOCALS = 24;
+const MAX_VALUE_CHARS = 300;
+const EXCERPT_RADIUS = 12;
+
+/** What the learner allows the AI request to include. */
+export type ExplanationPrivacy = {
+  /** Code around the active line; when off only the active line is sent. */
+  includeCode: boolean;
+  /** Variable, return and change values; when off only names and types are sent. */
+  includeValues: boolean;
+  /** Recent printed output. */
+  includeOutput: boolean;
+};
+
+export const DEFAULT_EXPLANATION_PRIVACY: ExplanationPrivacy = {
+  includeCode: true,
+  includeValues: true,
+  includeOutput: true,
+};
 
 type ExplainStepOptions = {
   code: string;
@@ -23,6 +41,7 @@ type ExplainStepOptions = {
   endpoint?: string;
   fetchImpl?: typeof fetch;
   signal?: AbortSignal;
+  privacy?: ExplanationPrivacy;
 };
 
 type ExplainerErrorPayload = {
@@ -38,14 +57,33 @@ type ParsedResponse = {
 export type { DeepSeekStepExplanation, StepExplanationContext };
 export { DEFAULT_DEEPSEEK_MODEL, DEEPSEEK_EXPLAINER_ENDPOINT };
 
-export function buildStepExplanationContext({
-  code,
-  currentStep,
-  frameIndex,
-  language,
-  previousStep,
-  result,
-}: Omit<ExplainStepOptions, 'endpoint' | 'fetchImpl' | 'signal'>): StepExplanationContext | null {
+/**
+ * Lines around the active line, shrunk from the far ends until they fit, so the
+ * active line is always included.
+ */
+function excerptAround(lines: string[], activeIndex: number): { start: number; text: string } {
+  let start = Math.max(0, activeIndex - EXCERPT_RADIUS);
+  let end = Math.min(lines.length, activeIndex + EXCERPT_RADIUS + 1);
+  const size = () => lines.slice(start, end).join('\n').length;
+  while (size() > MAX_CODE_CHARS && end - start > 1) {
+    if (activeIndex - start >= end - 1 - activeIndex && start < activeIndex) start += 1;
+    else if (end - 1 > activeIndex) end -= 1;
+    else start += 1;
+  }
+  return { start, text: clipText(lines.slice(start, end).join('\n'), MAX_CODE_CHARS) };
+}
+
+export function buildStepExplanationContext(
+  {
+    code,
+    currentStep,
+    frameIndex,
+    language,
+    previousStep,
+    result,
+  }: Omit<ExplainStepOptions, 'endpoint' | 'fetchImpl' | 'signal' | 'privacy'>,
+  privacy: ExplanationPrivacy = DEFAULT_EXPLANATION_PRIVACY,
+): StepExplanationContext | null {
   if (!currentStep) {
     return null;
   }
@@ -54,26 +92,26 @@ export function buildStepExplanationContext({
   const locals = frame ? expandSelf(frame.locals) : {};
   const previousLocals = previousFrame ? expandSelf(previousFrame.locals) : undefined;
   const diff = diffLocals(previousLocals, locals);
-  const formattedLocals = formatLocals(locals);
-  const formattedPreviousLocals = previousLocals ? formatLocals(previousLocals) : {};
-
-  const currentLineText =
-    currentStep.line > 0 ? (code.split(/\r?\n/)[currentStep.line - 1] ?? '') : '';
-  const exception = currentStep.exc ?? result?.run?.exception ?? result?.error ?? null;
-  const stdout = result?.run ? stdoutAtStep(result.run.stdout, currentStep) : '';
+  const formattedLocals = formatLocals(locals, privacy.includeValues);
+  const formattedPreviousLocals = previousLocals
+    ? formatLocals(previousLocals, privacy.includeValues)
+    : {};
 
   const codeLines = code.split(/\r?\n/);
-  const excerptStart = Math.max(0, currentStep.line - 13);
+  const currentLineText = currentStep.line > 0 ? (codeLines[currentStep.line - 1] ?? '') : '';
+  const exception = currentStep.exc ?? result?.run?.exception ?? result?.error ?? null;
+  const stdout = result?.run ? stdoutAtStep(result.run.stdout, currentStep) : '';
+  const excerpt = privacy.includeCode
+    ? excerptAround(codeLines, Math.max(0, currentStep.line - 1))
+    : { start: Math.max(0, currentStep.line - 1), text: currentLineText };
+
   return {
     language,
     statePhase:
       currentStep.phase ??
       (currentStep.event === 'line' ? (language === 'python' ? 'before' : 'after') : 'event'),
-    codeStartLine: excerptStart + 1,
-    codeExcerpt: clipText(
-      codeLines.slice(excerptStart, currentStep.line + 12).join('\n'),
-      MAX_CODE_CHARS,
-    ),
+    codeStartLine: excerpt.start + 1,
+    codeExcerpt: excerpt.text,
     currentLine: currentStep.line > 0 ? currentStep.line : null,
     currentLineText: currentLineText.trim(),
     event: currentStep.event,
@@ -82,9 +120,19 @@ export function buildStepExplanationContext({
     added: [...diff.added].sort(),
     changed: [...diff.changed].sort(),
     removed: [...diff.removed].sort(),
-    variableChanges: describeLocalChanges(diff, formattedPreviousLocals, formattedLocals),
-    stdout: clipText(stdout, MAX_STDOUT_CHARS),
-    returnValue: currentStep.ret ? formatValue(currentStep.ret) : null,
+    variableChanges: describeLocalChanges(
+      diff,
+      formattedPreviousLocals,
+      formattedLocals,
+      privacy.includeValues,
+    ),
+    // The most recent output is the most relevant to this step.
+    stdout: privacy.includeOutput ? clipTail(stdout, MAX_STDOUT_CHARS) : '',
+    returnValue: currentStep.ret
+      ? privacy.includeValues
+        ? clipText(formatValue(currentStep.ret), MAX_VALUE_CHARS)
+        : `<${typeNameOf(currentStep.ret)}>`
+      : null,
     exception: exception ? `${exception.type}: ${exception.msg}` : null,
   };
 }
@@ -99,15 +147,19 @@ export async function explainStepWithDeepSeek({
   previousStep,
   result,
   signal,
+  privacy = DEFAULT_EXPLANATION_PRIVACY,
 }: ExplainStepOptions): Promise<DeepSeekStepExplanation> {
-  const context = buildStepExplanationContext({
-    code,
-    currentStep,
-    frameIndex,
-    language,
-    previousStep,
-    result,
-  });
+  const context = buildStepExplanationContext(
+    {
+      code,
+      currentStep,
+      frameIndex,
+      language,
+      previousStep,
+      result,
+    },
+    privacy,
+  );
   if (!context) {
     throw new Error('Run code and select a step before requesting an explanation.');
   }
@@ -187,11 +239,17 @@ function isExplainerErrorPayload(value: unknown): value is ExplainerErrorPayload
   );
 }
 
-function formatLocals(locals: Record<string, EncodedValue>): Record<string, string> {
+function formatLocals(
+  locals: Record<string, EncodedValue>,
+  includeValues: boolean,
+): Record<string, string> {
   return Object.fromEntries(
     Object.entries(locals)
       .slice(0, MAX_LOCALS)
-      .map(([name, value]) => [name, formatValue(value)]),
+      .map(([name, value]) => [
+        name,
+        includeValues ? clipText(formatValue(value), MAX_VALUE_CHARS) : `<${typeNameOf(value)}>`,
+      ]),
   );
 }
 
@@ -199,11 +257,15 @@ function describeLocalChanges(
   diff: ReturnType<typeof diffLocals>,
   previousLocals: Record<string, string>,
   currentLocals: Record<string, string>,
+  includeValues: boolean,
 ): string[] {
   return [...new Set([...diff.added, ...diff.changed, ...diff.removed])]
     .sort()
     .slice(0, MAX_LOCALS)
     .map((name) => {
+      if (!includeValues) {
+        return `${name}: ${diff.added.has(name) ? 'created' : diff.removed.has(name) ? 'removed' : 'changed'}`;
+      }
       if (diff.added.has(name)) {
         return `${name}: created as ${currentLocals[name] ?? '(unknown)'}`;
       }
@@ -221,4 +283,11 @@ function clipText(text: string, maxChars: number): string {
     return text;
   }
   return `${text.slice(0, maxChars)}\n...[truncated]`;
+}
+
+function clipTail(text: string, maxChars: number): string {
+  if (text.length <= maxChars) {
+    return text;
+  }
+  return `[earlier output truncated]...\n${text.slice(text.length - maxChars)}`;
 }

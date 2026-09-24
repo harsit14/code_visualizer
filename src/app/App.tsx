@@ -727,6 +727,7 @@ export function DashboardApp({ onOpenLanding }: DashboardAppProps) {
             title="Explainer"
           >
             <ExplainerPanel
+              change={stepChange}
               available={capabilities.ai}
               code={session.code}
               currentStep={session.currentStep}
@@ -747,6 +748,7 @@ export function DashboardApp({ onOpenLanding }: DashboardAppProps) {
             title="Console"
           >
             <ConsolePanel
+              language={session.language}
               atLastStep={atLastStep}
               canMeasureComplexity={session.language === 'python' && showInputs && !session.isBusy}
               complexity={session.complexity}

@@ -38,7 +38,7 @@ import {
   sendEmailCode,
   verifyEmailCode,
 } from './managedAuth';
-import { limitForPlan, planForUser, usageDay } from './usage';
+import { anonymousSubject, limitForPlan, planForUser, usageDay } from './usage';
 import type { AuthUser, ServerEnv } from './types';
 
 const AUTH_BODY_LIMIT_BYTES = 4096;
@@ -127,7 +127,7 @@ async function accountStatus(env: ServerEnv, request: Request): Promise<Response
     billingConfigured: false,
     ...account,
     subscription: null,
-    usage: await currentUsage(env, context?.user ?? null),
+    usage: await currentUsage(env, context?.user ?? null, request),
   });
 }
 
@@ -301,14 +301,18 @@ async function signOut(env: ServerEnv, request: Request): Promise<Response> {
   });
 }
 
-async function currentUsage(env: ServerEnv, user: AuthUser | null) {
+async function currentUsage(env: ServerEnv, user: AuthUser | null, request?: Request) {
   const db = getDatabase(env);
   if (!db) {
     return null;
   }
   const plan = planForUser(env, user);
   const day = usageDay();
-  const subject = user ? `user:${user.id}` : null;
+  const subject = user
+    ? `user:${user.id}`
+    : request
+      ? `anon:${await anonymousSubject(env, request)}`
+      : null;
   const row = subject === null ? null : await db.getUsageCount(subject, day);
   const used = Number(row ?? 0);
   const limit = limitForPlan(env, plan);

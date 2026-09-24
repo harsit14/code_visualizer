@@ -71,18 +71,39 @@ The migration creates:
 - `billing_events`: reserved for future Stripe webhook idempotency records.
 - `code_history`: saved rerunnable code sessions for signed-in users.
 
+Then apply `supabase/migrations/0003_explainer_quota.sql` (after 0001; 0002 is
+the separate managed-auth rollout). It adds `refund_usage_daily`, so a failed or
+over-limit AI request is returned to the user's daily count, and `explain_cache`,
+which answers identical requests (same model and exact sanitized context) for 30
+days without calling the provider or using quota. The Worker keeps working before
+this migration is applied; it just skips refunds and caching.
+
+AI explainer quota behavior:
+
+- Each request reserves one explanation from the caller's daily count and the
+  global daily count, then refunds it if the provider fails, times out (`504`),
+  or the caller is over a limit. Only delivered answers count.
+- Guests are counted by the Cloudflare edge IP (`CF-Connecting-IP`, IPv6 grouped
+  by /64) with `ANON_USAGE_SALT`; the User-Agent and client forwarding headers are
+  ignored.
+- A per-subject burst guard allows 8 requests a minute per Worker isolate.
+- `EXPLAIN_GLOBAL_DAILY_LIMIT` caps all non-admin explanations per UTC day.
+- Error responses never echo provider or exception text, and the route logs only
+  the error type, never the request body.
+
 Set these Worker variables and secrets:
 
-| Name                        | Type     | Purpose                                                       |
-| --------------------------- | -------- | ------------------------------------------------------------- |
-| `SUPABASE_URL`              | Variable | Supabase project URL, for example `https://...supabase.co`.   |
-| `SUPABASE_SERVICE_ROLE_KEY` | Secret   | Server-side Supabase service role key.                        |
-| `SUPABASE_SCHEMA`           | Variable | Optional, default `public`.                                   |
-| `ANON_USAGE_SALT`           | Secret   | Hashes anonymous usage subjects.                              |
-| `ANON_DAILY_EXPLAIN_LIMIT`  | Variable | Optional, default `3`.                                        |
-| `FREE_DAILY_EXPLAIN_LIMIT`  | Variable | Optional, default `5`.                                        |
-| `ADMIN_USER_IDS`            | Variable | Optional comma/space-separated verified account ID allowlist. |
-| `PASSWORD_PEPPER`           | Secret   | Signs password hashes; set before public launch.              |
+| Name                         | Type     | Purpose                                                       |
+| ---------------------------- | -------- | ------------------------------------------------------------- |
+| `SUPABASE_URL`               | Variable | Supabase project URL, for example `https://...supabase.co`.   |
+| `SUPABASE_SERVICE_ROLE_KEY`  | Secret   | Server-side Supabase service role key.                        |
+| `SUPABASE_SCHEMA`            | Variable | Optional, default `public`.                                   |
+| `ANON_USAGE_SALT`            | Secret   | Hashes anonymous usage subjects.                              |
+| `ANON_DAILY_EXPLAIN_LIMIT`   | Variable | Optional, default `3`.                                        |
+| `FREE_DAILY_EXPLAIN_LIMIT`   | Variable | Optional, default `5`.                                        |
+| `EXPLAIN_GLOBAL_DAILY_LIMIT` | Variable | Optional overall daily cap, default `2000`.                   |
+| `ADMIN_USER_IDS`             | Variable | Optional comma/space-separated verified account ID allowlist. |
+| `PASSWORD_PEPPER`            | Secret   | Signs password hashes; set before public launch.              |
 
 The landing page lives at `/`. The dashboard lives at `/app`. Shared trace links
 with `#cv=` and iframe embeds still open the dashboard directly.

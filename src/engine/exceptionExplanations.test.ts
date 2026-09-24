@@ -11,6 +11,17 @@ describe('explainException', () => {
     );
   });
 
+  it('uses JavaScript wording for JavaScript and TypeScript errors', () => {
+    expect(explainException({ type: 'TypeError', msg: 'x' }, 'javascript')?.detail).toContain(
+      'undefined or null',
+    );
+    expect(explainException({ type: 'ReferenceError', msg: 'x' }, 'typescript')?.title).toBe(
+      'A name is used before it exists.',
+    );
+    expect(explainException({ type: 'TypeError', msg: 'x' })?.detail).toContain('Python');
+    expect(explainException({ type: 'KeyError', msg: 'x' }, 'javascript')).toBeNull();
+  });
+
   it('returns null for unknown exception types', () => {
     expect(explainException({ type: 'CustomError', msg: 'no hint' })).toBeNull();
     expect(explainException(null)).toBeNull();

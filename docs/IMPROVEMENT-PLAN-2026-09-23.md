@@ -272,6 +272,37 @@ Validation: full CI passes typecheck, lint, 520 tests in 66 files, app build/smo
 check with its 404 fallback. In the browser, the landing page loaded only its three
 entry chunks and the dashboard opened from "Start visualizing".
 
+## Twelfth batch: AI cost and data handling (finding 12)
+
+- The Explainer shows a local explanation first (the step change and, for errors,
+  a language-aware exception note, including JavaScript wording) that never leaves
+  the browser. The AI answer is an optional deeper layer.
+- Learners choose what the request may include (code around the line, variable
+  values, printed output) and can preview the exact JSON before sending. The
+  client bounds every field: the excerpt keeps the active line even when nearby
+  lines are long, each value is capped at 300 characters, and the most recent
+  output is kept instead of the oldest.
+- Quota is reserved atomically and refunded when the provider fails, times out
+  (now a `504` with a generic message) or the caller is over a limit, so only
+  delivered answers count and counters no longer creep past the limit.
+- Identical requests are answered from a 30-day server cache without calling the
+  provider or using quota, and each browser session reuses answers it already
+  received when a step is revisited.
+- Guests are counted by edge IP (IPv6 /64) without the User-Agent; a global daily
+  cap and a per-subject burst guard bound total spend and abuse. `/api/me` now
+  reports guest usage.
+- Error responses no longer echo provider or exception text; the route logs only
+  the error type.
+- Migration `0003_explainer_quota.sql` adds the refund function and the cache; the
+  Worker degrades gracefully until it is applied.
+
+Validation: full CI passes typecheck, lint, 540 tests in 68 files and both builds.
+New tests cover the cache, refunds on failure and timeout, the limit no longer
+creeping, User-Agent-independent guest counting, the global cap, bursts, running
+without the migration, IPv6 grouping, the migration in embedded PostgreSQL,
+redaction and bounds in the request builder, the preview, and in-session reuse.
+The browser check confirmed the local explanation and the static-host AI notice.
+
 ## Evidence and limits (original audit)
 
 | Check                                       | Result                                                                                                                                  |

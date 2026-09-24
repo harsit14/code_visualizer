@@ -62,6 +62,52 @@ describe('buildStepExplanationContext', () => {
     expect(buildDeepSeekMessages(context!)[1].content).toContain('=> 401 | value = 400');
   });
 
+  it('respects privacy choices and bounds every field', () => {
+    const current = step(1, { secret: { k: 'str', v: 'x'.repeat(900), truncated: false } });
+    const run = result(current);
+    run.run!.stdout = `${'old line\n'.repeat(400)}latest`;
+    current.stdoutLen = run.run!.stdout.length;
+    const base = {
+      code: 'a = 1\nsecret = input()',
+      currentStep: current,
+      frameIndex: null,
+      language: 'python' as const,
+      previousStep: step(0, {}),
+      result: run,
+    };
+    const full = buildStepExplanationContext(base)!;
+    expect(full.locals.secret.length).toBeLessThan(340);
+    expect(full.stdout.endsWith('latest')).toBe(true);
+    expect(full.stdout.length).toBeLessThan(1300);
+    const redacted = buildStepExplanationContext(base, {
+      includeCode: false,
+      includeValues: false,
+      includeOutput: false,
+    })!;
+    expect(redacted.locals).toEqual({ secret: '<str>' });
+    expect(redacted.variableChanges).toEqual(['secret: created']);
+    expect(redacted.stdout).toBe('');
+    expect(redacted.codeExcerpt).toBe('secret = input()');
+    expect(JSON.stringify(redacted)).not.toContain('xxxx');
+  });
+
+  it('keeps the active line when long lines crowd the excerpt', () => {
+    const lines = Array.from({ length: 30 }, (_, index) =>
+      index === 14 ? 'target = 1' : `pad_${index} = '${'y'.repeat(700)}'`,
+    );
+    const current = { ...step(1, {}), line: 15 };
+    const context = buildStepExplanationContext({
+      code: lines.join('\n'),
+      currentStep: current,
+      frameIndex: null,
+      language: 'python',
+      previousStep: undefined,
+      result: result(current),
+    })!;
+    expect(context.codeExcerpt).toContain('target = 1');
+    expect(context.codeExcerpt.length).toBeLessThanOrEqual(7100);
+  });
+
   it('summarizes the current line and variable diff', () => {
     const previousStep = step(0, { total: num(1) });
     const currentStep = step(1, { total: num(3), i: num(2) });

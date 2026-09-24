@@ -5,9 +5,10 @@
 import { AlertTriangle, Terminal, TrendingUp } from 'lucide-react';
 import { explainException } from '../engine/exceptionExplanations';
 import { fitGrowth, formatValue, stdoutAtStep } from '../engine/trace';
-import type { ComplexityResult, SessionResult, TraceStep } from '../engine/types';
+import type { ComplexityResult, Language, SessionResult, TraceStep } from '../engine/types';
 
 type ConsolePanelProps = {
+  language?: Language;
   result: SessionResult | null;
   currentStep: TraceStep | undefined;
   atLastStep: boolean;
@@ -46,6 +47,7 @@ function formatMemory(
 }
 
 export function ConsolePanel({
+  language = 'python',
   result,
   currentStep,
   atLastStep,
@@ -58,7 +60,7 @@ export function ConsolePanel({
   const stdout = run ? stdoutAtStep(run.stdout, currentStep) : '';
   const exception = run?.exception ?? run?.setupError ?? null;
   const error = result?.error ?? null;
-  const explanation = explainException(exception ?? error);
+  const explanation = explainException(exception ?? error, language);
   const growth =
     complexity && complexity.samples.length >= 3 ? fitGrowth(complexity.samples) : null;
   const maxOps = complexity ? Math.max(...complexity.samples.map((sample) => sample.ops), 1) : 1;

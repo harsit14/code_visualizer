@@ -17,6 +17,8 @@ export type UsageDecision =
       ok: true;
       snapshot: UsageSnapshot;
       user: AuthUser | null;
+      /** Returns the reserved explanation when no answer is delivered. */
+      refund: () => Promise<void>;
     }
   | {
       ok: false;
@@ -26,9 +28,32 @@ export type UsageDecision =
 const DEFAULT_ANON_DAILY_LIMIT = 3;
 const DEFAULT_FREE_DAILY_LIMIT = 5;
 const DEFAULT_PRO_DAILY_LIMIT = 250;
+const DEFAULT_GLOBAL_DAILY_LIMIT = 2000;
 const ADMIN_DAILY_LIMIT = Number.MAX_SAFE_INTEGER;
+const GLOBAL_SUBJECT = 'global:explain';
+const BURST_LIMIT = 8;
+const BURST_WINDOW_MS = 60_000;
 
-export async function enforceExplainerUsage(
+const noRefund = async () => {};
+
+/**
+ * Refunds are best effort: before migration 0003 is applied the RPC does not
+ * exist, and the request still answers normally.
+ */
+async function refundQuietly(env: ServerEnv, subject: string, day: string) {
+  try {
+    await getDatabase(env)?.refundUsageDaily({ day, subject });
+  } catch {
+    // Missing migration or a transient database error; the reservation stands.
+  }
+}
+
+/**
+ * Reserves one AI explanation for the caller. The reservation counts toward the
+ * daily limits immediately (so concurrent requests cannot overshoot) and is
+ * refunded if the request is over a limit or no answer is delivered.
+ */
+export async function reserveExplainerUsage(
   env: ServerEnv,
   request: Request,
 ): Promise<UsageDecision> {
@@ -45,6 +70,7 @@ export async function enforceExplainerUsage(
       ok: true,
       snapshot,
       user: null,
+      refund: noRefund,
     };
   }
 
@@ -70,21 +96,45 @@ export async function enforceExplainerUsage(
     ? `user:${session.user.id}`
     : `anon:${await anonymousSubject(env, request)}`;
 
-  const used = await db.incrementUsageDaily({
-    day,
-    plan,
-    subject,
-    updatedAt: nowIso(),
-  });
-  const snapshot: UsageSnapshot = {
-    day,
-    limit,
-    plan,
-    remaining: Math.max(0, limit - used),
-    used,
+  const burst = enforceBurstLimit(subject);
+  if (burst) return { ok: false, response: burst };
+
+  const updatedAt = nowIso();
+  const globalLimit = readLimit(env.EXPLAIN_GLOBAL_DAILY_LIMIT, DEFAULT_GLOBAL_DAILY_LIMIT);
+  const countsGlobally = plan !== 'admin';
+  if (countsGlobally) {
+    const globalUsed = await db.incrementUsageDaily({
+      day,
+      plan: 'pro',
+      subject: GLOBAL_SUBJECT,
+      updatedAt,
+    });
+    if (globalUsed > globalLimit) {
+      await refundQuietly(env, GLOBAL_SUBJECT, day);
+      return {
+        ok: false,
+        response: jsonResponse(
+          {
+            error:
+              'The AI explainer has reached its overall limit for today. Local step explanations still work.',
+          },
+          503,
+          { 'Retry-After': nextUtcMidnightSeconds() },
+        ),
+      };
+    }
+  }
+
+  const used = await db.incrementUsageDaily({ day, plan, subject, updatedAt });
+  const refund = async () => {
+    await refundQuietly(env, subject, day);
+    if (countsGlobally) await refundQuietly(env, GLOBAL_SUBJECT, day);
   };
 
   if (used > limit) {
+    // The over-limit attempt is returned so the counter reflects delivered answers.
+    await refund();
+    const snapshot: UsageSnapshot = { day, limit, plan, remaining: 0, used: limit };
     return {
       ok: false,
       response: jsonResponse(
@@ -101,12 +151,46 @@ export async function enforceExplainerUsage(
     };
   }
 
+  const snapshot: UsageSnapshot = {
+    day,
+    limit,
+    plan,
+    remaining: Math.max(0, limit - used),
+    used,
+  };
   return {
     headers: usageHeaders(snapshot),
     ok: true,
     snapshot,
     user: session?.user ?? null,
+    refund,
   };
+}
+
+const bursts = new Map<string, { count: number; resetAt: number }>();
+
+/** Per-isolate burst guard; the durable daily limits still apply across isolates. */
+function enforceBurstLimit(subject: string): Response | null {
+  const now = Date.now();
+  const bucket = bursts.get(subject);
+  if (!bucket || bucket.resetAt <= now) {
+    bursts.set(subject, { count: 1, resetAt: now + BURST_WINDOW_MS });
+    if (bursts.size > 5000) {
+      for (const [key, value] of bursts) if (value.resetAt <= now) bursts.delete(key);
+    }
+    return null;
+  }
+  if (bucket.count >= BURST_LIMIT) {
+    return jsonResponse({ error: 'Too many explanation requests. Wait a minute and retry.' }, 429, {
+      'Retry-After': String(Math.max(1, Math.ceil((bucket.resetAt - now) / 1000))),
+    });
+  }
+  bucket.count += 1;
+  return null;
+}
+
+export function resetExplainerBurstsForTests() {
+  bursts.clear();
 }
 
 export function usageHeaders(snapshot: UsageSnapshot): Record<string, string> {
@@ -150,14 +234,30 @@ export function isAdminUserId(env: ServerEnv, id: string): boolean {
   );
 }
 
-async function anonymousSubject(env: ServerEnv, request: Request): Promise<string> {
-  const address =
-    request.headers.get('CF-Connecting-IP') ??
-    request.headers.get('X-Forwarded-For')?.split(',')[0]?.trim() ??
-    'unknown';
-  const agent = request.headers.get('User-Agent') ?? 'unknown';
+/**
+ * Guests are counted by the edge-reported address only: a changed User-Agent does
+ * not reset the quota, and client-supplied forwarding headers are ignored. IPv6
+ * addresses are grouped by /64 because one connection usually owns the prefix.
+ */
+export async function anonymousSubject(env: ServerEnv, request: Request): Promise<string> {
+  const address = request.headers.get('CF-Connecting-IP')?.trim() || 'unknown';
   const salt = env.ANON_USAGE_SALT ?? 'code-visualizer';
-  return sha256Hex(`${salt}:${address}:${agent}`);
+  return sha256Hex(`${salt}:${networkOf(address)}`);
+}
+
+export function networkOf(address: string): string {
+  if (!address.includes(':')) return address;
+  const [head] = address.split('::');
+  const groups = address.includes('::')
+    ? [
+        ...head.split(':').filter(Boolean),
+        ...Array(8 - address.split(':').filter(Boolean).length).fill('0'),
+      ]
+    : address.split(':');
+  return `${groups
+    .slice(0, 4)
+    .map((group) => group.toLowerCase().padStart(4, '0'))
+    .join(':')}::/64`;
 }
 
 function readLimit(value: string | undefined, fallback: number): number {

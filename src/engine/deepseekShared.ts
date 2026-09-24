@@ -14,6 +14,8 @@ export type ExplainerLanguage = 'python' | 'javascript' | 'typescript';
 export type DeepSeekStepExplanation = {
   text: string;
   model: string;
+  /** Served from the explanation cache without using quota. */
+  cached?: boolean;
   usage?: {
     promptTokens?: number;
     completionTokens?: number;
@@ -164,7 +166,7 @@ export function parseDeepSeekExplanationPayload(value: unknown): DeepSeekStepExp
           typeof value.usage.totalTokens === 'number' ? value.usage.totalTokens : undefined,
       }
     : undefined;
-  return { model: value.model, text: value.text, usage };
+  return { model: value.model, text: value.text, usage, cached: value.cached === true };
 }
 
 export function deepSeekCompletionToExplanation(

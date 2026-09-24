@@ -48,6 +48,7 @@ describe('/api/explain-step', () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
+      cached: false,
       model: 'deepseek-v4-flash',
       text: 'total is initialized to 1.',
       usage: {
@@ -164,11 +165,11 @@ describe('/api/explain-step', () => {
       }),
     });
 
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(502);
     expect(response.headers.get('Content-Type')).toContain('application/json');
     expect(response.headers.get('X-Code-Visualizer-Function')).toBe('explain-step');
     expect(await response.json()).toEqual({
-      error: 'AI explainer crashed before returning JSON: network unavailable',
+      error: 'Could not reach the AI service. No explanation was used from your quota; try again.',
     });
   });
 });

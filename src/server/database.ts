@@ -83,6 +83,17 @@ export type AppDatabase = {
     subject: string;
     updatedAt: string;
   }): Promise<number>;
+  refundUsageDaily(params: { day: string; subject: string }): Promise<void>;
+  getCachedExplanation(
+    contextHash: string,
+    createdAfter: string,
+  ): Promise<{ answer: string; model: string } | null>;
+  putCachedExplanation(row: {
+    answer: string;
+    context_hash: string;
+    created_at: string;
+    model: string;
+  }): Promise<void>;
   insertBillingEvent(row: { created_at: string; id: string; type: string }): Promise<void>;
   insertHistory(row: HistoryRow): Promise<void>;
   listHistory(userId: string, limit: number): Promise<HistoryRow[]>;
@@ -294,6 +305,38 @@ class SupabaseRestDatabase implements AppDatabase {
       method: 'POST',
     });
     return Number(rows[0]?.new_count ?? 1);
+  }
+
+  async refundUsageDaily({ day, subject }: { day: string; subject: string }): Promise<void> {
+    await this.request<null>('rpc/refund_usage_daily', {
+      body: { p_day: day, p_subject: subject },
+      method: 'POST',
+    });
+  }
+
+  async getCachedExplanation(
+    contextHash: string,
+    createdAfter: string,
+  ): Promise<{ answer: string; model: string } | null> {
+    return this.first<{ answer: string; model: string }>('explain_cache', {
+      context_hash: eq(contextHash),
+      created_at: `gte.${createdAfter}`,
+      select: 'answer,model',
+    });
+  }
+
+  async putCachedExplanation(row: {
+    answer: string;
+    context_hash: string;
+    created_at: string;
+    model: string;
+  }): Promise<void> {
+    await this.request<null>('explain_cache', {
+      body: row,
+      method: 'POST',
+      params: { on_conflict: 'context_hash' },
+      prefer: 'resolution=merge-duplicates,return=minimal',
+    });
   }
 
   async insertBillingEvent(row: { created_at: string; id: string; type: string }): Promise<void> {
