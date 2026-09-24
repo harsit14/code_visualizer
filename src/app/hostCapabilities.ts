@@ -18,8 +18,8 @@ const NONE: HostCapabilities = { accounts: false, history: false, ai: false, kno
 
 let request: Promise<HostCapabilities> | null = null;
 
-export function fetchHostCapabilities(): Promise<HostCapabilities> {
-  if (STATIC_HOST) return Promise.resolve(NONE);
+export function fetchHostCapabilities(staticHost = STATIC_HOST): Promise<HostCapabilities> {
+  if (staticHost) return Promise.resolve(NONE);
   request ??= fetch('/api/capabilities', {
     credentials: 'same-origin',
     headers: { Accept: 'application/json' },
