@@ -37,9 +37,17 @@ provisioned admin IDs retain their original account ID.
 Managed session lookups join the provider identity on every account/history/AI
 request. Expiry, removed identity mappings, provider bans, deletion, email mismatch
 or verified MFA factors deny access. App logout deletes the current app session;
-Supabase logout alone does not revoke these separate app sessions. To revoke all
-app sessions, delete the rows for the independently verified internal user ID.
+Supabase logout alone does not revoke these separate app sessions. Signed-in users
+can list and revoke their app sessions from the account menu once
+`0004_account_controls.sql` is applied. Operators can still revoke all app sessions
+by deleting the rows for the independently verified internal user ID.
 Never roll back to code that omits the managed-session lookup or session guard.
+
+Deleting an email-code account requires a fresh email code: the Worker verifies it
+with Supabase and `delete_account` checks that the verified identity maps to the
+account before removing its data. The Worker then deletes the Supabase Auth user
+through the admin API, best effort. See
+[Account sessions, export and deletion](deployment.md#account-sessions-export-and-deletion).
 
 Every managed auth request uses database-backed IP and normalized-email counters.
 Keys are HMACs using the service credential, so limiter records do not contain
