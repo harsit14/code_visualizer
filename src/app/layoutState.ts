@@ -81,6 +81,7 @@ export const PRESENTATION_PANEL_VISIBILITY: PanelVisibility = {
   callStack: false,
   explainer: false,
   console: false,
+  compare: false,
 };
 
 export const DEFAULT_COLUMN_WEIGHTS: ColumnWeights = {
