@@ -369,6 +369,21 @@ tagging, autosave and restore, the service worker's update flow and offline cach
 reads, an O(n²) measurement, and presentation checkpoints plus a replay export
 containing a hostile string.
 
+## Sixteenth batch: opt-in workspace sync (findings 10 and batch 5)
+
+- Signed-in learners can turn on library sync (off by default). Explicit revisions,
+  tags and review state sync; autosaves and "Keep local only" workspaces stay on
+  the device, and pulled code is never run.
+- Migration `0005_workspace_sync.sql` stores immutable revisions and heads per
+  account. A revision is stored only when the server head equals its base, and a
+  re-sent identical revision is a no-op, so retries after a lost acknowledgement
+  never duplicate. On a conflict both versions are kept; the other device's copy is
+  saved as "… (from another device)".
+- Every sync request names the library's account; a different signed-in account is
+  refused, sign-out or an account switch stops sync, and attaching the library to
+  another account asks first. Account deletion and export include synced
+  workspaces.
+
 ## Evidence and limits (original audit)
 
 | Check                                       | Result                                                                                                                                  |
@@ -576,4 +591,4 @@ A practical first batch is: (1) privilege protection, (2) practice equality repa
 - Test replay with 100, 1,000 and 3,000 steps and several structure sizes. Agree budgets after measuring baseline; a reasonable initial target is p95 step-to-render under 100 ms on a named reference device.
 - Measure first successful run, meaningful stepping after a run, successful failure-case debugging, saved-work recovery and return visits. Use privacy-preserving events; exclude code, inputs, locals, notebook text and full share URLs.
 
-Next remaining milestones: stage the isolated runner and managed accounts, apply migrations 0003 and 0004 to the hosted database, run the browser end-to-end suite in CI (Chromium, Firefox, WebKit and phone sizes) and verify the real device matrix, and finish idempotent cloud sync for the workspace library. Everything else in this plan is implemented: phone navigation, save-failure recovery, local workspace revisions, search, tags, autosave and archives, parser-based JavaScript/TypeScript tracing, step explanations, trace search and bookmarks, failing-case explanations, guided lessons, algorithm views, run comparison, teaching mode, complexity experiments, the offline shell, and account session control, export and deletion.
+Next remaining milestones: stage the isolated runner and managed accounts, apply migrations 0003, 0004 and 0005 to the hosted database, and run the browser end-to-end suite in CI (Chromium, Firefox, WebKit and phone sizes) and verify the real device matrix. Everything else in this plan is implemented: phone navigation, save-failure recovery, local workspace revisions, search, tags, autosave and archives, parser-based JavaScript/TypeScript tracing, step explanations, trace search and bookmarks, failing-case explanations, guided lessons, algorithm views, run comparison, teaching mode, complexity experiments, the offline shell, account session control, export and deletion, and opt-in workspace sync.
