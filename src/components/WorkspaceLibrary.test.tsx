@@ -2,6 +2,7 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { useWorkspaceLibrary } from '../app/useWorkspaceLibrary';
+import type { WorkspaceSyncState, WorkspaceSyncView } from '../app/useWorkspaceSync';
 import type { WorkspaceSummary } from '../app/workspaceStore';
 import { WorkspaceLibrary } from './WorkspaceLibrary';
 
@@ -36,7 +37,28 @@ const items = [
   summary({ id: 'search', name: 'Binary search', savedAt: 10, source: 'lo = 0' }),
 ];
 
-function renderLibrary(overrides: Partial<Library> = {}) {
+const syncView = (overrides: Partial<WorkspaceSyncView> = {}): WorkspaceSyncView => ({
+  mode: 'ready',
+  enabled: false,
+  account: null,
+  user: { id: 'me', email: 'me@example.com' },
+  phase: 'idle',
+  error: null,
+  notice: '',
+  lastSyncedAt: null,
+  statusOf: () => ({ kind: 'local', label: 'Local only', detail: null }),
+  isLocalOnly: () => false,
+  inAccount: () => false,
+  enable: vi.fn(async () => {}),
+  disable: vi.fn(),
+  syncNow: vi.fn(),
+  setLocalOnly: vi.fn(async () => {}),
+  dismissIssue: vi.fn(async () => {}),
+  removeFromAccount: vi.fn(async () => {}),
+  ...overrides,
+});
+
+function renderLibrary(overrides: Partial<Library> = {}, sync?: WorkspaceSyncView) {
   const library = {
     active: null,
     items,
@@ -65,7 +87,7 @@ function renderLibrary(overrides: Partial<Library> = {}) {
     notebookPatterns: '',
     ...overrides,
   } as Library;
-  render(<WorkspaceLibrary library={library} />);
+  render(<WorkspaceLibrary library={library} sync={sync} />);
   return library;
 }
 const resultNames = () =>
@@ -181,5 +203,119 @@ describe('WorkspaceLibrary', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: /Include every revision/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Export library' }));
     expect(library.exportArchive).toHaveBeenCalledWith(true);
+  });
+});
+
+describe('WorkspaceLibrary account sync', () => {
+  const heading = () => screen.queryByText('Account sync', { selector: 'strong' });
+
+  it('is hidden on static hosts and explains why it is paused elsewhere', () => {
+    renderLibrary({}, syncView({ mode: 'static' }));
+    expect(heading()).toBeNull();
+    fireEvent.click(screen.getByRole('radio', { name: /Two Sum/ }));
+    expect(screen.queryByRole('checkbox', { name: 'Keep local only' })).toBeNull();
+    cleanup();
+
+    renderLibrary({}, syncView({ mode: 'unavailable' }));
+    expect(screen.getByText(/not available on this server yet/)).toBeTruthy();
+    expect(screen.queryByRole('checkbox', { name: /Sync this library/ })).toBeNull();
+    cleanup();
+
+    renderLibrary({}, syncView({ mode: 'offline', enabled: true }));
+    expect(screen.getByText(/sync resumes when you reconnect/)).toBeTruthy();
+    cleanup();
+
+    renderLibrary(
+      {},
+      syncView({ mode: 'signed-out', enabled: true, account: { id: 'a', email: 'a@example.com' } }),
+    );
+    expect(screen.getByText(/Sign in as a@example.com to keep syncing/)).toBeTruthy();
+  });
+
+  it('asks before syncing with a different signed-in account', () => {
+    const sync = syncView({
+      mode: 'other-account',
+      enabled: true,
+      account: { id: 'a', email: 'a@example.com' },
+      user: { id: 'b', email: 'b@example.com' },
+    });
+    renderLibrary({}, sync);
+    expect(
+      screen.getByText(/syncs with a@example.com. You are signed in as b@example.com/),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Sync with b@example.com instead' }));
+    expect(sync.enable).toHaveBeenCalledOnce();
+  });
+
+  it('turns library sync on and off and shows the last sync', () => {
+    const off = syncView();
+    renderLibrary({}, off);
+    const toggle = screen.getByRole('checkbox', { name: 'Sync this library with my account' });
+    expect((toggle as HTMLInputElement).checked).toBe(false);
+    fireEvent.click(toggle);
+    expect(off.enable).toHaveBeenCalledOnce();
+    cleanup();
+
+    const on = syncView({
+      enabled: true,
+      account: { id: 'me', email: 'me@example.com' },
+      lastSyncedAt: new Date(2026, 8, 26, 14, 2).getTime(),
+    });
+    renderLibrary({}, on);
+    expect(screen.getByText(/Last synced/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Sync now' }));
+    expect(on.syncNow).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Sync this library with my account' }));
+    expect(on.disable).toHaveBeenCalledOnce();
+    cleanup();
+
+    const failed = syncView({ enabled: true, phase: 'failed', error: 'Server unreachable.' });
+    renderLibrary({}, failed);
+    expect(screen.getByRole('alert').textContent).toContain('Sync failed: Server unreachable.');
+    fireEvent.click(screen.getByRole('button', { name: 'Retry sync' }));
+    expect(failed.syncNow).toHaveBeenCalledOnce();
+  });
+
+  it('shows each workspace’s state with Retry, Dismiss, Keep local only and removal', () => {
+    const states: Record<string, WorkspaceSyncState> = {
+      sum: { kind: 'synced', label: 'Synced', detail: null },
+      window: { kind: 'failed', label: 'Sync failed', detail: 'Too large.' },
+      search: { kind: 'conflict', label: 'Conflict', detail: 'Both are kept.' },
+    };
+    const sync = syncView({
+      enabled: true,
+      account: { id: 'me', email: 'me@example.com' },
+      statusOf: (item) => states[item.id],
+      isLocalOnly: (id) => id === 'search',
+      inAccount: (id) => id === 'sum',
+    });
+    renderLibrary({ active: { id: 'sum', name: 'Two Sum', revision: 1 }, dirty: false }, sync);
+    expect(screen.getByText('Local saved · revision 1 · Synced')).toBeTruthy();
+    const meta = screen.getAllByText(/· r1 ·/).map((node) => node.textContent);
+    expect(meta).toEqual([
+      expect.stringContaining('synced'),
+      expect.stringContaining('sync failed'),
+      expect.stringContaining('conflict'),
+    ]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove from account' }));
+    expect(sync.removeFromAccount).toHaveBeenCalledWith(items[0]);
+
+    fireEvent.click(screen.getByRole('radio', { name: /Max window/ }));
+    expect(screen.getByRole('alert').textContent).toContain('Sync failed. Too large.');
+    fireEvent.click(screen.getByRole('button', { name: 'Retry sync' }));
+    expect(sync.syncNow).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Keep local only' }));
+    expect(sync.setLocalOnly).toHaveBeenCalledWith('window', true);
+    expect(screen.queryByRole('button', { name: 'Remove from account' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('radio', { name: /Binary search/ }));
+    expect(screen.getByRole('alert').textContent).toContain('Conflict. Both are kept.');
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(sync.dismissIssue).toHaveBeenCalledWith('search');
+    const keep = screen.getByRole('checkbox', { name: 'Keep local only' }) as HTMLInputElement;
+    expect(keep.checked).toBe(true);
+    fireEvent.click(keep);
+    expect(sync.setLocalOnly).toHaveBeenLastCalledWith('search', false);
   });
 });

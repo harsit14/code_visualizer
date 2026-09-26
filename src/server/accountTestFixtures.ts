@@ -5,7 +5,10 @@ import {
   type AppDatabase,
   type HistoryRow,
   type SessionRow,
+  type SyncedWorkspaceRow,
   type UserWithPasswordRow,
+  type WorkspacePushRow,
+  type WorkspaceSyncResult,
 } from './database';
 
 export const TEST_PEPPER_ENV = { PASSWORD_PEPPER: 'test-pepper' };
@@ -17,13 +20,21 @@ export const ALICE_LAPTOP_TOKEN = 'l'.repeat(43);
 export const BOB_TOKEN = 'b'.repeat(43);
 
 type StoredHistory = HistoryRow & { idempotency_key: string | null };
+type StoredWorkspace = SyncedWorkspaceRow & { user_id: string; bytes: number };
+type StoredRevision = { user_id: string; workspace_id: string; revision: number; body: string };
+
+const EMPTY_TAGS = { tags: [], needsReview: false, reviewBy: null };
 
 /**
  * An in-memory stand-in for the Supabase adapter that follows the SQL rules of
- * migrations 0001-0004 (the real SQL is exercised by the *Migration tests).
- * `migrated: false` behaves like a database without 0004.
+ * migrations 0001-0005 (the real SQL is exercised by the *Migration tests).
+ * `migrated: false` behaves like a database without 0004 and 0005;
+ * `workspaceSync: false` like one without 0005.
  */
-export async function createAccountFixture({ migrated = true } = {}) {
+export async function createAccountFixture({
+  migrated = true,
+  workspaceSync = migrated,
+}: { migrated?: boolean; workspaceSync?: boolean } = {}) {
   const day = new Date(Date.now() + 86_400_000).toISOString();
   const users: Array<UserWithPasswordRow & { auth_method?: 'legacy' | 'supabase' }> = [
     {
@@ -67,8 +78,39 @@ export async function createAccountFixture({ migrated = true } = {}) {
     { subject: `user:${BOB}`, day: '2026-09-24', plan: 'free', count: 1 },
   ];
   const identities: Array<{ subject: string; userId: string }> = [];
+  const workspaces: StoredWorkspace[] = [];
+  const revisions: StoredRevision[] = [];
+  let changeSeq = 0;
 
   const missing = (code: string) => new DatabaseRequestError('missing migration 0004', 400, code);
+  const requireSync = (code: 'PGRST202' | 'PGRST205') => {
+    if (!workspaceSync) throw new DatabaseRequestError('missing migration 0005', 404, code);
+  };
+  const headOf = (row: StoredWorkspace): SyncedWorkspaceRow => ({
+    change_seq: row.change_seq,
+    deleted_at: row.deleted_at,
+    id: row.id,
+    meta: structuredClone(row.meta),
+    meta_version: row.meta_version,
+    name: row.name,
+    revision: row.revision,
+    updated_at: row.updated_at,
+  });
+  const findWorkspace = (userId: string, id: string) =>
+    workspaces.find((w) => w.user_id === userId && w.id === id);
+  const lockUser = (userId: string) => {
+    if (!users.some((u) => u.id === userId)) {
+      throw new DatabaseRequestError('account_missing', 400, 'P0001');
+    }
+  };
+  const result = (
+    status: WorkspaceSyncResult['status'],
+    row?: StoredWorkspace,
+  ): WorkspaceSyncResult => ({ status, head: row ? headOf(row) : null });
+  const bump = (row: StoredWorkspace) => {
+    row.change_seq = ++changeSeq;
+    row.updated_at = new Date().toISOString();
+  };
   const visible = (row: SessionRow): SessionRow => {
     const copy = { ...row };
     if (!migrated) {
@@ -148,6 +190,8 @@ export async function createAccountFixture({ migrated = true } = {}) {
       }
       removeWhere(usage, (u) => u.subject === `user:${userId}`);
       removeWhere(history, (h) => h.user_id === userId);
+      removeWhere(workspaces, (w) => w.user_id === userId);
+      removeWhere(revisions, (r) => r.user_id === userId);
       removeWhere(sessions, (s) => s.user_id === userId);
       removeWhere(identities, (i) => i.userId === userId);
       removeWhere(users, (u) => u.id === userId);
@@ -175,6 +219,143 @@ export async function createAccountFixture({ migrated = true } = {}) {
     ),
     updateHistory: vi.fn(async () => {}),
     pruneHistory: vi.fn(async () => {}),
+    listSyncedWorkspaces: vi.fn(async (userId: string, after: number, limit: number) => {
+      requireSync('PGRST205');
+      return workspaces
+        .filter((w) => w.user_id === userId && w.change_seq > after)
+        .sort((a, b) => a.change_seq - b.change_seq)
+        .slice(0, limit)
+        .map(headOf);
+    }),
+    getSyncedRevision: vi.fn(async (userId: string, id: string, revision: number) => {
+      requireSync('PGRST205');
+      return (
+        revisions.find(
+          (r) => r.user_id === userId && r.workspace_id === id && r.revision === revision,
+        )?.body ?? null
+      );
+    }),
+    pushWorkspaceRevision: vi.fn(async (row: WorkspacePushRow) => {
+      requireSync('PGRST202');
+      lockUser(row.user_id);
+      const head = findWorkspace(row.user_id, row.workspace_id);
+      const next = row.base_revision + 1;
+      if (head && !head.deleted_at) {
+        const stored = revisions.find(
+          (r) =>
+            r.user_id === row.user_id && r.workspace_id === row.workspace_id && r.revision === next,
+        );
+        if (stored || head.revision !== row.base_revision) {
+          return result(stored?.body === row.body ? 'duplicate' : 'conflict', head);
+        }
+      } else if (row.base_revision > 0) {
+        return result(head ? 'deleted' : 'missing', head);
+      }
+      const size = new TextEncoder().encode(row.body).length;
+      const own = workspaces.filter((w) => w.user_id === row.user_id);
+      if (
+        (!head || head.deleted_at) &&
+        own.filter((w) => !w.deleted_at).length >= row.max_workspaces
+      ) {
+        return result('quota');
+      }
+      if (own.reduce((sum, w) => sum + w.bytes, 0) + size > row.max_bytes) {
+        return result('quota');
+      }
+      let stored = head;
+      if (!stored) {
+        stored = {
+          user_id: row.user_id,
+          id: row.workspace_id,
+          name: row.name,
+          revision: 1,
+          meta: structuredClone(row.meta),
+          meta_version: 0,
+          bytes: size,
+          change_seq: 0,
+          updated_at: '',
+          deleted_at: null,
+        };
+        workspaces.push(stored);
+      } else {
+        const revived = stored.deleted_at !== null;
+        Object.assign(stored, {
+          name: row.name,
+          revision: next,
+          meta: revived ? structuredClone(row.meta) : stored.meta,
+          meta_version: stored.meta_version + (revived ? 1 : 0),
+          bytes: (revived ? 0 : stored.bytes) + size,
+          deleted_at: null,
+        });
+      }
+      bump(stored);
+      revisions.push({
+        user_id: row.user_id,
+        workspace_id: row.workspace_id,
+        revision: next,
+        body: row.body,
+      });
+      return result('stored', stored);
+    }),
+    updateSyncedWorkspaceMeta: vi.fn(
+      async (userId: string, id: string, metaVersion: number, meta: unknown) => {
+        requireSync('PGRST202');
+        lockUser(userId);
+        const head = findWorkspace(userId, id);
+        if (!head) return result('missing');
+        if (head.deleted_at) return result('deleted', head);
+        if (
+          head.meta_version === metaVersion + 1 &&
+          JSON.stringify(head.meta) === JSON.stringify(meta)
+        ) {
+          return result('duplicate', head);
+        }
+        if (head.meta_version !== metaVersion) return result('conflict', head);
+        head.meta = structuredClone(meta);
+        head.meta_version += 1;
+        bump(head);
+        return result('stored', head);
+      },
+    ),
+    deleteSyncedWorkspace: vi.fn(async (userId: string, id: string) => {
+      requireSync('PGRST202');
+      lockUser(userId);
+      const head = findWorkspace(userId, id);
+      if (!head) return result('missing');
+      if (head.deleted_at) return result('duplicate', head);
+      removeWhere(revisions, (r) => r.user_id === userId && r.workspace_id === id);
+      Object.assign(head, {
+        name: 'Removed workspace',
+        meta: structuredClone(EMPTY_TAGS),
+        bytes: 0,
+        deleted_at: new Date().toISOString(),
+      });
+      bump(head);
+      return result('stored', head);
+    }),
+    exportSyncedWorkspaces: vi.fn(async (userId: string, limit: number, maxBytes: number) => {
+      requireSync('PGRST202');
+      let running = 0;
+      return workspaces
+        .filter((w) => w.user_id === userId && !w.deleted_at)
+        .sort((a, b) => b.updated_at.localeCompare(a.updated_at) || a.id.localeCompare(b.id))
+        .slice(0, limit)
+        .map((w) => {
+          const body =
+            revisions.find(
+              (r) => r.user_id === userId && r.workspace_id === w.id && r.revision === w.revision,
+            )?.body ?? '';
+          running += new TextEncoder().encode(body).length;
+          return {
+            id: w.id,
+            name: w.name,
+            revision: w.revision,
+            meta: structuredClone(w.meta),
+            updated_at: w.updated_at,
+            body: running <= maxBytes ? body : null,
+          };
+        });
+    }),
   };
 
   return {
@@ -182,9 +363,11 @@ export async function createAccountFixture({ migrated = true } = {}) {
     database: db as unknown as AppDatabase,
     history,
     identities,
+    revisions,
     sessions,
     usage,
     users,
+    workspaces,
   };
 }
 

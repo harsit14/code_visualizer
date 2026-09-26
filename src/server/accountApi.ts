@@ -32,6 +32,7 @@ import {
 } from './http';
 import { handleAccountControlsApi } from './accountControlsApi';
 import { handleHistoryApi } from './historyApi';
+import { handleWorkspaceSyncApi } from './workspaceSyncApi';
 import { enforceAuthRateLimit } from './rateLimit';
 import {
   managedAuthEnabled,
@@ -56,6 +57,11 @@ export async function handleAccountApi(request: Request, env: ServerEnv): Promis
     const historyResponse = await handleHistoryApi(request, env);
     if (historyResponse) {
       return historyResponse;
+    }
+
+    const workspaceSyncResponse = await handleWorkspaceSyncApi(request, env);
+    if (workspaceSyncResponse) {
+      return workspaceSyncResponse;
     }
 
     const accountControlsResponse = await handleAccountControlsApi(request, env);

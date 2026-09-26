@@ -1,6 +1,7 @@
 import { useDeferredValue, useId, useMemo, useRef, useState } from 'react';
 import type { Language } from '../engine/types';
 import { formatTime, type useWorkspaceLibrary } from '../app/useWorkspaceLibrary';
+import type { WorkspaceSyncView } from '../app/useWorkspaceSync';
 import {
   buildWorkspaceIndex,
   lastActivity,
@@ -121,11 +122,148 @@ function TagEditor({
   );
 }
 
+/** Library-level sync: the opt-in toggle, last sync, and why sync is paused. */
+function SyncSection({ sync, headingId }: { sync: WorkspaceSyncView; headingId: string }) {
+  const { mode, account, user, enabled } = sync;
+  const explanation =
+    mode === 'offline'
+      ? enabled
+        ? 'You are offline. Saving still works on this device, and sync resumes when you reconnect.'
+        : 'You are offline. Account sync can be turned on when you reconnect.'
+      : mode === 'unavailable'
+        ? 'Account sync is not available on this server yet. Workspaces stay in this browser.'
+        : mode === 'checking'
+          ? 'Checking your account…'
+          : mode === 'signed-out'
+            ? enabled && account
+              ? `Sign in as ${account.email} to keep syncing. Nothing is uploaded while signed out.`
+              : 'Sign in to sync this library with your account. Until then, workspaces stay in this browser.'
+            : mode === 'other-account' && account && user
+              ? `This library syncs with ${account.email}. You are signed in as ${user.email}, so nothing is uploaded to or downloaded from either account.`
+              : null;
+  return (
+    <section className="workspace-menu-section" aria-labelledby={headingId}>
+      <strong className="workspace-menu-heading" id={headingId}>
+        Account sync
+      </strong>
+      {explanation && <p className="account-note">{explanation}</p>}
+      {mode === 'other-account' && user && (
+        <button type="button" onClick={() => void sync.enable()}>
+          Sync with {user.email} instead
+        </button>
+      )}
+      {mode === 'ready' && (
+        <>
+          <label className="panel-menu-item workspace-check">
+            <input
+              type="checkbox"
+              checked={enabled}
+              onChange={(event) => (event.target.checked ? void sync.enable() : sync.disable())}
+            />
+            Sync this library with my account
+          </label>
+          <p className="account-note">
+            {enabled && account
+              ? `Saved revisions, names, tags and review state sync with ${account.email}. Autosaves and workspaces marked Keep local only stay on this device. Synced code runs only when you choose Run.`
+              : 'Off. Workspaces stay in this browser. Turn on to keep a copy in your account and open it on your other devices.'}
+          </p>
+          {enabled && (
+            <p
+              className={`account-note workspace-sync-state${sync.phase === 'failed' ? ' workspace-sync-failed' : ''}`}
+              role={sync.phase === 'failed' ? 'alert' : 'status'}
+            >
+              <span>
+                {sync.phase === 'syncing'
+                  ? 'Syncing…'
+                  : sync.phase === 'failed'
+                    ? `Sync failed: ${sync.error}`
+                    : sync.lastSyncedAt
+                      ? `Last synced ${formatTime(sync.lastSyncedAt)}`
+                      : 'Not synced yet'}
+              </span>
+              {sync.phase !== 'syncing' && (
+                <button type="button" onClick={sync.syncNow}>
+                  {sync.phase === 'failed' ? 'Retry sync' : 'Sync now'}
+                </button>
+              )}
+            </p>
+          )}
+        </>
+      )}
+      {sync.notice && (
+        <p className="account-note" role="status">
+          {sync.notice}
+        </p>
+      )}
+    </section>
+  );
+}
+
+/** Per-workspace sync state and the Keep local only choice. */
+function WorkspaceSyncControls({
+  sync,
+  item,
+  blocked,
+}: {
+  sync: WorkspaceSyncView;
+  item: WorkspaceSummary;
+  blocked: boolean;
+}) {
+  const status = sync.statusOf(item);
+  const alert = status.kind === 'failed' || status.kind === 'conflict';
+  const canSync = sync.mode === 'ready' && sync.enabled;
+  return (
+    <div className="workspace-sync-item">
+      <span className="workspace-subheading">Account sync</span>
+      <p
+        className={`account-note workspace-sync-state workspace-sync-${status.kind}`}
+        role={alert ? 'alert' : 'status'}
+      >
+        <span>
+          {status.label}
+          {status.detail ? `. ${status.detail}` : ''}
+        </span>
+        {status.kind === 'failed' && (
+          <button type="button" disabled={!canSync} onClick={sync.syncNow}>
+            Retry sync
+          </button>
+        )}
+        {status.kind === 'conflict' && (
+          <button type="button" onClick={() => void sync.dismissIssue(item.id)}>
+            Dismiss
+          </button>
+        )}
+      </p>
+      <label className="panel-menu-item workspace-check">
+        <input
+          type="checkbox"
+          checked={sync.isLocalOnly(item.id)}
+          disabled={blocked}
+          onChange={(event) => void sync.setLocalOnly(item.id, event.target.checked)}
+        />
+        Keep local only
+      </label>
+      {sync.inAccount(item.id) && (
+        <button
+          type="button"
+          disabled={blocked || !canSync}
+          onClick={() => void sync.removeFromAccount(item)}
+        >
+          Remove from account
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function WorkspaceLibrary({
   library,
+  sync,
   disabled = false,
 }: {
   library: Library;
+  /** Account sync; omitted where the host has no accounts. */
+  sync?: WorkspaceSyncView;
   disabled?: boolean;
 }) {
   const file = useRef<HTMLInputElement>(null);
@@ -175,6 +313,10 @@ export function WorkspaceLibrary({
   };
   const offer = library.offer;
   const autosave = library.autosave;
+  // Static hosts have no accounts, so sync is not mentioned at all.
+  const syncShown = sync && sync.mode !== 'static' ? sync : null;
+  const syncing = syncShown?.enabled ? syncShown : null;
+  const activeItem = library.items.find((item) => item.id === library.active?.id);
   return (
     <details
       className="panel-menu workspace-library"
@@ -193,8 +335,9 @@ export function WorkspaceLibrary({
         <strong className="workspace-menu-heading">Local workspace library</strong>
         <p className="account-note">
           Save revisions explicitly; a saved workspace also autosaves while you edit. Code, inputs,
-          cases, notes, watches, breakpoints and the current replay stay on this device. Export a
-          backup before clearing browser data.
+          cases, notes, watches, breakpoints and the current replay stay on this device
+          {syncing ? ', and saved revisions also sync with your account' : ''}. Export a backup
+          before clearing browser data.
         </p>
         <label className="workspace-field">
           Workspace name
@@ -237,7 +380,9 @@ export function WorkspaceLibrary({
             ? 'Working…'
             : library.dirty
               ? 'Unsaved workspace changes'
-              : `Local saved · revision ${library.active?.revision}`}
+              : `Local saved · revision ${library.active?.revision}${
+                  syncing && activeItem ? ` · ${syncing.statusOf(activeItem).label}` : ''
+                }`}
         </p>
         {autosave && (
           <p
@@ -279,6 +424,7 @@ export function WorkspaceLibrary({
             </div>
           </div>
         )}
+        {syncShown && <SyncSection sync={syncShown} headingId={`${ids}-sync`} />}
         <section className="workspace-menu-section" aria-labelledby={`${ids}-saved`}>
           <strong className="workspace-menu-heading" id={`${ids}-saved`}>
             Saved workspaces
@@ -376,6 +522,7 @@ export function WorkspaceLibrary({
                             formatDay(lastActivity(item)),
                             item.autosave && 'autosaved',
                             reviewDue(item, today) && 'needs review',
+                            syncing && syncing.statusOf(item).label.toLowerCase(),
                           ]
                             .filter(Boolean)
                             .join(' · ')}
@@ -470,6 +617,9 @@ export function WorkspaceLibrary({
                 />
               </label>
             </div>
+            {syncShown && (
+              <WorkspaceSyncControls sync={syncShown} item={selected} blocked={blocked} />
+            )}
           </section>
         )}
         <section className="workspace-menu-section" aria-labelledby={`${ids}-archive`}>

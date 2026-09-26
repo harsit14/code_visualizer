@@ -55,13 +55,17 @@ export class WorkspaceMetaConflictError extends Error {
 }
 
 const DB_NAME = 'cv-workspaces-v1';
-/** Version 2 adds head metadata (tags, review, search source) and the autosave store. */
-export const DB_VERSION = 2;
+/**
+ * Version 2 adds head metadata (tags, review, search source) and the autosave store.
+ * Version 3 adds the `sync` store of per-workspace account sync state.
+ */
+export const DB_VERSION = 3;
 const LANGUAGES: Language[] = ['python', 'javascript', 'typescript'];
 
-type StoredHead = Partial<WorkspaceSummary> & Pick<WorkspaceSummary, 'id' | 'name' | 'revision'>;
+export type StoredHead = Partial<WorkspaceSummary> &
+  Pick<WorkspaceSummary, 'id' | 'name' | 'revision'>;
 
-function toSummary(head: StoredHead): WorkspaceSummary {
+export function toSummary(head: StoredHead): WorkspaceSummary {
   return {
     id: head.id,
     name: head.name,
@@ -108,9 +112,13 @@ function upgrade(db: IDBDatabase, tx: IDBTransaction, oldVersion: number) {
       }
     };
   }
+  if (oldVersion < 3) {
+    db.createObjectStore('sync', { keyPath: 'id' });
+  }
 }
 
-function openDatabase(): Promise<IDBDatabase> {
+/** Shared with workspaceSyncStore, whose writes must commit with heads and revisions. */
+export function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     if (typeof indexedDB === 'undefined') {
       reject(
@@ -144,7 +152,7 @@ function openDatabase(): Promise<IDBDatabase> {
   });
 }
 
-function transaction<T>(
+export function transaction<T>(
   db: IDBDatabase,
   stores: string[],
   mode: IDBTransactionMode,

@@ -178,6 +178,36 @@
   gap: 6px;
 }
 
+/* Account sync: library toggle and per-workspace state. */
+.workspace-sync-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.workspace-sync-state {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.workspace-sync-state.workspace-sync-failed {
+  color: var(--red);
+}
+
+.workspace-sync-state.workspace-sync-conflict {
+  background: var(--amber-soft);
+  border: 1px solid var(--amber);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 6px 8px;
+}
+
+.workspace-sync-state.workspace-sync-synced {
+  color: var(--green);
+}
+
 @media (max-width: 720px) {
   .workspace-library input[type='radio'],
   .workspace-library input[type='checkbox'] {

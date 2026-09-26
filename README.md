@@ -55,7 +55,8 @@ or understanding how state mutates one line at a time.
 - Save named local workspace revisions with cases, notes, inputs, watches,
   breakpoints, bookmarks and replay. Tag them by pattern, mark them for review,
   search names, tags and code, and let open workspaces autosave. Export one
-  exercise or the whole library as a backup.
+  exercise or the whole library as a backup, or opt in to sync the library with
+  your account.
 - Keep a run as a baseline, edit the code and compare: the first divergent return
   value, variable, output line or call is named, with a jump to that step.
 - Run complexity experiments: choose which input grows, see every sampled size
@@ -170,6 +171,9 @@ Overlarge share links should be replaced with a trace export. JS traces stop aft
   You can download it with the rest of your account data, or delete the account.
 - The offline cache holds only the app and the Python runtime; API responses and
   your data are never cached by the service worker.
+- Workspace sync is off until you turn it on. Only explicit revisions, tags and
+  review state are uploaded; autosaves and workspaces marked local only stay on
+  the device.
 
 ## Quick Start
 
