@@ -980,7 +980,9 @@ export function DashboardApp({ onOpenLanding }: DashboardAppProps) {
         )}
 
         {!embedMode &&
-          (draftStatus !== 'idle' || (historySyncEnabled && historySaveStatus !== 'idle')) && (
+          (draftStatus !== 'idle' ||
+            library.autosave ||
+            (historySyncEnabled && historySaveStatus !== 'idle')) && (
             <div className="persistence-status">
               {!embedMode && draftStatus !== 'idle' && (
                 <div className="save-status" role={draftStatus === 'failed' ? 'alert' : 'status'}>
@@ -996,6 +998,16 @@ export function DashboardApp({ onOpenLanding }: DashboardAppProps) {
                   {draftStatus === 'failed' && (
                     <button type="button" onClick={flushDraft}>
                       Retry draft save
+                    </button>
+                  )}
+                </div>
+              )}
+              {library.autosave && (
+                <div className="save-status" role={library.autosave.alert ? 'alert' : 'status'}>
+                  <span>{library.autosave.text}</span>
+                  {library.autosave.retry && (
+                    <button type="button" onClick={() => void library.retryAutosave()}>
+                      Retry autosave
                     </button>
                   )}
                 </div>
