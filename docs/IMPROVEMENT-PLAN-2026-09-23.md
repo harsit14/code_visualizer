@@ -384,6 +384,18 @@ containing a hostile string.
   another account asks first. Account deletion and export include synced
   workspaces.
 
+## Seventeenth batch: browser tests on pull requests (Stage B)
+
+- Playwright runs the production build in Chromium, Firefox, WebKit and 390×844
+  Pixel and iPhone profiles on every pull request, in a CI job separate from the
+  unit checks. Specs cover landing → app, Python and JavaScript stepping, the
+  LeetCode prelude and "Did you mean" hints, ligature-free code, practice cases,
+  share reloads, trace export/import, nested structures, Stop and timeout
+  recovery, a failed runtime download with Retry, phone tabs and keyboard focus,
+  Compare runs and presentation mode.
+- The first CI run passed on every project (Firefox cannot launch locally on
+  macOS 27, so CI is its reference). Reports and traces upload on failure.
+
 ## Evidence and limits (original audit)
 
 | Check                                       | Result                                                                                                                                  |
@@ -591,4 +603,4 @@ A practical first batch is: (1) privilege protection, (2) practice equality repa
 - Test replay with 100, 1,000 and 3,000 steps and several structure sizes. Agree budgets after measuring baseline; a reasonable initial target is p95 step-to-render under 100 ms on a named reference device.
 - Measure first successful run, meaningful stepping after a run, successful failure-case debugging, saved-work recovery and return visits. Use privacy-preserving events; exclude code, inputs, locals, notebook text and full share URLs.
 
-Next remaining milestones: stage the isolated runner and managed accounts, apply migrations 0003, 0004 and 0005 to the hosted database, and run the browser end-to-end suite in CI (Chromium, Firefox, WebKit and phone sizes) and verify the real device matrix. Everything else in this plan is implemented: phone navigation, save-failure recovery, local workspace revisions, search, tags, autosave and archives, parser-based JavaScript/TypeScript tracing, step explanations, trace search and bookmarks, failing-case explanations, guided lessons, algorithm views, run comparison, teaching mode, complexity experiments, the offline shell, account session control, export and deletion, and opt-in workspace sync.
+Next remaining milestones: stage the isolated runner and managed accounts, apply migrations 0003, 0004 and 0005 to the hosted database, make the Chromium browser job a required check once it has a stable record, and verify on real phones and tablets. Everything else in this plan is implemented: phone navigation, save-failure recovery, local workspace revisions, search, tags, autosave and archives, parser-based JavaScript/TypeScript tracing, step explanations, trace search and bookmarks, failing-case explanations, guided lessons, algorithm views, run comparison, teaching mode, complexity experiments, the offline shell, account session control, export and deletion, opt-in workspace sync, and browser tests on every pull request.
