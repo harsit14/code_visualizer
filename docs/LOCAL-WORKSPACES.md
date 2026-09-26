@@ -16,16 +16,19 @@ has a syntax error; editing resets case verdicts. Existing source-keyed practice
 storage is read normally until the first workspace save, so a current exercise
 can be captured without deleting its legacy records.
 
-Saves are **explicit**. The Library indicator shows unsaved changes or a check
-mark for the saved revision. Close/reload warns when a named workspace has unsaved
-changes, subject to browser support. The single code draft continues to save
-while typing; that draft does not contain the rest of a workspace. After a reload,
-use **Library → Saved workspaces → Open revision** to resume a saved exercise.
+Revisions are **explicit**; a saved workspace also [autosaves](#autosave) into a
+separate slot that never becomes a revision on its own. The Library indicator
+shows unsaved changes or a check mark for the saved revision. Close/reload warns
+when a named workspace has unsaved changes, subject to browser support. The single
+code draft continues to save while typing; that draft does not contain the rest of
+a workspace. After a reload, use **Library → Saved workspaces → Open revision** to
+resume a saved exercise.
 Loading examples or changing language/function can reset exercise state, so save
 a revision before replacing it. Loading an example, draft, history item or trace,
 or changing language, asks before replacing an open workspace. After confirmation
-the Library detaches from it: the next save creates a new workspace, and practice
-cases/notes return to the normal per-source storage without overwriting it.
+the Library detaches from it: pending edits are written to its autosave slot one
+last time, the next save creates a new workspace, and practice cases/notes return
+to the normal per-source storage without overwriting it.
 
 Select a saved workspace and its revision number to open an earlier state.
 Saving that state appends a new revision after the latest head; it does not erase
@@ -35,20 +38,147 @@ open the newer revision. Head metadata and revision content commit in the same
 transaction. A failed/aborted write leaves the last committed revision intact.
 
 **Export workspace** requests a `.cvworkspace.json` download containing the
-current exercise, including unsaved changes and the current replay. Check your
-browser's downloads and keep the file somewhere safe. Each file contains one
-complete exercise snapshot; it does not contain every revision in the library,
-layout/theme preferences, account credentials, AI conversation or complexity
-experiments. Open a different revision and export it to keep that snapshot too.
+current exercise, including unsaved changes and the current replay, plus its tags
+and review state. Check your browser's downloads and keep the file somewhere safe.
+Each file contains one complete exercise snapshot; it does not contain every
+revision in the library, layout/theme preferences, account credentials, AI
+conversation or complexity experiments. Open a different revision and export it
+to keep that snapshot too, or use [Export library](#whole-library-archives).
 Export remains available if IndexedDB is unavailable, within the file limits.
 
-**Restore backup** validates a version 1 file before changing the editor, then
-saves it under a new local ID. A backup cannot overwrite an existing workspace by
-reusing its ID. Invalid, future-version or oversized files leave the current
-exercise intact. Edits made while a file is being read also prevent replacement.
-Files are limited to 25 MB, source and individual text fields to 200,000
-characters, and cases to 500; nested trace limits also apply. A full or disabled
-browser store causes a visible error; retry saving or export the current exercise.
+**Restore backup** validates a version 1 or 2 file before changing the editor,
+then saves it under a new local ID. A backup cannot overwrite an existing
+workspace by reusing its ID. Invalid, future-version or oversized files leave the
+current exercise intact. Edits made while a file is being read also prevent
+replacement. Files are limited to 25 MB, source and individual text fields to
+200,000 characters, and cases to 500; nested trace limits also apply. A full or
+disabled browser store causes a visible error; retry saving or export the current
+exercise.
+
+Workspace files are version 2. Version 2 adds an optional top-level `meta` object
+(`tags`, `needsReview`, `reviewBy`) beside the unchanged `workspace` object.
+Version 1 files still restore, with no tags; `meta` in a version 1 file is
+ignored. Stored revisions omit `meta` because tags belong to the workspace, not
+to a revision.
+
+## Tags, review and search
+
+Select a workspace in **Saved workspaces** to see its tags and review state.
+Tags are trimmed, lowercased and whitespace-collapsed, so `Sliding  Window` and
+`sliding window` are the same tag. Common spellings are merged: `two-pointer`
+becomes `two pointers`, `dynamic programming` becomes `dp`, and
+`breadth-first search` becomes `bfs`. A tag holds letters, numbers, spaces and
+`_ + # . / ' -`, starts with a letter or number, and has at most 32 characters.
+A workspace has at most 12 tags. Suggested pattern tags are two pointers, sliding
+window, binary search, BFS, DFS, DP, heap, recursion, hash map, stack, graph and
+greedy. Patterns named in the open exercise's notebook are suggested first.
+Custom tags are allowed.
+
+**Needs review** flags a workspace to revisit. **Review by** sets a date; on
+and after that local date the workspace also counts as due for review.
+
+Tags and review state are workspace metadata. Changing them never creates a code
+revision, never changes the editor and does not mark the open workspace unsaved.
+Each edit is checked against the metadata version this tab last read. When
+another tab changed them first, the edit is rejected, the list reloads and the
+change can be applied again.
+
+The search box matches every typed word against the name, tags and source code of
+the latest revision. Filters narrow by language, tag and **Due for review**. Sort
+by **Recently saved** or **Name**. Recently saved counts autosaves, so a
+workspace being edited stays near the top. The Library reads one head record per
+workspace when it opens; each head carries the latest source for search. It then
+builds a lowercase in-memory index, so typing does not read IndexedDB. Up to 100
+matches are listed; refine the search to reach the rest.
+
+## Autosave
+
+While a saved workspace is open, edits to its code, inputs, cases, notes,
+watches, breakpoints, bookmarks, replay or name are autosaved 1.5 seconds after
+the last change. They go to one replaceable **autosave slot** per workspace. The
+slot is not a revision: **Save revision** still creates an immutable revision,
+and that save clears the slot when the slot holds this tab's autosave. Untitled
+drafts are never autosaved; the separate code draft covers them. A saved
+workspace with an empty name waits until it has one.
+
+The status bar and Library show the autosave state: **Autosave pending…**,
+**Autosaving…**, **Autosaved 14:02**, **Autosave failed — retry** (with a retry
+button; the next edit also retries) or **Autosave stopped** after a conflict.
+Pending edits are written when the page is hidden or closed, as drafts are.
+They are also written when the workspace is replaced by an example, draft,
+history item, trace or language change. Page-hide writes are best effort,
+because a browser may end a closing page before IndexedDB commits. Hiding the
+tab, for example by switching apps on a phone, is more reliable.
+
+When an opened workspace has an autosave, the Library offers **Restore
+autosave** or **Discard autosave**. Autosave pauses until you choose. Restoring
+replaces the editor with the autosaved state without running code. It keeps the
+workspace unsaved until you choose Save revision. Restoring asks first if you
+edited since opening. Discarding asks for confirmation and deletes only that
+autosave. If the autosave started from an older revision than the latest one,
+the offer says so.
+
+Concurrency uses the same optimistic checks as revisions. Every autosave records
+the head revision it started from and gets a new token. A write succeeds only if
+the head is still that revision and the slot still holds the token this tab last
+wrote or restored. A stale tab cannot replace a newer revision or another tab's
+newer autosave. Its autosave stops with a visible message; reopen the workspace
+to review the other change, or save a copy. An explicit save from a tab that did
+not write the current autosave keeps that autosave, so it can be restored or
+discarded later. Restore and discard fail visibly if another tab changed the
+slot meanwhile.
+
+## Whole-library archives
+
+**Export library** requests one `code-visualizer-library-YYYY-MM-DD.cvlibrary.json`
+file. It contains every workspace's latest revision, its autosave when one holds
+unsaved edits, and its tags and review state. **Include every revision** adds all
+earlier revisions while the archive stays within 100 MB; beyond that, the export
+falls back to latest revisions only and says so. Pending autosave edits of the
+open workspace are written first, so the archive includes them. Damaged stored
+records are left out and counted. The format is:
+
+```json
+{
+  "format": "code-visualizer-library",
+  "version": 1,
+  "exportedAt": 1790000000000,
+  "history": false,
+  "workspaces": [
+    {
+      "meta": { "tags": ["bfs"], "needsReview": false, "reviewBy": null },
+      "revisions": [{ "id": "…", "name": "…", "revision": 3, "savedAt": 0, "content": {} }],
+      "autosave": null
+    }
+  ]
+}
+```
+
+Each `revisions` and `autosave` item is the same `workspace` object used by
+single backups and is validated the same way.
+
+**Import library** reads and validates the whole file before writing anything.
+Archives are limited to 100 MB, 1,000 workspaces and 10,000 revisions. Files that
+are not version 1 library archives, including single workspace backups, are
+rejected. A workspace that fails validation is skipped by name with the reason;
+the others still import. A workspace whose latest name, save time and source
+already match a library workspace is skipped as a duplicate, so importing the
+same archive twice is harmless. Every imported workspace gets a new ID. Its
+revisions are renumbered from 1 in their original order, so a latest-only archive
+imports as revision 1. All workspaces are written in one IndexedDB transaction:
+if any write fails, none are kept. Import never runs saved code, and it does not
+change the editor or the open workspace. The Library reports how many workspaces
+and revisions were imported and how many were skipped.
+
+## Storage schema
+
+The IndexedDB database `cv-workspaces-v1` is at schema version 2. Version 2 adds
+tags, review state, language, latest source and autosave information to each
+workspace head. It also adds an `autosaves` store, keyed by workspace ID. The
+upgrade runs once when the new version first opens. It keeps every head and
+revision and fills search fields from each latest revision; a damaged revision
+upgrades with empty search text. Tabs still running the previous version cannot
+open the upgraded database, so reload them.
 
 Workspace files and browser storage contain source, inputs, notes and recorded
 values in plain text. Library operations do not upload them to an account.
@@ -74,3 +204,15 @@ The browser stalled at a later confirmation dialog during the older-revision
 check; that path is covered by the automated tests. The browser download event
 was not observed; export payload/download wiring is covered by a component test.
 Real Safari/Firefox, browser eviction and actual disk-full behavior remain untested.
+
+Tag, search, autosave and archive coverage uses fake-indexeddb and Testing
+Library. It checks tag normalization and limits, and version 1 and 2 backups. It
+checks the schema 1 → 2 upgrade, including a damaged revision, and metadata edits
+that neither create revisions nor overwrite another tab's change. Autosave
+checks cover debounce, fold-on-save, page-hide and replace flushes, untitled
+drafts, restore and discard offers, and failure and retry. They also cover stale
+tabs against a newer revision or autosave. Archive checks cover history and
+latest-only exports and fresh-ID renumbered imports. They also cover duplicate
+and invalid skips, file limits, and an aborted import that leaves no workspace.
+Component tests cover search, filters, sorting, the empty state, tag editing and
+the autosave offer. These features have not yet been checked in a real browser.
