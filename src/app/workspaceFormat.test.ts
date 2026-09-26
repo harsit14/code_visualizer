@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_WORKSPACE_BYTES, parseWorkspace, serializeWorkspace } from './workspaceFormat';
+import {
+  MAX_WORKSPACE_BYTES,
+  parseWorkspace,
+  parseWorkspaceBackup,
+  serializeWorkspace,
+} from './workspaceFormat';
 import { workspaceRevision } from './workspaceTestFixtures';
 
 describe('complete workspace backups', () => {
@@ -60,5 +65,28 @@ describe('complete workspace backups', () => {
     const restored = parseWorkspace(serializeWorkspace(workspace));
     expect(restored.content.cases[0].status).toBe('idle');
     expect(restored.content.step).toBe(1);
+  });
+  it('carries tags and review state in version 2 backups', () => {
+    const meta = { tags: ['two pointers', 'dp'], needsReview: true, reviewBy: '2026-10-01' };
+    const text = serializeWorkspace(workspaceRevision(), meta);
+    expect(JSON.parse(text).version).toBe(2);
+    expect(parseWorkspaceBackup(text)).toEqual({ workspace: workspaceRevision(), meta });
+    const payload = JSON.parse(text);
+    payload.meta.tags = ['x'.repeat(40)];
+    expect(() => parseWorkspaceBackup(JSON.stringify(payload))).toThrow('tag');
+    payload.meta = { tags: [], needsReview: false, reviewBy: '2026-13-01' };
+    expect(() => parseWorkspaceBackup(JSON.stringify(payload))).toThrow('review');
+  });
+  it('still imports version 1 backups, without tags', () => {
+    const v1 = JSON.stringify({
+      format: 'code-visualizer-workspace',
+      version: 1,
+      workspace: workspaceRevision(),
+      meta: { tags: ['ignored'], needsReview: true, reviewBy: null },
+    });
+    expect(parseWorkspaceBackup(v1)).toEqual({
+      workspace: workspaceRevision(),
+      meta: { tags: [], needsReview: false, reviewBy: null },
+    });
   });
 });
