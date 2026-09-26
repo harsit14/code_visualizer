@@ -69,3 +69,71 @@ jobs:
         with:
           name: code-visualizer-dist
           path: dist
+
+  # Separate from verify so a flaky browser cannot hide the unit signal.
+  e2e:
+    name: e2e (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: chromium
+            browsers: chromium
+            projects: --project=chromium
+          - name: firefox
+            browsers: firefox
+            projects: --project=firefox
+          - name: webkit
+            browsers: webkit
+            projects: --project=webkit
+          - name: mobile
+            browsers: chromium webkit
+            projects: --project=mobile-chromium --project=mobile-webkit
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Playwright version
+        id: playwright
+        run: echo "version=$(npx playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.playwright.outputs.version }}-${{ matrix.name }}
+
+      # Downloads are skipped on a cache hit; system dependencies are always installed.
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps ${{ matrix.browsers }}
+
+      - name: Build
+        run: npm run build
+
+      - name: Browser tests
+        run: npx playwright test ${{ matrix.projects }}
+        env:
+          E2E_SKIP_BUILD: '1'
+
+      - name: Upload report and traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-${{ matrix.name }}
+          path: |
+            playwright-report
+            test-results
+          retention-days: 14
