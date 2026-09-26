@@ -28,6 +28,11 @@ export function jsonResponse(
   });
 }
 
+/** Sends already serialized JSON, such as a stored document, without parsing it again. */
+export function jsonTextResponse(text: string, status = 200): Response {
+  return new Response(text, { headers: JSON_HEADERS, status });
+}
+
 export async function readJson(request: Request): Promise<unknown> {
   try {
     return await request.json();

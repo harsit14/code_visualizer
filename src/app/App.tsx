@@ -5,6 +5,7 @@
 import { MobileWorkspaceTabs } from '../components/MobileWorkspaceTabs';
 import { WorkspaceLibrary } from '../components/WorkspaceLibrary';
 import { useWorkspaceLibrary } from './useWorkspaceLibrary';
+import { useWorkspaceSync } from './useWorkspaceSync';
 import type { WorkspaceContent } from './workspaceFormat';
 import { panelMobileTab, useMobileWorkspace } from './useMobileWorkspace';
 import { Fragment, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -352,6 +353,15 @@ export function DashboardApp({ onOpenLanding }: DashboardAppProps) {
     session.enableWorkspacePersistence,
     !embedMode,
   );
+  const workspaceSync = useWorkspaceSync({
+    items: library.items,
+    refresh: library.refresh,
+    activeId: library.active?.id ?? null,
+    accounts: capabilities.accounts,
+    known: capabilities.known,
+    online,
+    allowed: !embedMode,
+  });
   const {
     active: activeWorkspace,
     confirmReplace: confirmWorkspaceReplace,
@@ -912,7 +922,9 @@ export function DashboardApp({ onOpenLanding }: DashboardAppProps) {
         ) : (
           <TopBar
             mobile={mobile}
-            workspaceLibrary={<WorkspaceLibrary library={library} disabled={session.isBusy} />}
+            workspaceLibrary={
+              <WorkspaceLibrary library={library} sync={workspaceSync} disabled={session.isBusy} />
+            }
             showAccount={capabilities.accounts && online}
             showHistory={capabilities.history && online}
             storageControls={

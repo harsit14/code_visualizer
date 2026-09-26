@@ -65,6 +65,51 @@ export type SubscriptionUpsertRow = SubscriptionRow & {
   stripe_customer_id: string | null;
 };
 
+/** A synced workspace head from migration 0005; `meta` is validated by the caller. */
+export type SyncedWorkspaceRow = {
+  change_seq: number;
+  deleted_at: string | null;
+  id: string;
+  meta: unknown;
+  meta_version: number;
+  name: string;
+  revision: number;
+  updated_at: string;
+};
+
+export type WorkspaceSyncStatus =
+  | 'conflict'
+  | 'deleted'
+  | 'duplicate'
+  | 'missing'
+  | 'quota'
+  | 'stored';
+
+export type WorkspaceSyncResult = {
+  head: SyncedWorkspaceRow | null;
+  status: WorkspaceSyncStatus;
+};
+
+export type WorkspacePushRow = {
+  base_revision: number;
+  body: string;
+  max_bytes: number;
+  max_workspaces: number;
+  meta: unknown;
+  name: string;
+  user_id: string;
+  workspace_id: string;
+};
+
+export type SyncedWorkspaceExportRow = {
+  body: string | null;
+  id: string;
+  meta: unknown;
+  name: string;
+  revision: number;
+  updated_at: string;
+};
+
 export type AppDatabase = {
   consumeAuthLimit(
     bucket: string,
@@ -96,7 +141,15 @@ export type AppDatabase = {
   /** Deletes every session of the user except `keepTokenHash`; returns how many. */
   deleteOtherSessions(userId: string, keepTokenHash: string): Promise<number>;
   deleteSession(tokenHash: string): Promise<void>;
+  /** Tombstones a synced workspace (`workspace_sync_delete`, migration 0005). */
+  deleteSyncedWorkspace(userId: string, workspaceId: string): Promise<WorkspaceSyncResult>;
   deleteUserSession(tokenHash: string, userId: string): Promise<void>;
+  /** Latest revision of each live synced workspace, bodies within `maxBytes`. */
+  exportSyncedWorkspaces(
+    userId: string,
+    limit: number,
+    maxBytes: number,
+  ): Promise<SyncedWorkspaceExportRow[]>;
   findHistoryByIdempotencyKey(userId: string, key: string): Promise<HistoryRow | null>;
   findOwnedHistoryId(id: string, userId: string): Promise<string | null>;
   findSessionUser(tokenHash: string, expiresAfter: string): Promise<SessionUserRow | null>;
@@ -104,6 +157,8 @@ export type AppDatabase = {
   findUserByStripeCustomerId(customerId: string): Promise<UserRow | null>;
   getHistoryItem(id: string, userId: string): Promise<HistoryRow | null>;
   getSubscriptionForUser(userId: string): Promise<SubscriptionRow | null>;
+  /** The stored workspace document of one synced revision. */
+  getSyncedRevision(userId: string, workspaceId: string, revision: number): Promise<string | null>;
   getUsageCount(subject: string, day: string): Promise<number>;
   incrementUsageDaily(params: {
     day: string;
@@ -128,9 +183,20 @@ export type AppDatabase = {
   insertHistoryOnce(row: HistoryRow, idempotencyKey: string): Promise<boolean>;
   listHistory(userId: string, limit: number): Promise<HistoryRow[]>;
   listSessions(userId: string, expiresAfter: string, limit: number): Promise<SessionRow[]>;
+  /** Heads whose change number is above `after`, oldest change first. */
+  listSyncedWorkspaces(userId: string, after: number, limit: number): Promise<SyncedWorkspaceRow[]>;
   listUsage(subject: string, limit: number): Promise<UsageRow[]>;
   pruneHistory(userId: string, keep: number): Promise<void>;
+  /** Compare-and-append of one revision (`workspace_sync_push`, migration 0005). */
+  pushWorkspaceRevision(row: WorkspacePushRow): Promise<WorkspaceSyncResult>;
   updateHistory(row: HistoryUpdateRow): Promise<void>;
+  /** Compare-and-set of tags and review state (`workspace_sync_meta`, migration 0005). */
+  updateSyncedWorkspaceMeta(
+    userId: string,
+    workspaceId: string,
+    metaVersion: number,
+    meta: unknown,
+  ): Promise<WorkspaceSyncResult>;
   updateSessionMetadata(
     tokenHash: string,
     fields: { device_label?: string; last_used_at?: string },
@@ -296,11 +362,33 @@ class SupabaseRestDatabase implements AppDatabase {
     });
   }
 
+  async deleteSyncedWorkspace(userId: string, workspaceId: string): Promise<WorkspaceSyncResult> {
+    return this.syncCall('workspace_sync_delete', {
+      p_user_id: userId,
+      p_workspace_id: workspaceId,
+    });
+  }
+
   async deleteUserSession(tokenHash: string, userId: string): Promise<void> {
     await this.mutate('sessions', 'DELETE', undefined, {
       token_hash: eq(tokenHash),
       user_id: eq(userId),
     });
+  }
+
+  async exportSyncedWorkspaces(
+    userId: string,
+    limit: number,
+    maxBytes: number,
+  ): Promise<SyncedWorkspaceExportRow[]> {
+    const rows = await this.request<SyncedWorkspaceExportRow[] | null>(
+      'rpc/workspace_sync_export',
+      {
+        body: { p_user_id: userId, p_limit: limit, p_max_bytes: maxBytes },
+        method: 'POST',
+      },
+    );
+    return rows ?? [];
   }
 
   async findHistoryByIdempotencyKey(userId: string, key: string): Promise<HistoryRow | null> {
@@ -373,6 +461,20 @@ class SupabaseRestDatabase implements AppDatabase {
       select: 'user_id,stripe_subscription_id,status,price_id,current_period_end,updated_at',
       user_id: eq(userId),
     });
+  }
+
+  async getSyncedRevision(
+    userId: string,
+    workspaceId: string,
+    revision: number,
+  ): Promise<string | null> {
+    const row = await this.first<{ body: string }>('synced_workspace_revisions', {
+      revision: eq(revision),
+      select: 'body',
+      user_id: eq(userId),
+      workspace_id: eq(workspaceId),
+    });
+    return row?.body ?? null;
   }
 
   async getUsageCount(subject: string, day: string): Promise<number> {
@@ -477,6 +579,20 @@ class SupabaseRestDatabase implements AppDatabase {
     });
   }
 
+  async listSyncedWorkspaces(
+    userId: string,
+    after: number,
+    limit: number,
+  ): Promise<SyncedWorkspaceRow[]> {
+    return this.select<SyncedWorkspaceRow>('synced_workspaces', {
+      change_seq: gt(after),
+      limit,
+      order: 'change_seq.asc',
+      select: 'id,name,revision,meta,meta_version,change_seq,updated_at,deleted_at',
+      user_id: eq(userId),
+    });
+  }
+
   async listUsage(subject: string, limit: number): Promise<UsageRow[]> {
     return this.select<UsageRow>('usage_daily', {
       limit,
@@ -500,6 +616,33 @@ class SupabaseRestDatabase implements AppDatabase {
     await this.mutate('code_history', 'DELETE', undefined, {
       id: inList(staleIds),
       user_id: eq(userId),
+    });
+  }
+
+  async pushWorkspaceRevision(row: WorkspacePushRow): Promise<WorkspaceSyncResult> {
+    return this.syncCall('workspace_sync_push', {
+      p_base_revision: row.base_revision,
+      p_body: row.body,
+      p_max_bytes: row.max_bytes,
+      p_max_workspaces: row.max_workspaces,
+      p_meta: row.meta,
+      p_name: row.name,
+      p_user_id: row.user_id,
+      p_workspace_id: row.workspace_id,
+    });
+  }
+
+  async updateSyncedWorkspaceMeta(
+    userId: string,
+    workspaceId: string,
+    metaVersion: number,
+    meta: unknown,
+  ): Promise<WorkspaceSyncResult> {
+    return this.syncCall('workspace_sync_meta', {
+      p_meta: meta,
+      p_meta_version: metaVersion,
+      p_user_id: userId,
+      p_workspace_id: workspaceId,
     });
   }
 
@@ -550,6 +693,17 @@ class SupabaseRestDatabase implements AppDatabase {
       id: eq(id),
       select: 'id,email,created_at,stripe_customer_id',
     });
+  }
+
+  private async syncCall(fn: string, body: Record<string, unknown>): Promise<WorkspaceSyncResult> {
+    const result = await this.request<WorkspaceSyncResult | null>(`rpc/${fn}`, {
+      body,
+      method: 'POST',
+    });
+    if (!isRecord(result) || typeof result.status !== 'string') {
+      throw new Error('Invalid workspace sync response.');
+    }
+    return result;
   }
 
   private async first<T>(

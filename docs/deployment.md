@@ -83,6 +83,10 @@ Then apply `supabase/migrations/0004_account_controls.sql` (after 0001; 0002 and
 session list, data download and account deletion, and makes history saves
 idempotent. See [Account sessions, export and deletion](#account-sessions-export-and-deletion).
 
+Then apply `supabase/migrations/0005_workspace_sync.sql` (after 0004). It adds
+opt-in account sync for the local workspace library and extends account export
+and deletion to synced workspaces. See [Workspace sync](#workspace-sync).
+
 AI explainer quota behavior:
 
 - Each request reserves one explanation from the caller's daily count and the
@@ -136,14 +140,14 @@ capped at 600 KB before parsing.
 Routes, all requiring the session cookie and the same-origin checks as the other
 account routes:
 
-| Route                                      | Purpose                                                                                                                                                                                   |
-| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/account/sessions`                | Active sessions: opaque ID, device label, created, last-used and expiry times, and which one is current.                                                                                  |
-| `DELETE /api/account/sessions/:id`         | Signs out one other session. The current session returns 400; an ID that is not the caller's returns 404.                                                                                 |
-| `POST /api/account/sessions/revoke-others` | Signs out every other session.                                                                                                                                                            |
-| `GET /api/account/export`                  | Versioned JSON (`code-visualizer-account-export`, version 1): profile, up to 50 history entries, up to 50 active sessions and up to 400 days of AI usage counters. 5 per minute per user. |
-| `POST /api/account/delete`                 | Deletes the account. Body `{ confirmEmail, password }` or `{ confirmEmail, code }`, capped at 4 KB and throttled like login.                                                              |
-| `POST /api/history`                        | Accepts an `Idempotency-Key: <uuid>` header. A replayed key returns the stored entry.                                                                                                     |
+| Route                                      | Purpose                                                                                                                                                                                                                           |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/account/sessions`                | Active sessions: opaque ID, device label, created, last-used and expiry times, and which one is current.                                                                                                                          |
+| `DELETE /api/account/sessions/:id`         | Signs out one other session. The current session returns 400; an ID that is not the caller's returns 404.                                                                                                                         |
+| `POST /api/account/sessions/revoke-others` | Signs out every other session.                                                                                                                                                                                                    |
+| `GET /api/account/export`                  | Versioned JSON (`code-visualizer-account-export`, version 1): profile, up to 50 history entries, up to 50 active sessions, up to 400 days of AI usage counters and, with 0005, up to 50 synced workspaces. 5 per minute per user. |
+| `POST /api/account/delete`                 | Deletes the account. Body `{ confirmEmail, password }` or `{ confirmEmail, code }`, capped at 4 KB and throttled like login.                                                                                                      |
+| `POST /api/history`                        | Accepts an `Idempotency-Key: <uuid>` header. A replayed key returns the stored entry.                                                                                                                                             |
 
 Revocation takes effect on the next request, because every request looks up the
 session row. The export never contains password hashes, session tokens or their
@@ -163,13 +167,56 @@ account.
 
 Not covered by export or deletion: the AI answer cache (keyed by content hash, not
 by account), `auth_rate_limits` (HMAC buckets), anonymous usage counters, drafts
-and workspaces stored only in the browser, and provider logs or backups, which
-follow their own retention.
+and workspaces stored only in the browser (including those never synced or marked
+Keep local only), and provider logs or backups, which follow their own retention.
 
 Before 0004 is applied, sessions are listed without device or last-used details,
 history saves ignore the key (a lost acknowledgement can still duplicate an
 entry), and deletion returns 503. Supabase reloads the PostgREST schema cache
 after SQL-editor migrations; elsewhere run `NOTIFY pgrst, 'reload schema'`.
+
+### Workspace sync
+
+`0005_workspace_sync.sql` adds:
+
+- `synced_workspaces`: one head per `(user_id, id)` with the latest revision's
+  number and name, tags and review state (`meta`, at most 4 KB) with their own
+  `meta_version`, the revisions' total size, a `change_seq` cursor and a
+  `deleted_at` tombstone.
+- `synced_workspace_revisions`: immutable revisions keyed by
+  `(user_id, workspace_id, revision)`, each the validated workspace document of
+  at most 2 MB.
+- `workspace_sync_push`, `workspace_sync_meta`, `workspace_sync_delete` and
+  `workspace_sync_export`, and a replaced `delete_account` (same signature) that
+  also removes synced workspaces. All are executable only by `service_role`; both
+  tables have RLS enabled and no browser-role access.
+
+Every route needs the session cookie, passes the same-origin checks as the other
+account routes, and must send `X-Sync-Account: <user id>`. A different signed-in
+account gets `409` with `code: "account_mismatch"`, so a session switched mid-sync
+never receives or sends another account's workspaces. Reads are limited to 240
+and writes to 120 per minute per account (per Worker isolate).
+
+| Route                                  | Purpose                                                                                                                                                                                                                                                                                    |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GET /api/workspaces?since=<cursor>`   | Heads changed after the cursor, oldest change first, 100 per page: `{ items, cursor, more }`. Each head has `id`, `name`, `revision`, `meta`, `metaVersion`, `updatedAt`, `deleted` and `cursor`.                                                                                          |
+| `GET /api/workspaces/:id/revisions/:n` | The stored workspace document for revision `n`, or `404`.                                                                                                                                                                                                                                  |
+| `PUT /api/workspaces/:id/revisions/:n` | Body `{ baseRevision: n - 1, workspace, meta }`, capped at 2 MB plus 16 KB. Stored only when the head is `baseRevision` (`201`); an identical re-send returns `200` `duplicate`; otherwise `409` `conflict` with the head. A tombstone returns `409` `deleted` unless `baseRevision` is 0. |
+| `PATCH /api/workspaces/:id`            | Body `{ metaVersion, meta }`, capped at 4 KB. Replaces tags and review state when the head still has `metaVersion`; `409` `conflict` otherwise. A retried identical update returns `duplicate`.                                                                                            |
+| `DELETE /api/workspaces/:id`           | Deletes the revisions and leaves a tombstone without name, tags or code. Repeating it succeeds.                                                                                                                                                                                            |
+
+The Worker validates each pushed workspace with the same parser as backup files
+(`src/app/workspaceFormat.ts`) and stores its own re-serialization, so unknown
+fields are dropped. Per account, at most 500 live workspaces and 50 MB of
+revisions are kept; beyond that a push returns `409` `quota`. The account export
+lists up to 50 live workspaces, newest first, each with its latest revision as a
+restorable `.cvworkspace.json` document until 8 MB of documents is reached; later
+ones are listed with `backup: null`.
+
+Before 0005 is applied, every `/api/workspaces` route returns `503` with
+`code: "sync_unavailable"` and the Library says sync is not available yet; exports
+list no workspaces, and deletion works as in 0004. Tombstones are small and are
+not pruned.
 
 ### Parked Subscription Code
 

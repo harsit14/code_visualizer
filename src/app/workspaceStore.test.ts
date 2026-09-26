@@ -16,6 +16,7 @@ import {
   WorkspaceConflictError,
   WorkspaceMetaConflictError,
 } from './workspaceStore';
+import { listSyncRecords } from './workspaceSyncStore';
 import { workspaceContent, workspaceRevision } from './workspaceTestFixtures';
 
 beforeEach(() => vi.stubGlobal('indexedDB', new IDBFactory()));
@@ -123,7 +124,7 @@ describe('schema upgrade', () => {
         text: '{not json',
       },
     ]);
-    expect(DB_VERSION).toBe(2);
+    expect(DB_VERSION).toBe(3);
     const heads = await listWorkspaces();
     expect(heads).toEqual([
       {
@@ -145,6 +146,41 @@ describe('schema upgrade', () => {
     const next = await saveWorkspace('Upgraded', workspaceContent(), heads[0]);
     expect(next.revision).toBe(2);
     expect(await readAutosave(v1.id)).toBeNull();
+    expect(await listSyncRecords()).toEqual([]);
+  });
+  it('adds an empty sync store to a version 2 library without touching it', async () => {
+    const saved = workspaceRevision();
+    await new Promise<void>((resolve, reject) => {
+      const request = indexedDB.open('cv-workspaces-v1', 2);
+      request.onupgradeneeded = () => {
+        request.result.createObjectStore('heads', { keyPath: 'id' });
+        request.result.createObjectStore('revisions', { keyPath: ['id', 'revision'] });
+        request.result.createObjectStore('autosaves', { keyPath: 'id' });
+      };
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        const tx = request.result.transaction(['heads', 'revisions'], 'readwrite');
+        tx.objectStore('heads').put({ id: saved.id, name: saved.name, revision: 1, savedAt: 5 });
+        tx.objectStore('revisions').put({
+          id: saved.id,
+          revision: 1,
+          text: JSON.stringify({
+            format: 'code-visualizer-workspace',
+            version: 2,
+            workspace: saved,
+          }),
+        });
+        tx.oncomplete = () => {
+          request.result.close();
+          resolve();
+        };
+      };
+    });
+    expect(await listSyncRecords()).toEqual([]);
+    expect(await listWorkspaces()).toEqual([
+      expect.objectContaining({ id: saved.id, revision: 1 }),
+    ]);
+    expect(await readWorkspace(saved.id, 1)).toEqual(saved);
   });
 });
 

@@ -29,6 +29,11 @@ import {
 import { HISTORY_LIMIT, rowToHistoryItem } from './historyApi';
 import { deleteProviderIdentity, managedAuthEnabled, verifyEmailCode } from './managedAuth';
 import { enforceAuthRateLimit, enforceIpRateLimit } from './rateLimit';
+import {
+  exportSyncedWorkspaces,
+  WORKSPACE_EXPORT_BYTES,
+  WORKSPACE_EXPORT_LIMIT,
+} from './workspaceSyncApi';
 import type { ServerEnv } from './types';
 
 const SESSION_LIST_LIMIT = 50;
@@ -127,10 +132,11 @@ async function exportAccount(env: ServerEnv, request: Request): Promise<Response
   });
   if (limited) return limited;
 
-  const [sessions, history, usage] = await Promise.all([
+  const [sessions, history, usage, workspaces] = await Promise.all([
     auth.db.listSessions(user.id, nowIso(), SESSION_LIST_LIMIT),
     auth.db.listHistory(user.id, HISTORY_LIMIT),
     auth.db.listUsage(`user:${user.id}`, USAGE_EXPORT_DAYS),
+    exportSyncedWorkspaces(auth.db, user.id),
   ]);
   const exportedAt = nowIso();
   // Built field by field so hashes, tokens and provider IDs can never slip in.
@@ -152,10 +158,13 @@ async function exportAccount(env: ServerEnv, request: Request): Promise<Response
         day: row.day,
         plan: row.plan,
       })),
+      workspaces,
       limits: {
         historyItems: HISTORY_LIMIT,
         sessions: SESSION_LIST_LIMIT,
         usageDays: USAGE_EXPORT_DAYS,
+        workspaces: WORKSPACE_EXPORT_LIMIT,
+        workspaceBackupBytes: WORKSPACE_EXPORT_BYTES,
       },
     },
     200,

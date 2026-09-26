@@ -6,6 +6,8 @@ import type { PracticeTestCase } from './practiceCases';
 import { EMPTY_META, parseWorkspaceMeta, type WorkspaceMeta } from './workspaceTags';
 
 export const MAX_WORKSPACE_BYTES = 25 * 1024 * 1024;
+/** Largest serialized revision account sync stores; larger ones sync without their replay. */
+export const MAX_SYNCED_REVISION_BYTES = 2 * 1024 * 1024;
 /** Version 2 adds optional library metadata (tags, review state); version 1 still imports. */
 export const WORKSPACE_FORMAT_VERSION = 2;
 export type WorkspaceContent = {

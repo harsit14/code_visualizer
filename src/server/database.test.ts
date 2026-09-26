@@ -181,6 +181,51 @@ describe('Supabase database adapter', () => {
       p_provider_subject: null,
     });
   });
+
+  it('pushes workspace revisions through the compare-and-append RPC', async () => {
+    const head = { id: 'ws-1', revision: 1, change_seq: 7 };
+    const fetchMock = vi.fn<FetchMock>(async () => Response.json({ status: 'stored', head }));
+    vi.stubGlobal('fetch', fetchMock);
+    const db = getDatabase(env)!;
+    await expect(
+      db.pushWorkspaceRevision({
+        base_revision: 0,
+        body: '{}',
+        max_bytes: 10,
+        max_workspaces: 2,
+        meta: { tags: [] },
+        name: 'Two Sum',
+        user_id: 'user-1',
+        workspace_id: 'ws-1',
+      }),
+    ).resolves.toEqual({ status: 'stored', head });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toBe('https://project.supabase.co/rest/v1/rpc/workspace_sync_push');
+    expect(JSON.parse(String(init?.body))).toMatchObject({
+      p_user_id: 'user-1',
+      p_workspace_id: 'ws-1',
+      p_base_revision: 0,
+      p_body: '{}',
+    });
+
+    fetchMock.mockResolvedValueOnce(Response.json([]));
+    await db.listSyncedWorkspaces('user-1', 7, 101);
+    const target = new URL(String(fetchMock.mock.calls[1][0]));
+    expect(target.pathname).toBe('/rest/v1/synced_workspaces');
+    expect(target.searchParams.get('user_id')).toBe('eq.user-1');
+    expect(target.searchParams.get('change_seq')).toBe('gt.7');
+    expect(target.searchParams.get('order')).toBe('change_seq.asc');
+
+    fetchMock.mockResolvedValueOnce(
+      Response.json({ code: 'PGRST202', message: 'Could not find the function' }, { status: 404 }),
+    );
+    const missing = await db.deleteSyncedWorkspace('user-1', 'ws-1').catch((error) => error);
+    expect(isMissingSchemaError(missing)).toBe(true);
+    fetchMock.mockResolvedValueOnce(Response.json(null));
+    await expect(db.updateSyncedWorkspaceMeta('user-1', 'ws-1', 0, {})).rejects.toThrow(
+      'Invalid workspace sync response.',
+    );
+  });
 });
 
 const env = {

@@ -170,18 +170,96 @@ if any write fails, none are kept. Import never runs saved code, and it does not
 change the editor or the open workspace. The Library reports how many workspaces
 and revisions were imported and how many were skipped.
 
+## Account sync
+
+Account sync is **off by default**. Signed in on a deployment with accounts,
+open **Library → Account sync** and choose **Sync this library with my
+account**. A confirmation says which account, how many workspaces will be
+uploaded and that uploads include code, inputs, cases, notes and replay. Until
+then nothing in the library leaves the browser. Turning sync off stops it; copies
+already in the account stay there.
+
+What syncs: every saved revision (immutable and numbered as on this device),
+the workspace name, and tags and review state. What never syncs: autosave slots,
+the code draft, and workspaces marked **Keep local only**. Keep local only is in
+each workspace's details and works whether library sync is on or off. For a
+workspace already in the account, **Remove from account** deletes its revisions
+there and leaves a tombstone; this device, and every other device that synced it,
+keeps its copy as local only. A revision larger than 2 MB syncs without its
+replay (cases, notes and code still sync); if it is still larger, that workspace
+reports Sync failed and stays on this device.
+
+Each workspace shows its state in the list and in its details: **Local only**,
+**Waiting to sync**, **Syncing…**, **Synced**, **Sync failed** (with **Retry
+sync**), or **Conflict** (with **Dismiss**). The open workspace's state follows
+"Local saved · revision N". The Account sync section shows the last sync time,
+**Sync now**, or why sync is paused.
+
+A pass runs when sync is turned on, a second or two after a save or tag edit,
+when the tab becomes visible, every two minutes while visible, and on **Sync
+now**. It first lists what changed in the account since the last pass, then:
+
+- Pulls workspaces that are new to this device, and newer revisions and tags of
+  workspaces with no local changes, into IndexedDB. Every revision is validated
+  with the same parser as backup files. Pulled code is never run: it opens
+  paused, like any saved revision, and runs only when you choose Run. At most the
+  newest 50 revisions of a workspace are fetched in one pass; older ones stay in
+  the account.
+- Uploads local revisions the account lacks, in order, each against the account's
+  current head. The account accepts a revision only when its head is the
+  revision before it. A retry after a lost acknowledgement sends the same
+  revision number and content, which the account recognises as already stored,
+  so nothing is duplicated.
+- Uploads tag and review edits with their own version check. When both sides
+  changed them, they are merged: every tag from both (up to 12), needs review if
+  either set it, and the earlier review date.
+
+**Conflicts never overwrite either side.** When this device and another both
+saved new revisions of a workspace, the local head stays as it is. The account's
+latest version is saved here as a new, local-only workspace named "… (from
+another device)", and the Library says so. The local head is then uploaded after
+the account's revisions, so both devices end with the same latest revision and
+the other device keeps its own revisions in history. If the local head was not
+numbered above the account's, it is repeated as a new revision after them; the
+local revisions it passed over stay on this device only. A workspace removed from
+the account on another device becomes local only here, with a notice.
+
+**Accounts never mix.** The library records the account it syncs with, and each
+workspace records the account it was synced with. Every request states that
+account, and the server refuses it if the signed-in account differs, so a
+sign-in in another tab cannot redirect uploads. On sign-out or an account change,
+the current pass stops. While signed out, nothing syncs. While a different
+account is signed in, nothing is uploaded or downloaded, and workspaces saved
+then are held as local only, so they do not reach the library's account later.
+**Sync with … instead** asks before attaching the library to the signed-in
+account. Only workspaces never synced, including those held while it was signed
+in, are uploaded; workspaces synced with the previous account stay on this
+device and are never uploaded to the new one. Signing back in to the library's account
+resumes sync.
+
+Sync is not offered on static hosts, which have no accounts. Offline, the Library
+says sync resumes on reconnection, and saving still works locally. If the
+server's database lacks migration 0005, the Library says sync is not available
+yet. One pass runs at a time, across tabs where the browser supports Web Locks.
+The library's setting is in `localStorage` (`cv-workspace-sync`); per-workspace
+sync state is in IndexedDB. Server details are in
+[deployment](deployment.md#workspace-sync).
+
 ## Storage schema
 
-The IndexedDB database `cv-workspaces-v1` is at schema version 2. Version 2 adds
+The IndexedDB database `cv-workspaces-v1` is at schema version 3. Version 2 adds
 tags, review state, language, latest source and autosave information to each
-workspace head. It also adds an `autosaves` store, keyed by workspace ID. The
-upgrade runs once when the new version first opens. It keeps every head and
-revision and fills search fields from each latest revision; a damaged revision
-upgrades with empty search text. Tabs still running the previous version cannot
-open the upgraded database, so reload them.
+workspace head. It also adds an `autosaves` store, keyed by workspace ID. Version
+3 adds a `sync` store, keyed by workspace ID, with each workspace's account,
+Keep local only choice, last synced revision and tag version, and any sync
+problem. The upgrades run once when the new version first opens. They keep every
+head and revision; version 2 fills search fields from each latest revision, and
+a damaged revision upgrades with empty search text. Tabs still running the
+previous version cannot open the upgraded database, so reload them.
 
 Workspace files and browser storage contain source, inputs, notes and recorded
-values in plain text. Library operations do not upload them to an account.
+values in plain text. Library operations do not upload them to an account unless
+[account sync](#account-sync) is turned on.
 Opening a workspace disables automatic account-history uploads for that session;
 users may opt back in explicitly. Sharing a runnable link or requesting an AI
 explanation retains its existing, separate data behavior. Browser storage is
@@ -216,3 +294,18 @@ latest-only exports and fresh-ID renumbered imports. They also cover duplicate
 and invalid skips, file limits, and an aborted import that leaves no workspace.
 Component tests cover search, filters, sorting, the empty state, tag editing and
 the autosave offer. These features have not yet been checked in a real browser.
+
+Account sync is tested at three levels. PGlite runs migration 0005 and checks
+identical re-pushes, conflicts, tombstones and revival, per-account bounds,
+the export bound, `delete_account` removing synced workspaces (with and without
+managed accounts), idempotent re-application and browser-role access. Worker
+tests cover sign-in, the account header, cross-user isolation, 409 conflicts,
+invalid and oversized payloads, rate limits, a missing migration, and the account
+export and deletion. Client tests drive the sync pass against the real Worker
+handler with fake-indexeddb as two devices: first sync and pull, pulling newer
+revisions and tags, conflicts that keep both versions, a retry after a lost
+acknowledgement, account switches, Keep local only and autosaves, removal on
+another device, tag merges and a missing migration. Hook and component tests
+cover the opt-in confirmation, held workspaces, paused states and the per-workspace
+controls. Sync has not been checked against a real Supabase project or in a real
+browser.
