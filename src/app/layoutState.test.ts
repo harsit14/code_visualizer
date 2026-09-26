@@ -35,6 +35,7 @@ describe('layoutState', () => {
       inputs: true,
       watch: false,
       explainer: false,
+      compare: false,
     });
     expect(Object.values(FULL_PANEL_VISIBILITY).every(Boolean)).toBe(true);
   });
@@ -43,6 +44,7 @@ describe('layoutState', () => {
     expect(LEARN_PANEL_VISIBILITY).toEqual({
       callStack: false,
       code: true,
+      compare: false,
       console: true,
       data: true,
       explainer: false,
