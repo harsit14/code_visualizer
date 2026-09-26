@@ -1,9 +1,9 @@
 /**
  * Pure helpers over the engine's trace schema: compact value formatting,
  * step-to-step variable diffing, pointer-marker detection for arrays and
- * linked lists, and complexity growth-curve labeling.
+ * linked lists.
  */
-import type { ComplexitySample, EncodedValue, FrameSnapshot, TraceStep } from './types';
+import type { EncodedValue, FrameSnapshot, TraceStep } from './types';
 
 /** Render an encoded value as a compact one-line preview. */
 export function formatValue(value: EncodedValue | null | undefined, depth = 0): string {
@@ -501,45 +501,6 @@ export function groupChains(locals: Record<string, EncodedValue>): ChainGroup[] 
     }
   }
   return groups;
-}
-
-export type GrowthLabel = 'O(1)' | 'O(log n)' | 'O(n)' | 'O(n log n)' | 'O(n²)' | 'O(n³) or worse';
-
-/**
- * Fit a growth label to (n, ops) samples by comparing against candidate
- * curves with least relative error. Needs >= 3 samples.
- */
-export function fitGrowth(samples: ComplexitySample[]): GrowthLabel | null {
-  const usable = samples.filter((sample) => sample.n > 1 && sample.ops > 0);
-  if (usable.length < 3) {
-    return null;
-  }
-
-  const candidates: { label: GrowthLabel; fn: (n: number) => number }[] = [
-    { label: 'O(1)', fn: () => 1 },
-    { label: 'O(log n)', fn: (n) => Math.log2(n) },
-    { label: 'O(n)', fn: (n) => n },
-    { label: 'O(n log n)', fn: (n) => n * Math.log2(n) },
-    { label: 'O(n²)', fn: (n) => n * n },
-    { label: 'O(n³) or worse', fn: (n) => n * n * n },
-  ];
-
-  let best: GrowthLabel | null = null;
-  let bestError = Number.POSITIVE_INFINITY;
-  for (const candidate of candidates) {
-    // Scale each candidate to match the first sample, then measure error.
-    const scale = usable[0].ops / candidate.fn(usable[0].n);
-    let error = 0;
-    for (const sample of usable) {
-      const predicted = scale * candidate.fn(sample.n);
-      error += Math.abs(Math.log(sample.ops / predicted));
-    }
-    if (error < bestError) {
-      bestError = error;
-      best = candidate.label;
-    }
-  }
-  return best;
 }
 
 /** Slice the final stdout down to what was printed by step `step`. */

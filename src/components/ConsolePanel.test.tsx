@@ -192,5 +192,39 @@ describe('ConsolePanel', () => {
 
     expect(html).toContain('Stopped at n=16');
     expect(html).toContain('Growth estimate may be biased toward smaller inputs.');
+    // Results from an older engine payload still render, without a fit.
+    expect(html).toContain('Sampled sizes');
+    expect(html).toContain('not enough data');
+  });
+
+  it('offers the complexity experiment for the active Python function', () => {
+    const html = renderToStaticMarkup(
+      <ConsolePanel
+        atLastStep={false}
+        canMeasureComplexity={true}
+        complexity={null}
+        complexityBusy={false}
+        complexityFunction={{
+          name: 'window',
+          qualname: 'window',
+          className: null,
+          params: [
+            { name: 'nums', inferred: 'list[int]', annotation: null, source: 'name' },
+            { name: 'k', inferred: 'int', annotation: null, source: 'name' },
+          ],
+          line: 1,
+          isGenerator: false,
+          docstring: null,
+          returns: null,
+        }}
+        currentStep={undefined}
+        onMeasureComplexity={() => {}}
+        result={null}
+      />,
+    );
+
+    expect(html).toContain('Complexity experiment');
+    expect(html).toContain('n = len(nums)');
+    expect(html).toContain('k will use generated defaults.');
   });
 });

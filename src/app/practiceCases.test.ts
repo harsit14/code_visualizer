@@ -88,4 +88,29 @@ describe('practiceCases', () => {
       ['[1, 1, 2, -3]', '2'],
     ]);
   });
+
+  it('uses set literals for set parameters', () => {
+    const cases = createEdgePracticeCases(
+      {
+        className: null,
+        docstring: null,
+        isGenerator: false,
+        line: 1,
+        name: 'overlap',
+        params: [
+          { annotation: 'set[int]', inferred: 'set[int]', name: 'ids', source: 'hint' },
+          { annotation: 'set[str]', inferred: 'set[str]', name: 'tags', source: 'hint' },
+        ],
+        qualname: 'overlap',
+        returns: null,
+      },
+      0,
+    );
+
+    expect(cases.map((testCase) => testCase.inputs)).toEqual([
+      ['set()', 'set()'],
+      ['{1}', "{'a'}"],
+      ['{-3, 1, 2}', "{'a', 'b', 'c'}"],
+    ]);
+  });
 });

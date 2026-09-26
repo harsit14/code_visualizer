@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import io
 import inspect
+import random
 import time
 import traceback
 import tracemalloc
@@ -19,6 +20,16 @@ from typing import Any, Optional
 
 from .analyzer import Analysis, FunctionInfo, analyze
 from .assertions import assess_return
+from .complexity import (
+    clamp_fixed_pointers,
+    fit_caveats,
+    fit_growth,
+    generate_sized_input,
+    measure_size,
+    pick_dimension,
+    sanitize_sizes,
+    structure_hint,
+)
 from .inputgen import GeneratedInput, evaluate_input, generate_inputs
 from .serialize import Snapshotter
 from .structures import ListNode, TreeNode, build_linked_list, build_tree
@@ -26,6 +37,11 @@ from .tracer import DEFAULT_MAX_STEPS, TraceLimitError, Tracer
 
 USER_FILENAME = "<user_code>"
 BYTES_PER_MB = 1024 * 1024
+# Complexity experiments: each sample stops at whichever cap it hits first,
+# and the whole experiment stays well inside the client's 30s timeout.
+COMPLEXITY_SAMPLE_STEPS = 1_000_000
+COMPLEXITY_SAMPLE_SECONDS = 4.0
+COMPLEXITY_TOTAL_SECONDS = 20.0
 
 
 def _javascript_string_length(value: str) -> int:
@@ -396,19 +412,35 @@ def _run_function(
     return _finalize_run(run, tracer, stdout, stderr)
 
 
+def _short_literal(literal: str, limit: int = 60) -> str:
+    return literal if len(literal) <= limit else f"{literal[: limit - 1]}…"
+
+
 def measure_complexity(
     source: str,
     function: Optional[str] = None,
     seed: Optional[int] = None,
     sizes: Optional[list[int]] = None,
-    max_seconds: float = 4.0,
+    max_seconds: float = COMPLEXITY_SAMPLE_SECONDS,
+    *,
+    param: Optional[str] = None,
+    axis: Optional[str] = None,
+    inputs: Optional[list[str]] = None,
+    max_steps: int = COMPLEXITY_SAMPLE_STEPS,
+    total_seconds: float = COMPLEXITY_TOTAL_SECONDS,
 ) -> dict[str, Any]:
-    """Run ``function`` at increasing input sizes and count operations.
+    """Run ``function`` while one input grows and count trace events.
 
-    Uses a counting-only tracer (no snapshots) so larger sizes stay cheap.
-    Returns ``{"functionName", "seed", "samples": [{"n", "ops"} ...],
-    "error", "truncated", "truncationReason"}`` — the UI fits a growth
-    label to the samples and warns when slow growth stopped sampling early.
+    Only the chosen dimension (``param``/``axis``, default: the first sized
+    collection) grows. Other arguments stay fixed: the ``inputs`` literals
+    when given, otherwise generated defaults that avoid early exits. Uses a
+    counting-only tracer (no snapshots) so larger sizes stay cheap.
+
+    Every requested size gets a sample row with a ``status`` — ``ok``,
+    ``exception``, ``step-limit``, ``time-limit``, ``setup-error`` or
+    ``skipped`` — so failures are reported rather than dropped. Only ``ok``
+    samples feed ``fit`` (measured growth); ``structure`` is a separate
+    static heuristic. Neither is a proof of Big-O.
     """
     analysis = analyze(source)
     target_name = function or analysis.default_function
@@ -420,10 +452,24 @@ def measure_complexity(
         "error": None,
         "truncated": False,
         "truncationReason": None,
+        "dimension": None,
+        "fixed": [],
+        "fit": None,
+        "caveats": [],
+        "structure": None,
+        "limits": {"maxSteps": max_steps, "maxSeconds": max_seconds},
     }
     if info is None:
         payload["error"] = {"type": "AnalysisError", "msg": "No function to measure."}
         return payload
+
+    try:
+        dimension = pick_dimension(info, param, axis)
+    except ValueError as exc:
+        payload["error"] = {"type": "ValueError", "msg": str(exc)}
+        return payload
+    payload["dimension"] = dimension.to_dict()
+    payload["structure"] = structure_hint(source, info)
 
     try:
         code = compile(source, USER_FILENAME, "exec")
@@ -433,7 +479,66 @@ def measure_complexity(
 
     used_seed = seed if seed is not None else 1234
     payload["seed"] = used_seed
-    for size in sizes or [4, 8, 16, 32, 64]:
+    size_list = sanitize_sizes(sizes, dimension.max_n)
+    grow_index = next(i for i, p in enumerate(info.params) if p.name == dimension.param)
+    grow_param = info.params[grow_index]
+
+    base, _ = generate_inputs(info, seed=used_seed, make_solvable=False)
+    from_user = inputs is not None and len(inputs) == len(info.params)
+    if from_user:
+        base = [
+            GeneratedInput(name=p.name, type=p.inferred, literal=literal)
+            for p, literal in zip(info.params, inputs or [])
+        ]
+    else:
+        clamp_fixed_pointers(info, base, dimension, size_list[0])
+    try:
+        # The grown input's own value only sets the fixed axis of a grid, so
+        # an unparsable draft there should not block the experiment.
+        base_grow_value = evaluate_input(base[grow_index].literal)
+    except Exception:
+        base_grow_value = None
+    try:
+        for index, item in enumerate(base):
+            if index != grow_index:
+                evaluate_input(item.literal)
+    except Exception as exc:
+        payload["error"] = {"type": type(exc).__name__, "msg": f"Could not evaluate inputs: {exc}"}
+        return payload
+    payload["fixed"] = [
+        {
+            "name": item.name,
+            "literal": _short_literal(item.literal),
+            "source": "current" if from_user else "generated",
+        }
+        for index, item in enumerate(base)
+        if index != grow_index
+    ]
+
+    deadline = time.perf_counter() + total_seconds
+    skip_note: Optional[str] = None
+    for size in size_list:
+        sample: dict[str, Any] = {
+            "n": size,
+            "ops": 0,
+            "ms": None,
+            "status": "skipped",
+            "error": None,
+            "note": None,
+        }
+        payload["samples"].append(sample)
+        remaining = deadline - time.perf_counter()
+        if skip_note is None and remaining <= 0:
+            skip_note = "Skipped: the experiment's total time budget was used up."
+            payload["truncated"] = True
+            payload["truncationReason"] = (
+                f"Stopped before n={size}: the {total_seconds:.0f}s budget for the whole "
+                "experiment was used up."
+            )
+        if skip_note is not None:
+            sample["note"] = skip_note
+            continue
+
         # Start every sample from a clean module and class instance so caches,
         # globals, and attributes cannot leak into the next input size.
         env = _base_globals(analysis)
@@ -441,44 +546,78 @@ def measure_complexity(
         try:
             with redirect_stdout(setup_stdout), redirect_stderr(setup_stderr):
                 exec(code, env)
+        except KeyboardInterrupt:
+            raise
         except BaseException as exc:
+            sample["status"] = "setup-error"
+            sample["error"] = {"type": type(exc).__name__, "msg": str(exc)}
             payload["error"] = _error_payload(exc)
-            return payload
-        generated, _ = generate_inputs(info, seed=used_seed, size=size, make_solvable=False)
+            break
+
+        rng = random.Random(used_seed * 100_003 + size)
         try:
-            arguments = [evaluate_input(item.literal) for item in generated]
-        except BaseException as exc:
-            payload["error"] = _error_payload(exc)
-            return payload
-        constructor_values = arguments[: info.constructor_param_count]
-        function_values = arguments[info.constructor_param_count :]
-        try:
-            target = _resolve_callable(env, info, constructor_values)
+            grown = generate_sized_input(grow_param, dimension, size, rng, base_grow_value)
+            grown_value = evaluate_input(grown.literal)
+            measured = measure_size(grown_value, dimension)
+            sample["n"] = measured if measured is not None else size
+            # Re-evaluate fixed inputs each time: the function may mutate them.
+            arguments = [
+                grown_value if index == grow_index else evaluate_input(item.literal)
+                for index, item in enumerate(base)
+            ]
+            constructor_values = arguments[: info.constructor_param_count]
+            function_values = arguments[info.constructor_param_count :]
+            with redirect_stdout(setup_stdout), redirect_stderr(setup_stderr):
+                target = _resolve_callable(env, info, constructor_values)
             call_args, call_kwargs = _prepare_call(
                 info.params[info.constructor_param_count :], function_values
             )
-        except BaseException:
+        except KeyboardInterrupt:
+            raise
+        except BaseException as exc:
+            sample["status"] = "setup-error"
+            sample["error"] = {"type": type(exc).__name__, "msg": str(exc)}
             continue
+
         stdout, stderr = io.StringIO(), io.StringIO()
         tracer = Tracer(
             filename=USER_FILENAME,
-            max_steps=10**9,
-            max_seconds=max_seconds,
+            max_steps=max_steps,
+            max_seconds=min(max_seconds, max(remaining, 0.0)),
             count_only=True,
         )
+        started_at = time.perf_counter()
         try:
             with redirect_stdout(stdout), redirect_stderr(stderr):
                 with tracer:
                     _materialize_return_value(
                         target(*call_args, **call_kwargs), info.is_generator
                     )
+            sample["status"] = "ok"
         except TraceLimitError as exc:
+            hit_steps = tracer.op_count > max_steps
+            sample["status"] = "step-limit" if hit_steps else "time-limit"
+            sample["note"] = exc.reason
             payload["truncated"] = True
             payload["truncationReason"] = (
-                f"Stopped at n={size}: {exc.reason} Earlier samples were kept."
+                f"Stopped at n={sample['n']}: {exc.reason} Larger sizes were skipped."
             )
-            break
-        except BaseException:
-            continue  # this size failed (e.g. int param scaled oddly); skip it
-        payload["samples"].append({"n": size, "ops": tracer.op_count})
+            skip_note = (
+                f"Skipped: n={sample['n']} already hit the "
+                f"{'step' if hit_steps else 'time'} limit."
+            )
+        except KeyboardInterrupt:
+            raise
+        except BaseException as exc:
+            sample["status"] = "exception"
+            sample["error"] = {"type": type(exc).__name__, "msg": str(exc)}
+        finally:
+            sample["ms"] = round((time.perf_counter() - started_at) * 1000, 3)
+            sample["ops"] = tracer.op_count
+
+    fit = fit_growth(payload["samples"])
+    payload["fit"] = fit
+    payload["caveats"] = fit_caveats(
+        payload["samples"], fit, fixed_from_user=from_user and len(info.params) > 1
+    )
     return payload

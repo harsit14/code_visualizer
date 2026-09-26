@@ -753,8 +753,11 @@ export function DashboardApp({ onOpenLanding }: DashboardAppProps) {
               canMeasureComplexity={session.language === 'python' && showInputs && !session.isBusy}
               complexity={session.complexity}
               complexityBusy={session.complexityBusy}
+              complexityFunction={showInputs ? session.activeFunction : null}
+              complexityInputs={session.inputLiterals}
               currentStep={session.currentStep}
-              onMeasureComplexity={() => void session.measureComplexity()}
+              onMeasureComplexity={(options) => void session.measureComplexity(options)}
+              onStopComplexity={session.stopExecution}
               result={session.result}
             />
           </ErrorBoundary>,

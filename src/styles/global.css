@@ -1833,47 +1833,6 @@ input[type='password'] {
   font-family: var(--mono);
 }
 
-.complexity-bars {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.complexity-bar-row {
-  align-items: center;
-  display: flex;
-  gap: 8px;
-}
-
-.complexity-n {
-  color: var(--text-faint);
-  font-family: var(--mono);
-  font-size: 11px;
-  width: 44px;
-}
-
-.complexity-bar-track {
-  background: var(--bg-inset);
-  border-radius: 4px;
-  flex: 1;
-  height: 10px;
-  overflow: hidden;
-}
-
-.complexity-bar {
-  background: var(--purple);
-  border-radius: 4px;
-  height: 100%;
-}
-
-.complexity-ops {
-  color: var(--text-dim);
-  font-family: var(--mono);
-  font-size: 11px;
-  min-width: 48px;
-  text-align: right;
-}
-
 /* ---------------------------------------------------------- landing */
 
 .landing-document {
