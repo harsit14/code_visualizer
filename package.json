@@ -17,6 +17,8 @@
     "test": "vitest run",
     "test:a11y": "vitest run src/styles/accessibility.test.ts src/app/layoutState.test.ts src/components/ControlsBar.test.tsx src/components/TopBar.test.tsx src/components/VariablesPanel.test.tsx",
     "test:engine": "cd engine && .venv/bin/pytest -q",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
     "build:runner": "tsc -b && vite build --config vite.runner.config.ts",
     "dev:runner": "vite --config vite.runner.config.ts --host 127.0.0.1",
     "preview:runner": "vite preview --config vite.runner.config.ts --host 127.0.0.1",
@@ -42,6 +44,7 @@
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
     "@eslint/js": "^9.0.0",
+    "@playwright/test": "^1.63.0",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^25.9.1",
     "@types/react": "^19.0.0",

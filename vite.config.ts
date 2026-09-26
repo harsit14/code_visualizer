@@ -1,4 +1,5 @@
 import { defineConfig, loadEnv } from 'vite';
+import { configDefaults } from 'vitest/config';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { runnerUrl } from './src/runner/protocol';
 import { offlineShell, readThemeColors } from './src/offline/offlineShellPlugin';
@@ -141,6 +142,10 @@ export default defineConfig(({ mode }) => {
     },
     worker: {
       format: 'es',
+    },
+    test: {
+      // Playwright runs the browser specs in e2e/ (npm run test:e2e).
+      exclude: [...configDefaults.exclude, 'e2e/**'],
     },
   };
 });
