@@ -49,6 +49,20 @@ def _gen_str(rng: random.Random, size: Optional[int] = None) -> str:
     return "".join(rng.choice("abcd") for _ in range(length))
 
 
+def _set_literal(values: list[Any]) -> str:
+    """Set literal with sorted members: ``repr(set)`` order follows string
+    hashing, which changes per process and would break seeded replays."""
+    return "{" + ", ".join(repr(value) for value in sorted(values)) + "}"
+
+
+def _gen_set(rng: random.Random, strings: bool, size: Optional[int] = None) -> str:
+    count = size if size is not None else rng.randint(*DEFAULT_LIST_SIZE)
+    if strings:
+        # A random stem plus the index keeps members unique at any size.
+        return _set_literal([f"{_gen_str(rng, 3)}{index}" for index in range(count)])
+    return _set_literal(rng.sample(range(1, max(count * 4, 20) + 1), count))
+
+
 def _gen_pairs(rng: random.Random, size: Optional[int] = None) -> list[list[int]]:
     count = size if size is not None else rng.randint(3, 5)
     pairs = []
@@ -115,6 +129,8 @@ def generate_input(
     elif kind == "dict":
         keys = [_gen_str(rng, 3) for _ in range(size if size is not None else 4)]
         literal = repr({key: rng.randint(*DEFAULT_INT_RANGE) for key in keys})
+    elif kind in ("set[int]", "set[str]"):
+        literal = _gen_set(rng, kind == "set[str]", size)
     elif kind == "tree":
         literal = f"tree({_gen_tree_values(rng, size)!r})"
     elif kind == "listnode":
@@ -200,12 +216,13 @@ def evaluate_input(literal: str, extra_env: Optional[dict[str, Any]] = None) -> 
     """Evaluate an input literal in a restricted namespace.
 
     Only structure builders (``tree``, ``linked``, ``TreeNode``,
-    ``ListNode``) are available; there are no builtins. Execution happens
-    inside the Pyodide sandbox regardless — this just keeps input
-    expressions honest.
+    ``ListNode``) and ``set`` (an empty set has no literal form) are
+    available; there are no other builtins. Execution happens inside the
+    Pyodide sandbox regardless — this just keeps input expressions honest.
     """
     env: dict[str, Any] = {
         "__builtins__": {},
+        "set": set,
         "tree": build_tree,
         "linked": build_linked_list,
         "TreeNode": TreeNode,

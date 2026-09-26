@@ -32,6 +32,8 @@ TYPES = (
     "grid[str]",
     "pairs",  # list of [start, end] pairs (intervals/edges)
     "dict",
+    "set[int]",
+    "set[str]",
     "tree",
     "listnode",
 )
@@ -91,6 +93,9 @@ _ANNOTATION_TYPES: dict[str, str] = {
     "list[list[str]]": "grid[str]",
     "list[bool]": "list[int]",
     "dict": "dict",
+    "set": "set[int]",
+    "set[int]": "set[int]",
+    "set[str]": "set[str]",
     "treenode": "tree",
     "optional[treenode]": "tree",
     "treenode | none": "tree",

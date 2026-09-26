@@ -148,6 +148,12 @@ function literalForProfile(
         : 'linked([1, 2, 3])';
   }
 
+  if (inferred.startsWith('set')) {
+    if (profile === 'empty') return 'set()';
+    if (inferred.includes('str')) return profile === 'single' ? "{'a'}" : "{'a', 'b', 'c'}";
+    return profile === 'single' ? '{1}' : '{-3, 1, 2}';
+  }
+
   if (inferred.includes('grid')) {
     if (inferred.includes('str')) {
       return profile === 'empty'

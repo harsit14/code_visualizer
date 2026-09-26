@@ -1,12 +1,20 @@
 /**
  * Console panel: stdout up to the current step, return value, exceptions,
- * stderr, truncation notices, and complexity hints.
+ * stderr, truncation notices, and the complexity experiment.
  */
-import { AlertTriangle, Terminal, TrendingUp } from 'lucide-react';
+import { AlertTriangle, Terminal } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { explainException } from '../engine/exceptionExplanations';
-import { fitGrowth, formatValue, stdoutAtStep } from '../engine/trace';
-import type { ComplexityResult, Language, SessionResult, TraceStep } from '../engine/types';
+import { formatValue, stdoutAtStep } from '../engine/trace';
+import type {
+  ComplexityOptions,
+  ComplexityResult,
+  FunctionInfo,
+  Language,
+  SessionResult,
+  TraceStep,
+} from '../engine/types';
+import { ComplexityPanel } from './ComplexityPanel';
 
 type ConsolePanelProps = {
   language?: Language;
@@ -15,8 +23,12 @@ type ConsolePanelProps = {
   atLastStep: boolean;
   complexity: ComplexityResult | null;
   complexityBusy: boolean;
-  onMeasureComplexity: () => void;
+  onMeasureComplexity: (options: ComplexityOptions) => void;
   canMeasureComplexity: boolean;
+  /** The function a complexity experiment would call, with its current inputs. */
+  complexityFunction?: FunctionInfo | null;
+  complexityInputs?: string[];
+  onStopComplexity?: () => void;
   /** Extra control shown beside the heading, such as "Keep as baseline". */
   headerAction?: ReactNode;
 };
@@ -44,8 +56,7 @@ function formatMemory(
   if (typeof mb !== 'number' || !Number.isFinite(mb)) {
     return null;
   }
-  const amount =
-    mb < 0.01 ? '<0.01 MB' : `${mb < 10 ? mb.toFixed(2) : mb.toFixed(1)} MB`;
+  const amount = mb < 0.01 ? '<0.01 MB' : `${mb < 10 ? mb.toFixed(2) : mb.toFixed(1)} MB`;
   return isEstimate ? `~${amount}` : amount;
 }
 
@@ -58,6 +69,9 @@ export function ConsolePanel({
   complexityBusy,
   onMeasureComplexity,
   canMeasureComplexity,
+  complexityFunction = null,
+  complexityInputs,
+  onStopComplexity,
   headerAction,
 }: ConsolePanelProps) {
   const run = result?.run ?? null;
@@ -65,9 +79,6 @@ export function ConsolePanel({
   const exception = run?.exception ?? run?.setupError ?? null;
   const error = result?.error ?? null;
   const explanation = explainException(exception ?? error, language);
-  const growth =
-    complexity && complexity.samples.length >= 3 ? fitGrowth(complexity.samples) : null;
-  const maxOps = complexity ? Math.max(...complexity.samples.map((sample) => sample.ops), 1) : 1;
   const runtimeText = run ? formatRuntime(run.runtimeMs) : null;
   const memoryText = run ? formatMemory(run.memoryMb, run.memoryIsEstimate) : null;
   const showReturnValue = Boolean(atLastStep && run?.returnValue);
@@ -149,56 +160,16 @@ export function ConsolePanel({
           </dl>
         ) : null}
 
-        <div className="complexity-block">
-          <button
-            className="ghost-button"
-            disabled={!canMeasureComplexity || complexityBusy}
-            onClick={onMeasureComplexity}
-            title="Run the function at several input sizes and fit a growth curve"
-            type="button"
-          >
-            <TrendingUp size={13} />
-            {complexityBusy ? 'Measuring…' : 'Estimate complexity'}
-          </button>
-
-          {complexity?.error ? (
-            <p className="console-note">
-              {complexity.error.type}: {complexity.error.msg}
-            </p>
-          ) : null}
-
-          {complexity?.truncated ? (
-            <p className="console-note">
-              {complexity.truncationReason
-                ? `${complexity.truncationReason} Growth estimate may be biased toward smaller inputs.`
-                : 'Complexity measurement stopped early; growth estimate may be biased toward smaller inputs.'}
-            </p>
-          ) : null}
-
-          {complexity && complexity.samples.length > 0 ? (
-            <div className="complexity-result">
-              {growth ? (
-                <p className="complexity-label">
-                  steps grow like <strong>{growth}</strong>
-                </p>
-              ) : null}
-              <div className="complexity-bars">
-                {complexity.samples.map((sample) => (
-                  <div className="complexity-bar-row" key={sample.n}>
-                    <span className="complexity-n">n={sample.n}</span>
-                    <div className="complexity-bar-track">
-                      <div
-                        className="complexity-bar"
-                        style={{ width: `${Math.max(2, (sample.ops / maxOps) * 100)}%` }}
-                      />
-                    </div>
-                    <span className="complexity-ops">{sample.ops}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
-        </div>
+        <ComplexityPanel
+          busy={complexityBusy}
+          canMeasure={canMeasureComplexity}
+          fn={complexityFunction}
+          inputs={complexityInputs}
+          language={language}
+          onMeasure={onMeasureComplexity}
+          onStop={onStopComplexity}
+          result={complexity}
+        />
       </div>
     </section>
   );

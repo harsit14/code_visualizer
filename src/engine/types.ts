@@ -178,7 +178,60 @@ export type SessionResult = {
   pyodideVersion?: string;
 };
 
-export type ComplexitySample = { n: number; ops: number };
+/** How a complexity experiment grows its chosen input (see engine/codeviz/complexity.py). */
+export type ComplexityAxis = 'len' | 'nodes' | 'value' | 'both' | 'rows' | 'cols';
+
+export type ComplexitySampleStatus =
+  | 'ok'
+  | 'exception'
+  | 'step-limit'
+  | 'time-limit'
+  | 'setup-error'
+  | 'skipped';
+
+/** One sampled size. `ops` counts trace events in user code; only `ok` samples are fitted. */
+export type ComplexitySample = {
+  n: number;
+  ops: number;
+  ms?: number | null;
+  status?: ComplexitySampleStatus;
+  error?: { type: string; msg: string } | null;
+  note?: string | null;
+};
+
+export type ComplexityDimension = {
+  id: string;
+  param: string;
+  axis: ComplexityAxis;
+  kind: string;
+  meaning: string;
+  maxN: number;
+};
+
+/** Measured growth: the best-fitting candidate curve, not a proof of Big-O. */
+export type ComplexityFit = {
+  model: string;
+  label: string;
+  error: number;
+  quality: 'good' | 'fair' | 'poor';
+  samplesUsed: number;
+  runnerUp: { label: string; error: number } | null;
+  curve: { n: number; ops: number }[];
+};
+
+/** Static loop-nesting heuristic, reported separately from the measurement. */
+export type ComplexityStructure = {
+  label: string | null;
+  loopDepth: number;
+  recursive: boolean;
+  notes: string[];
+};
+
+export type ComplexityFixedInput = {
+  name: string;
+  literal: string;
+  source: 'current' | 'generated';
+};
 
 export type ComplexityResult = {
   functionName: string | null;
@@ -187,6 +240,21 @@ export type ComplexityResult = {
   error: EngineError | null;
   truncated?: boolean;
   truncationReason?: string | null;
+  dimension?: ComplexityDimension | null;
+  fixed?: ComplexityFixedInput[];
+  fit?: ComplexityFit | null;
+  caveats?: string[];
+  structure?: ComplexityStructure | null;
+  limits?: { maxSteps: number; maxSeconds: number };
+};
+
+/** What grows and which sizes to sample; omitted fields use engine defaults. */
+export type ComplexityOptions = {
+  param?: string;
+  axis?: ComplexityAxis;
+  sizes?: number[];
+  /** Literals that hold the other parameters fixed; omit for generated defaults. */
+  inputs?: string[];
 };
 
 export type RunOptions = {
@@ -202,7 +270,7 @@ export type RunOptions = {
 export type EngineRequest =
   | { op: 'run'; source: string; options?: RunOptions }
   | { op: 'analyze'; source: string }
-  | { op: 'complexity'; source: string; function?: string; seed?: number };
+  | ({ op: 'complexity'; source: string; function?: string; seed?: number } & ComplexityOptions);
 
 export type RuntimePhase =
   | 'idle'

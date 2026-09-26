@@ -4,7 +4,6 @@ import {
   diffLocals,
   findArrayPointers,
   findSharedReferences,
-  fitGrowth,
   formatValue,
   groupChains,
   largestContainingChain,
@@ -286,44 +285,6 @@ describe('groupChains', () => {
 
   it('ignores empty chains and non-chain locals', () => {
     expect(groupChains({ x: num(1) })).toEqual([]);
-  });
-});
-
-describe('fitGrowth', () => {
-  it('labels linear growth', () => {
-    expect(
-      fitGrowth([
-        { n: 4, ops: 40 },
-        { n: 8, ops: 82 },
-        { n: 16, ops: 158 },
-        { n: 32, ops: 330 },
-      ]),
-    ).toBe('O(n)');
-  });
-
-  it('labels quadratic growth', () => {
-    expect(
-      fitGrowth([
-        { n: 4, ops: 20 },
-        { n: 8, ops: 70 },
-        { n: 16, ops: 270 },
-        { n: 32, ops: 1060 },
-      ]),
-    ).toBe('O(n²)');
-  });
-
-  it('labels constant growth', () => {
-    expect(
-      fitGrowth([
-        { n: 4, ops: 6 },
-        { n: 8, ops: 6 },
-        { n: 16, ops: 6 },
-      ]),
-    ).toBe('O(1)');
-  });
-
-  it('returns null with too few samples', () => {
-    expect(fitGrowth([{ n: 4, ops: 10 }])).toBeNull();
   });
 });
 

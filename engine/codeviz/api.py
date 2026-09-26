@@ -8,7 +8,8 @@ Request shapes::
     {"op": "run", "source": "...", "options": {"mode"?, "function"?,
      "inputs"?, "seed"?, "maxSteps"?}}
     {"op": "analyze", "source": "..."}
-    {"op": "complexity", "source": "...", "function"?, "seed"?}
+    {"op": "complexity", "source": "...", "function"?, "seed"?, "param"?,
+     "axis"?, "sizes"?, "inputs"?}
 """
 
 from __future__ import annotations
@@ -41,10 +42,20 @@ def handle_request(request_json: str) -> str:
                 expected=options.get("expected"),
             )
         elif op == "complexity":
+            sizes = request.get("sizes")
+            inputs = request.get("inputs")
             payload = measure_complexity(
                 request["source"],
                 function=request.get("function"),
                 seed=request.get("seed"),
+                sizes=sizes if isinstance(sizes, list) else None,
+                param=request.get("param"),
+                axis=request.get("axis"),
+                inputs=(
+                    inputs
+                    if isinstance(inputs, list) and all(isinstance(item, str) for item in inputs)
+                    else None
+                ),
             )
         else:
             payload = {"error": {"type": "BadRequest", "msg": f"Unknown op {op!r}"}}
