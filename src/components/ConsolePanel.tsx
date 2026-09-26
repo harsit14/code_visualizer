@@ -3,6 +3,7 @@
  * stderr, truncation notices, and the complexity experiment.
  */
 import { AlertTriangle, Terminal } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { explainException } from '../engine/exceptionExplanations';
 import { formatValue, stdoutAtStep } from '../engine/trace';
 import type {
@@ -28,6 +29,8 @@ type ConsolePanelProps = {
   complexityFunction?: FunctionInfo | null;
   complexityInputs?: string[];
   onStopComplexity?: () => void;
+  /** Extra control shown beside the heading, such as "Keep as baseline". */
+  headerAction?: ReactNode;
 };
 
 function formatRuntime(ms: number | undefined): string | null {
@@ -69,6 +72,7 @@ export function ConsolePanel({
   complexityFunction = null,
   complexityInputs,
   onStopComplexity,
+  headerAction,
 }: ConsolePanelProps) {
   const run = result?.run ?? null;
   const stdout = run ? stdoutAtStep(run.stdout, currentStep) : '';
@@ -88,6 +92,7 @@ export function ConsolePanel({
         <h2>
           <Terminal size={14} /> Console
         </h2>
+        {headerAction}
       </header>
 
       <div className="panel-scroll console-body">

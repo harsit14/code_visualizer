@@ -1,6 +1,7 @@
+import { AccountSettings } from './AccountSettings';
 import { EmailCodeForm } from './EmailCodeForm';
 import { LogOut, UserRound } from 'lucide-react';
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fetchAccount, signIn, signOut, signUp, type AccountState } from '../app/accountClient';
 
 type AccountMenuProps = {
@@ -27,6 +28,9 @@ export function AccountMenu({ compact = false }: AccountMenuProps) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Settings (and their sessions request) mount only while the menu is open.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const summaryRef = useRef<HTMLElement | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -118,9 +122,27 @@ export function AccountMenu({ compact = false }: AccountMenuProps) {
     }
   }, []);
 
+  const handleDeleted = useCallback(() => {
+    setAccount((current) => ({
+      ...EMPTY_ACCOUNT,
+      accountConfigured: true,
+      authMode: current.authMode,
+    }));
+    setLegacyLogin(false);
+    setLinking(false);
+    setEmail('');
+    setPassword('');
+    setError(null);
+    setMessage('Account deleted. Its saved history, sessions and usage records were removed.');
+    summaryRef.current?.focus();
+  }, []);
+
   return (
-    <details className={`account-menu${compact ? ' account-menu-compact' : ''}`}>
-      <summary aria-label={summaryTitle} title={summaryTitle}>
+    <details
+      className={`account-menu${compact ? ' account-menu-compact' : ''}`}
+      onToggle={(event) => setMenuOpen(event.currentTarget.open)}
+    >
+      <summary aria-label={summaryTitle} ref={summaryRef} title={summaryTitle}>
         <UserRound size={14} />
         <span className="account-summary-label">{summaryLabel}</span>
       </summary>
@@ -190,6 +212,13 @@ export function AccountMenu({ compact = false }: AccountMenuProps) {
               <LogOut size={14} />
               Sign out
             </button>
+            {menuOpen ? (
+              <AccountSettings
+                authMethod={account.user.authMethod}
+                email={account.user.email}
+                onDeleted={handleDeleted}
+              />
+            ) : null}
           </div>
         ) : account.accountConfigured ? (
           <form className="account-form" onSubmit={(event) => void submitAuth(event)}>

@@ -78,6 +78,11 @@ which answers identical requests (same model and exact sanitized context) for 30
 days without calling the provider or using quota. The Worker keeps working before
 this migration is applied; it just skips refunds and caching.
 
+Then apply `supabase/migrations/0004_account_controls.sql` (after 0001; 0002 and
+0003 are optional and may come before or after it). It powers the account menu's
+session list, data download and account deletion, and makes history saves
+idempotent. See [Account sessions, export and deletion](#account-sessions-export-and-deletion).
+
 AI explainer quota behavior:
 
 - Each request reserves one explanation from the caller's daily count and the
@@ -117,6 +122,54 @@ before they can exhaust free Worker CPU.
 Signup and login are IP-throttled in the Worker at 5 attempts per minute per
 route. Auth JSON bodies are capped at 4 KB, and saved-history POST bodies are
 capped at 600 KB before parsing.
+
+### Account sessions, export and deletion
+
+`0004_account_controls.sql` adds:
+
+- `sessions.device_label`, a coarse "Browser on System" summary of at most 64
+  characters (never the User-Agent string or an IP address), and
+  `sessions.last_used_at`, refreshed at most hourly by the Worker.
+- `code_history.idempotency_key` with a unique `(user_id, idempotency_key)` index.
+- `delete_account(uuid, text, uuid)`, executable only by `service_role`.
+
+Routes, all requiring the session cookie and the same-origin checks as the other
+account routes:
+
+| Route                                      | Purpose                                                                                                                                                                                   |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/account/sessions`                | Active sessions: opaque ID, device label, created, last-used and expiry times, and which one is current.                                                                                  |
+| `DELETE /api/account/sessions/:id`         | Signs out one other session. The current session returns 400; an ID that is not the caller's returns 404.                                                                                 |
+| `POST /api/account/sessions/revoke-others` | Signs out every other session.                                                                                                                                                            |
+| `GET /api/account/export`                  | Versioned JSON (`code-visualizer-account-export`, version 1): profile, up to 50 history entries, up to 50 active sessions and up to 400 days of AI usage counters. 5 per minute per user. |
+| `POST /api/account/delete`                 | Deletes the account. Body `{ confirmEmail, password }` or `{ confirmEmail, code }`, capped at 4 KB and throttled like login.                                                              |
+| `POST /api/history`                        | Accepts an `Idempotency-Key: <uuid>` header. A replayed key returns the stored entry.                                                                                                     |
+
+Revocation takes effect on the next request, because every request looks up the
+session row. The export never contains password hashes, session tokens or their
+hashes, provider IDs or other users' rows.
+
+Deletion needs the account email typed exactly plus fresh proof of the sign-in
+method. Password accounts re-enter the current password. Email-code accounts
+request a new code through the existing `/api/auth/email-code` route; the Worker
+verifies it with Supabase, and `delete_account` checks that the verified identity
+belongs to this account. The function locks the user row, re-checks the caller's
+session (so a revoked session cannot delete), then removes usage counters,
+history, sessions and the account, cascading to subscriptions and identity
+mappings, in one transaction. Afterwards the Worker asks the Supabase Auth admin
+API to delete the email-code identity. That step is best effort: a failure is
+logged without identifiers, and the same email would simply start a new, empty
+account.
+
+Not covered by export or deletion: the AI answer cache (keyed by content hash, not
+by account), `auth_rate_limits` (HMAC buckets), anonymous usage counters, drafts
+and workspaces stored only in the browser, and provider logs or backups, which
+follow their own retention.
+
+Before 0004 is applied, sessions are listed without device or last-used details,
+history saves ignore the key (a lost acknowledgement can still duplicate an
+entry), and deletion returns 503. Supabase reloads the PostgREST schema cache
+after SQL-editor migrations; elsewhere run `NOTIFY pgrst, 'reload schema'`.
 
 ### Parked Subscription Code
 
@@ -357,6 +410,7 @@ No live migration or deployment was performed as part of implementation.
 Successful-run history upload is now an explicit **Workspace → Saving and privacy
 → Save runs to account history** preference. It defaults to local only and turns
 off on an account change. Existing saved histories remain accessible. Failed
-uploads show a retry action; retrying a request whose acknowledgement was lost
-can currently create a duplicate history entry. Named versioned workspaces and
-idempotent cloud saves remain separate roadmap work.
+uploads show a retry action. With `0004_account_controls.sql` applied, a retry
+or rerun of the same unconfirmed save reuses its idempotency key, so a lost
+acknowledgement no longer creates a duplicate entry. Named versioned workspaces
+remain separate roadmap work.
