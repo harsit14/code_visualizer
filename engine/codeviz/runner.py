@@ -20,6 +20,7 @@ from typing import Any, Optional
 from .analyzer import Analysis, FunctionInfo, analyze
 from .assertions import assess_return
 from .inputgen import GeneratedInput, evaluate_input, generate_inputs
+from .prelude import exception_message, prelude_for
 from .serialize import Snapshotter
 from .structures import ListNode, TreeNode, build_linked_list, build_tree
 from .tracer import DEFAULT_MAX_STEPS, TraceLimitError, Tracer
@@ -33,9 +34,11 @@ def _javascript_string_length(value: str) -> int:
     return len(value.encode("utf-16-le")) // 2
 
 
-def _base_globals(analysis: Analysis) -> dict[str, Any]:
-    """Globals for user code, with TreeNode/ListNode injected when needed."""
+def _base_globals(analysis: Analysis, prelude: dict[str, Any]) -> dict[str, Any]:
+    """Globals for user code: LeetCode-style prelude names the code reads, plus
+    TreeNode/ListNode when referenced but not defined."""
     env: dict[str, Any] = {"__name__": "__main__", "__file__": USER_FILENAME}
+    env.update(prelude)
     if analysis.references_tree_node and not analysis.defines_tree_node:
         env["TreeNode"] = TreeNode
     if analysis.references_list_node and not analysis.defines_list_node:
@@ -44,9 +47,20 @@ def _base_globals(analysis: Analysis) -> dict[str, Any]:
 
 
 def _error_payload(exc: BaseException) -> dict[str, Any]:
+    # Suggest names from the innermost user frame, where the error happened.
+    frame = None
+    tb = exc.__traceback__
+    while tb is not None:
+        if tb.tb_frame.f_code.co_filename == USER_FILENAME:
+            frame = tb.tb_frame
+        tb = tb.tb_next
     return {
         "type": type(exc).__name__,
-        "msg": str(exc),
+        "msg": exception_message(
+            exc,
+            frame.f_locals if frame is not None else None,
+            frame.f_globals if frame is not None else None,
+        ),
         "traceback": traceback.format_exc(limit=20),
     }
 
@@ -243,12 +257,14 @@ def _run_script(
 ) -> dict[str, Any]:
     stdout, stderr = io.StringIO(), io.StringIO()
     snapshotter = Snapshotter()
+    prelude = prelude_for(source)
     tracer = Tracer(
         filename=USER_FILENAME,
         snapshotter=snapshotter,
         max_steps=max_steps,
         max_seconds=max_seconds,
         stdout_len=lambda: _javascript_string_length(stdout.getvalue()),
+        hidden_globals=prelude,
     )
     run: dict[str, Any] = {
         "functionName": None,
@@ -260,7 +276,7 @@ def _run_script(
         "memoryMb": 0.0,
         "memoryIsEstimate": False,
     }
-    env = _base_globals(analysis)
+    env = _base_globals(analysis, prelude)
     code = compile(source, USER_FILENAME, "exec")
     try:
         with redirect_stdout(stdout), redirect_stderr(stderr):
@@ -317,7 +333,8 @@ def _run_function(
     run["functionName"] = info.qualname
 
     # Execute the definitions (untraced) to materialize functions/classes.
-    env = _base_globals(analysis)
+    prelude = prelude_for(source)
+    env = _base_globals(analysis, prelude)
     try:
         with redirect_stdout(stdout), redirect_stderr(stderr):
             exec(compile(source, USER_FILENAME, "exec"), env)
@@ -376,6 +393,7 @@ def _run_function(
         max_steps=max_steps,
         max_seconds=max_seconds,
         stdout_len=lambda: _javascript_string_length(stdout.getvalue()),
+        hidden_globals=prelude,
     )
     try:
         with redirect_stdout(stdout), redirect_stderr(stderr):
@@ -433,10 +451,11 @@ def measure_complexity(
 
     used_seed = seed if seed is not None else 1234
     payload["seed"] = used_seed
+    prelude = prelude_for(source)
     for size in sizes or [4, 8, 16, 32, 64]:
         # Start every sample from a clean module and class instance so caches,
         # globals, and attributes cannot leak into the next input size.
-        env = _base_globals(analysis)
+        env = _base_globals(analysis, prelude)
         setup_stdout, setup_stderr = io.StringIO(), io.StringIO()
         try:
             with redirect_stdout(setup_stdout), redirect_stderr(setup_stderr):

@@ -11,6 +11,17 @@ function initialSync() {
   }
 }
 
+function newSaveKey(): string {
+  if (typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 type UseCodeHistorySyncOptions = {
   code: string;
   embedMode: boolean;
@@ -67,6 +78,9 @@ export function useCodeHistorySync({
   }, []);
   const retryHistorySave = useCallback(() => setRetry((value) => value + 1), []);
   const currentHistoryIdRef = useRef<string | null>(null);
+  // The last unconfirmed save. Saving the same payload again (Retry, or a rerun
+  // after a lost acknowledgement) reuses its key, so the server stores it once.
+  const pendingSaveRef = useRef<{ key: string; signature: string } | null>(null);
   const [historyRefreshToken, setHistoryRefreshToken] = useState(0);
 
   const clearHistoryItemId = useCallback(() => {
@@ -80,6 +94,7 @@ export function useCodeHistorySync({
   useEffect(() => {
     const changed = () => {
       currentHistoryIdRef.current = null;
+      pendingSaveRef.current = null;
       setHistorySyncEnabled(false);
       setHistoryRefreshToken((value) => value + 1);
     };
@@ -107,22 +122,27 @@ export function useCodeHistorySync({
     setHistorySaveStatus('saving');
     setHistoryError('');
     const run = result.run;
-    void saveCodeHistory(
-      {
-        code,
-        exampleId,
-        functionName: run.functionName ?? functionOverride,
-        id: currentHistoryIdRef.current,
-        inputs: run.inputs.map((input) => input.literal),
-        language,
-        seed: run.seed,
-        title: historyTitle(exampleId, run.functionName ?? functionOverride, code),
-      },
-      controller.signal,
-    )
+    const payload = {
+      code,
+      exampleId,
+      functionName: run.functionName ?? functionOverride,
+      id: currentHistoryIdRef.current,
+      inputs: run.inputs.map((input) => input.literal),
+      language,
+      seed: run.seed,
+      title: historyTitle(exampleId, run.functionName ?? functionOverride, code),
+    };
+    const signature = JSON.stringify(payload);
+    const pending =
+      pendingSaveRef.current?.signature === signature
+        ? pendingSaveRef.current
+        : { key: newSaveKey(), signature };
+    pendingSaveRef.current = pending;
+    void saveCodeHistory(payload, controller.signal, pending.key)
       .then((item) => {
         if (!item) throw new Error('The server did not confirm this save. Please retry.');
         if (!cancelled && generation === generationRef.current && item) {
+          if (pendingSaveRef.current === pending) pendingSaveRef.current = null;
           setHistorySaveStatus('saved');
           currentHistoryIdRef.current = item.id;
           setHistoryRefreshToken((current) => current + 1);

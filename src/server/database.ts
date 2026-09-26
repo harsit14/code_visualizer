@@ -13,6 +13,28 @@ export type UserWithPasswordRow = UserRow & {
   password_hash: string;
 };
 
+export type SessionRow = {
+  auth_method?: 'legacy' | 'supabase';
+  created_at: string;
+  /** Absent until migration 0004 adds the column. */
+  device_label?: string | null;
+  expires_at: string;
+  /** Absent until migration 0004 adds the column. */
+  last_used_at?: string | null;
+  token_hash: string;
+  user_id: string;
+};
+
+export type SessionUserRow = UserRow & {
+  session?: Pick<SessionRow, 'created_at' | 'device_label' | 'last_used_at'>;
+};
+
+export type UsageRow = {
+  count: number;
+  day: string;
+  plan: string;
+};
+
 export type SubscriptionRow = {
   current_period_end: string | null;
   price_id: string | null;
@@ -68,10 +90,16 @@ export type AppDatabase = {
     id: string;
     password_hash: string;
   }): Promise<void>;
+  /** Atomic `delete_account` RPC from migration 0004. */
+  deleteAccount(userId: string, tokenHash: string, providerSubject: string | null): Promise<void>;
   deleteHistoryItem(id: string, userId: string): Promise<void>;
+  /** Deletes every session of the user except `keepTokenHash`; returns how many. */
+  deleteOtherSessions(userId: string, keepTokenHash: string): Promise<number>;
   deleteSession(tokenHash: string): Promise<void>;
+  deleteUserSession(tokenHash: string, userId: string): Promise<void>;
+  findHistoryByIdempotencyKey(userId: string, key: string): Promise<HistoryRow | null>;
   findOwnedHistoryId(id: string, userId: string): Promise<string | null>;
-  findSessionUser(tokenHash: string, expiresAfter: string): Promise<UserRow | null>;
+  findSessionUser(tokenHash: string, expiresAfter: string): Promise<SessionUserRow | null>;
   findUserByEmail(email: string): Promise<UserWithPasswordRow | null>;
   findUserByStripeCustomerId(customerId: string): Promise<UserRow | null>;
   getHistoryItem(id: string, userId: string): Promise<HistoryRow | null>;
@@ -96,9 +124,17 @@ export type AppDatabase = {
   }): Promise<void>;
   insertBillingEvent(row: { created_at: string; id: string; type: string }): Promise<void>;
   insertHistory(row: HistoryRow): Promise<void>;
+  /** Inserts unless (user_id, key) exists; returns whether a row was inserted. */
+  insertHistoryOnce(row: HistoryRow, idempotencyKey: string): Promise<boolean>;
   listHistory(userId: string, limit: number): Promise<HistoryRow[]>;
+  listSessions(userId: string, expiresAfter: string, limit: number): Promise<SessionRow[]>;
+  listUsage(subject: string, limit: number): Promise<UsageRow[]>;
   pruneHistory(userId: string, keep: number): Promise<void>;
   updateHistory(row: HistoryUpdateRow): Promise<void>;
+  updateSessionMetadata(
+    tokenHash: string,
+    fields: { device_label?: string; last_used_at?: string },
+  ): Promise<void>;
   updateUserStripeCustomerId(userId: string, customerId: string): Promise<void>;
   upsertSubscription(row: SubscriptionUpsertRow): Promise<void>;
 };
@@ -129,6 +165,25 @@ export function getDatabase(env: ServerEnv): AppDatabase | null {
     return null;
   }
   return new SupabaseRestDatabase(url, serviceRoleKey, env.SUPABASE_SCHEMA);
+}
+
+// A column, table or function that a not-yet-applied migration would add.
+const MISSING_SCHEMA_CODES = new Set([
+  'PGRST202',
+  'PGRST204',
+  'PGRST205',
+  '42703',
+  '42883',
+  '42P01',
+  '42P10',
+]);
+
+export function isMissingSchemaError(error: unknown): boolean {
+  return (
+    error instanceof DatabaseRequestError &&
+    error.code !== undefined &&
+    MISSING_SCHEMA_CODES.has(error.code)
+  );
 }
 
 export function isDatabaseUniqueConstraintError(error: unknown): boolean {
@@ -208,6 +263,17 @@ class SupabaseRestDatabase implements AppDatabase {
     await this.mutate('users', 'POST', { ...row, stripe_customer_id: null });
   }
 
+  async deleteAccount(
+    userId: string,
+    tokenHash: string,
+    providerSubject: string | null,
+  ): Promise<void> {
+    await this.request<unknown>('rpc/delete_account', {
+      method: 'POST',
+      body: { p_user_id: userId, p_token_hash: tokenHash, p_provider_subject: providerSubject },
+    });
+  }
+
   async deleteHistoryItem(id: string, userId: string): Promise<void> {
     await this.mutate('code_history', 'DELETE', undefined, {
       id: eq(id),
@@ -215,9 +281,33 @@ class SupabaseRestDatabase implements AppDatabase {
     });
   }
 
+  async deleteOtherSessions(userId: string, keepTokenHash: string): Promise<number> {
+    const rows = await this.request<Array<{ token_hash: string }> | null>('sessions', {
+      method: 'DELETE',
+      params: { select: 'token_hash', token_hash: `neq.${keepTokenHash}`, user_id: eq(userId) },
+      prefer: 'return=representation',
+    });
+    return rows?.length ?? 0;
+  }
+
   async deleteSession(tokenHash: string): Promise<void> {
     await this.mutate('sessions', 'DELETE', undefined, {
       token_hash: eq(tokenHash),
+    });
+  }
+
+  async deleteUserSession(tokenHash: string, userId: string): Promise<void> {
+    await this.mutate('sessions', 'DELETE', undefined, {
+      token_hash: eq(tokenHash),
+      user_id: eq(userId),
+    });
+  }
+
+  async findHistoryByIdempotencyKey(userId: string, key: string): Promise<HistoryRow | null> {
+    return this.first<HistoryRow>('code_history', {
+      idempotency_key: eq(key),
+      select: historySelect,
+      user_id: eq(userId),
     });
   }
 
@@ -230,20 +320,30 @@ class SupabaseRestDatabase implements AppDatabase {
     return row?.id ?? null;
   }
 
-  async findSessionUser(tokenHash: string, expiresAfter: string): Promise<UserRow | null> {
-    const session = await this.first<{ user_id: string; auth_method?: string }>('sessions', {
+  async findSessionUser(tokenHash: string, expiresAfter: string): Promise<SessionUserRow | null> {
+    // `*` so metadata columns from migration 0004 are read when present.
+    const session = await this.first<SessionRow>('sessions', {
       expires_at: gt(expiresAfter),
       select: '*',
       token_hash: eq(tokenHash),
     });
-    if (session?.auth_method === 'supabase') {
+    if (!session) {
+      return null;
+    }
+    const metadata: NonNullable<SessionUserRow['session']> = { created_at: session.created_at };
+    if ('last_used_at' in session) {
+      metadata.device_label = session.device_label ?? null;
+      metadata.last_used_at = session.last_used_at ?? null;
+    }
+    if (session.auth_method === 'supabase') {
       const rows = await this.request<UserRow[]>('rpc/managed_session_user', {
         method: 'POST',
         body: { p_token_hash: tokenHash },
       });
-      return rows[0] ? { ...rows[0], auth_method: 'supabase' } : null;
+      return rows[0] ? { ...rows[0], auth_method: 'supabase', session: metadata } : null;
     }
-    return session ? this.findUserById(session.user_id) : null;
+    const user = await this.findUserById(session.user_id);
+    return user ? { ...user, session: metadata } : null;
   }
 
   async findUserByEmail(email: string): Promise<UserWithPasswordRow | null> {
@@ -347,12 +447,42 @@ class SupabaseRestDatabase implements AppDatabase {
     await this.mutate('code_history', 'POST', row);
   }
 
+  async insertHistoryOnce(row: HistoryRow, idempotencyKey: string): Promise<boolean> {
+    // ON CONFLICT DO NOTHING: a replayed key returns no row instead of an error.
+    const rows = await this.request<Array<{ id: string }> | null>('code_history', {
+      body: { ...row, idempotency_key: idempotencyKey },
+      method: 'POST',
+      params: { on_conflict: 'user_id,idempotency_key', select: 'id' },
+      prefer: 'resolution=ignore-duplicates,return=representation',
+    });
+    return (rows?.length ?? 0) > 0;
+  }
+
   async listHistory(userId: string, limit: number): Promise<HistoryRow[]> {
     return this.select<HistoryRow>('code_history', {
       limit,
       order: 'last_run_at.desc',
       select: historySelect,
       user_id: eq(userId),
+    });
+  }
+
+  async listSessions(userId: string, expiresAfter: string, limit: number): Promise<SessionRow[]> {
+    return this.select<SessionRow>('sessions', {
+      expires_at: gt(expiresAfter),
+      limit,
+      order: 'created_at.desc',
+      select: '*',
+      user_id: eq(userId),
+    });
+  }
+
+  async listUsage(subject: string, limit: number): Promise<UsageRow[]> {
+    return this.select<UsageRow>('usage_daily', {
+      limit,
+      order: 'day.desc',
+      select: 'day,plan,count',
+      subject: eq(subject),
     });
   }
 
@@ -393,6 +523,13 @@ class SupabaseRestDatabase implements AppDatabase {
         user_id: eq(row.user_id),
       },
     );
+  }
+
+  async updateSessionMetadata(
+    tokenHash: string,
+    fields: { device_label?: string; last_used_at?: string },
+  ): Promise<void> {
+    await this.mutate('sessions', 'PATCH', fields, { token_hash: eq(tokenHash) });
   }
 
   async updateUserStripeCustomerId(userId: string, customerId: string): Promise<void> {

@@ -24,6 +24,22 @@ export type AccountState = {
   } | null;
 };
 
+export type AccountSession = {
+  createdAt: string;
+  current: boolean;
+  /** Coarse label such as "Firefox on Windows"; null until the session is used. */
+  device: string | null;
+  expiresAt: string;
+  id: string;
+  lastUsedAt: string | null;
+};
+
+export type DeleteAccountPayload = {
+  code?: string;
+  confirmEmail: string;
+  password?: string;
+};
+
 type AuthPayload = {
   email: string;
   password: string;
@@ -71,6 +87,50 @@ export async function createPortalSession(): Promise<string> {
   return payload.url;
 }
 
+export async function listSessions(): Promise<AccountSession[]> {
+  const payload = await requestJson<{ sessions: AccountSession[] }>('/api/account/sessions', {
+    method: 'GET',
+  });
+  return payload.sessions;
+}
+
+export async function revokeSession(id: string): Promise<void> {
+  await requestJson(`/api/account/sessions/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
+/** Signs out every session except this one; returns how many ended. */
+export async function revokeOtherSessions(): Promise<number> {
+  const payload = await requestJson<{ revoked: number }>('/api/account/sessions/revoke-others', {
+    method: 'POST',
+  });
+  return payload.revoked;
+}
+
+/** Saves the account export as a JSON download and returns its file name. */
+export async function downloadAccountData(): Promise<string> {
+  const payload = await requestJson('/api/account/export', { method: 'GET' });
+  const filename = `code-visualizer-account-${new Date().toISOString().slice(0, 10)}.json`;
+  const url = URL.createObjectURL(
+    new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' }),
+  );
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return filename;
+}
+
+export async function deleteAccount(payload: DeleteAccountPayload): Promise<void> {
+  await requestJson('/api/account/delete', {
+    body: JSON.stringify(payload),
+    headers: { 'Content-Type': 'application/json' },
+    method: 'POST',
+  });
+}
+
 async function requestJson<T = unknown>(url: string, init: RequestInit): Promise<T> {
   const response = await fetch(url, init);
   const contentType = response.headers.get('Content-Type')?.toLowerCase() ?? '';
@@ -94,8 +154,8 @@ async function requestJson<T = unknown>(url: string, init: RequestInit): Promise
     throw new Error(detail);
   }
   if (
-    url.startsWith('/api/auth/') &&
-    url !== '/api/auth/email-code' &&
+    ((url.startsWith('/api/auth/') && url !== '/api/auth/email-code') ||
+      url === '/api/account/delete') &&
     typeof window !== 'undefined'
   ) {
     window.dispatchEvent(new Event('cv-account-changed'));
