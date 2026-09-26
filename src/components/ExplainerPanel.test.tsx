@@ -202,6 +202,26 @@ describe('ExplainerPanel', () => {
     ).toBe(true);
   });
 
+  it('keeps the local explanation and disables AI requests offline', () => {
+    const currentStep = step(1, { total: num(3) });
+    render(
+      <ExplainerPanel
+        code="total = 3"
+        currentStep={currentStep}
+        frameIndex={null}
+        language="python"
+        offline
+        previousStep={undefined}
+        result={result(currentStep)}
+      />,
+    );
+    expect(screen.getByText(/You are offline. AI explanations need a connection/)).toBeTruthy();
+    expect(screen.queryByText('Include in the request')).toBeNull();
+    expect(
+      (screen.getByRole('button', { name: /explain step/i }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+  });
+
   it('waits for a trace before allowing explanations', () => {
     render(
       <ExplainerPanel

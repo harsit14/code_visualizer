@@ -4,6 +4,8 @@
  */
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { LandingPage } from '../components/LandingPage';
+import { OfflineStatus } from '../components/OfflineStatus';
+import { prefersSavingData, startServiceWorker } from '../offline/registration';
 import { isDashboardLocation, loadDashboard, openLanding } from './routes';
 
 const DashboardApp = lazy(() =>
@@ -31,10 +33,22 @@ export function Root() {
     };
   }, []);
 
-  if (!showDashboard) return <LandingPage />;
+  useEffect(() => {
+    // Installing the offline shell downloads the dashboard too; on data saver
+    // the landing page leaves that until the dashboard is opened.
+    if (showDashboard || !prefersSavingData()) startServiceWorker();
+  }, [showDashboard]);
+
   return (
-    <Suspense fallback={<DashboardLoading />}>
-      <DashboardApp onOpenLanding={openLanding} />
-    </Suspense>
+    <>
+      {showDashboard ? (
+        <Suspense fallback={<DashboardLoading />}>
+          <DashboardApp onOpenLanding={openLanding} />
+        </Suspense>
+      ) : (
+        <LandingPage />
+      )}
+      <OfflineStatus />
+    </>
   );
 }
