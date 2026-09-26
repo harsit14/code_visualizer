@@ -135,6 +135,7 @@ describe('presentation mode', () => {
     const storedLayout = storage.get('cv-panel-visibility-v2');
     expect(before.panels).toEqual(['code', 'data', 'variables', 'watch', 'console']);
     expect(screen.getByRole('textbox', { name: 'Source' }).hasAttribute('readonly')).toBe(false);
+    expect(screen.getByRole('button', { name: 'Keep as baseline' })).toBeTruthy();
 
     press('p');
     expect(visiblePanels()).toEqual(['code', 'data', 'variables', 'console']);
@@ -142,6 +143,7 @@ describe('presentation mode', () => {
     expect(document.querySelector('.top-bar')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Open workspace menu' })).toBeNull();
     expect(screen.queryByRole('button', { name: /Run/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Keep as baseline|Kept as baseline/ })).toBeNull();
     expect(screen.queryByRole('spinbutton', { name: 'Jump to step' })).toBeNull();
     expect(document.querySelector('.trace-finder')).toBeNull();
     expect(document.querySelectorAll('[role="separator"]')).toHaveLength(0);

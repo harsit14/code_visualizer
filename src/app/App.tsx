@@ -906,7 +906,7 @@ export function DashboardApp({ onOpenLanding }: DashboardAppProps) {
               result={session.result}
               headerAction={
                 // Phones always show Compare runs under Inspect, which has its own button.
-                embedMode || mobile ? undefined : (
+                embedMode || mobile || presenting ? undefined : (
                   <button
                     className="panel-header-action"
                     disabled={!canKeepBaseline || session.isBusy}

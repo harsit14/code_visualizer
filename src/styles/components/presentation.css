@@ -112,6 +112,11 @@
   font-size: 15px;
 }
 
+/* Presenting shows what the program did; tools that run code stay hidden. */
+.dashboard-instrument.presentation-mode .console-panel .complexity-block {
+  display: none;
+}
+
 .presentation-mode .controls-bar-presenting {
   justify-content: center;
 }
