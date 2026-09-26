@@ -111,6 +111,44 @@ describe('offline shell build output', () => {
     expect(injected.precache.some((path) => path.endsWith('.map') || path === 'sw.js')).toBe(false);
   }, 30_000);
 
+  it('serves cached files offline even when the host varies responses by Origin', async () => {
+    const { text } = await buildFixture('/');
+    const scope = 'https://example.test/';
+    // Like the Cache API: an entry stored for a request without an Origin header
+    // only matches an Origin-carrying request when Vary is ignored.
+    const stored = new Map<string, { origin: string | null; body: string }>();
+    const cache = {
+      match: async (request: Request | string, options?: CacheQueryOptions) => {
+        const url = typeof request === 'string' ? request : request.url;
+        const origin = typeof request === 'string' ? null : request.headers.get('Origin');
+        const entry = stored.get(url);
+        if (!entry || (!options?.ignoreVary && entry.origin !== origin)) return undefined;
+        return new Response(entry.body, { headers: { Vary: 'Origin' } });
+      },
+    };
+    stored.set(`${scope}assets/app.js`, { origin: null, body: 'cached app' });
+    const listeners = new Map<string, (event: unknown) => void>();
+    runInNewContext(text('sw.js'), {
+      self: {
+        registration: { scope },
+        addEventListener: (type: string, listener: (event: unknown) => void) =>
+          listeners.set(type, listener),
+      },
+      caches: { match: cache.match, open: async () => cache, keys: async () => [] },
+      fetch: () => Promise.reject(new TypeError('Failed to fetch')),
+      Request,
+      Response,
+      URL,
+    });
+    let responded: Promise<Response> | undefined;
+    listeners.get('fetch')!({
+      request: new Request(`${scope}assets/app.js`, { headers: { Origin: scope.slice(0, -1) } }),
+      respondWith: (response: Promise<Response>) => (responded = response),
+      waitUntil: () => undefined,
+    });
+    expect(await (await responded!).text()).toBe('cached app');
+  }, 30_000);
+
   it('builds a worker that only removes itself when disabled', async () => {
     const { text } = await buildFixture('/', false);
     const injected = readBuild(text('sw.js'));

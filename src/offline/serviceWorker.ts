@@ -43,6 +43,10 @@ type ServiceWorkerScope = {
 const worker = self as unknown as ServiceWorkerScope;
 const build = __CODEVIZ_SW_BUILD__;
 const scope = worker.registration.scope;
+// Hosts may send `Vary: Origin`, and the browser adds an Origin header to module
+// script requests but not to the worker's own fetches, so a Vary-respecting match
+// would miss files that are cached. Same-origin files never differ by Origin.
+const MATCH: CacheQueryOptions = { ignoreVary: true };
 
 async function precacheShell() {
   const [shellCache] = currentCacheNames(build);
@@ -50,10 +54,10 @@ async function precacheShell() {
   await Promise.all(
     build.precache.map(async (path) => {
       const url = new URL(path, scope).href;
-      if (await cache.match(url)) return;
+      if (await cache.match(url, MATCH)) return;
       // Hashed files are identical in every cache, so reuse an earlier build's copy.
       if (path.startsWith('assets/')) {
-        const earlier = await caches.match(url);
+        const earlier = await caches.match(url, MATCH);
         if (earlier) return cache.put(url, earlier);
       }
       const response = await fetch(
@@ -93,7 +97,7 @@ function store(event: FetchEvent, cacheName: string, response: Response) {
 async function respond(event: FetchEvent, route: Exclude<Route, { strategy: 'network' }>) {
   const { cacheName } = route;
   if (route.strategy === 'cache-first') {
-    const cached = await caches.match(event.request, { cacheName });
+    const cached = await caches.match(event.request, { ...MATCH, cacheName });
     if (cached) return cached;
     const response = await fromNetwork(event);
     store(event, cacheName, response);
@@ -107,7 +111,7 @@ async function respond(event: FetchEvent, route: Exclude<Route, { strategy: 'net
   } catch (error) {
     const cached = await caches.match(
       route.strategy === 'navigation' ? route.shellUrl : event.request,
-      { cacheName },
+      { ...MATCH, cacheName },
     );
     if (cached) return cached;
     throw error;
