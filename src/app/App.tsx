@@ -58,6 +58,7 @@ import { decodeShareHash } from './shareState';
 import { useTheme } from './theme';
 import { useCodeHistorySync } from './useCodeHistorySync';
 import { useHostCapabilities } from './hostCapabilities';
+import { useOnline } from '../offline/useOnline';
 import { useResizableLayout } from './useResizableLayout';
 import { useRunBaseline } from './useRunBaseline';
 import { useSession } from './useSession';
@@ -123,6 +124,9 @@ const PRESENTATION_MOBILE_TABS = mobileTabs.filter((tab) => tab !== 'Inputs');
 export function DashboardApp({ onOpenLanding }: DashboardAppProps) {
   const { mobile, mobileTab, setMobileTab } = useMobileWorkspace();
   const capabilities = useHostCapabilities();
+  // Offline, server features are hidden or explained, as on static hosts.
+  const online = useOnline();
+  const serverFeaturesOffline = !online && (capabilities.history || !capabilities.known);
   const [shared] = useState(initialShare);
   // Restore the local draft on boot unless a share link or embed supplies code.
   const [bootDraft] = useState(() => (shared || initialEmbedMode() ? null : loadStoredCodeDraft()));
@@ -874,7 +878,8 @@ export function DashboardApp({ onOpenLanding }: DashboardAppProps) {
           >
             <ExplainerPanel
               change={stepChange}
-              available={capabilities.ai}
+              available={capabilities.ai || !capabilities.known}
+              offline={!online}
               code={session.code}
               currentStep={session.currentStep}
               frameIndex={session.selectedFrameIndex}
@@ -1046,8 +1051,8 @@ export function DashboardApp({ onOpenLanding }: DashboardAppProps) {
           <TopBar
             mobile={mobile}
             workspaceLibrary={<WorkspaceLibrary library={library} disabled={session.isBusy} />}
-            showAccount={capabilities.accounts}
-            showHistory={capabilities.history}
+            showAccount={capabilities.accounts && online}
+            showHistory={capabilities.history && online}
             storageControls={
               <>
                 <strong className="workspace-menu-heading">Saving and privacy</strong>
@@ -1067,12 +1072,18 @@ export function DashboardApp({ onOpenLanding }: DashboardAppProps) {
                         : 'Local only. Running code does not send it to account history. AI explanations send code only when requested.'}
                     </p>
                   </>
-                ) : (
+                ) : serverFeaturesOffline ? null : (
                   <p className="account-note">
                     This deployment has no accounts or AI service. Code, cases and workspaces stay
                     in this browser.
                   </p>
                 )}
+                {serverFeaturesOffline ? (
+                  <p className="account-note">
+                    You are offline. Account history, sign-in and AI explanations return when you
+                    reconnect; code, cases and workspaces stay in this browser.
+                  </p>
+                ) : null}
               </>
             }
             canExport={Boolean(session.result?.run)}

@@ -304,6 +304,45 @@ The smoke check verifies:
 - Pyodide assets are not accidentally nested under `node_modules`.
 - Built HTML/CSS/JS do not reference Google Fonts endpoints blocked by the
   production CSP.
+- `manifest.webmanifest`, its icons and `sw.js` exist under the base path, `sw.js`
+  is a classic script with an injected precache list, and that list names only
+  files in `dist` (never Pyodide, source maps or `/api/*`).
+
+## Offline Shell And Service Worker
+
+Production builds are installable (`manifest.webmanifest`, icons in
+`public/icons/`) and register `sw.js`, scoped to the base path, after the page
+loads. The landing page skips registration on data saver or 2G until the
+dashboard is opened. Development, iframes and embeds never register, and the
+isolated runner build has no service worker (`npm run check:runner` checks).
+
+Caching:
+
+- `offlineShellPlugin` (`src/offline/`) writes `sw.js` with this build's
+  precache list: `index.html`, every script and stylesheet (so the dashboard,
+  workers and lessons load offline), Latin font subsets, the manifest and icons.
+  Its cache is `codeviz-shell-<hash of those files>`, so each deploy gets a new one.
+- The Pyodide runtime is cached on first use in `codeviz-pyodide-<version>`. It
+  survives app deploys and is replaced when the Pyodide version changes.
+- When a new worker activates it deletes every other `codeviz-*` cache.
+- `/api/*`, other origins, non-GET, credentialed, `Range`, `no-store` and
+  `private` requests are never cached. Navigations go to the network first;
+  offline, app routes get the cached shell.
+
+Updates: a new deploy's worker installs in the background and waits. The page
+shows "Update available — reload"; Reload activates it and refreshes, and Later
+keeps the current version until every tab of the app has closed. Workspaces and
+drafts live in browser storage, not in these caches, so updates and cache cleanup
+do not touch them.
+
+Disable it with `VITE_SERVICE_WORKER=false npm run build`. That build ships an
+`sw.js` which deletes the `codeviz-*` caches and unregisters itself, and the page
+unregisters any existing worker. Do not just delete `sw.js`: browsers keep an
+installed worker when its script returns 404.
+
+To check a build locally, run `npm run build && npm run preview`, open
+`http://localhost:4173/app`, run a Python example, then go offline in DevTools
+(Application → Service workers) and reload.
 
 ## Manual Smoke Test
 

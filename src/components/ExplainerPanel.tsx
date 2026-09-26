@@ -24,6 +24,8 @@ type ExplainerPanelProps = {
   result: SessionResult | null;
   /** False when this deployment has no AI service. */
   available?: boolean;
+  /** The AI service needs the network; the local explanation does not. */
+  offline?: boolean;
   /** Deterministic explanation of this step, shown before any AI request. */
   change?: StepChange | null;
 };
@@ -55,6 +57,7 @@ export function ExplainerPanel({
   previousStep,
   result,
   available = true,
+  offline = false,
   change = null,
 }: ExplainerPanelProps) {
   const [privacy, setPrivacy] = useState<ExplanationPrivacy>(DEFAULT_EXPLANATION_PRIVACY);
@@ -173,12 +176,14 @@ export function ExplainerPanel({
         <section aria-label="AI explanation" className="explainer-ai">
           <h3>Deeper explanation (optional)</h3>
           <p className="explainer-privacy">
-            {available
-              ? 'Uses the hosted AI service. Choose what the request may include; each new answer uses one of your daily AI explanations, and repeated requests are answered from a cache without using quota.'
-              : 'AI explanations are not available on this deployment. The local explanation above still describes each step.'}
+            {!available
+              ? 'AI explanations are not available on this deployment. The local explanation above still describes each step.'
+              : offline
+                ? 'You are offline. AI explanations need a connection; the local explanation above still describes each step.'
+                : 'Uses the hosted AI service. Choose what the request may include; each new answer uses one of your daily AI explanations, and repeated requests are answered from a cache without using quota.'}
           </p>
 
-          {available && canExplain ? (
+          {available && !offline && canExplain ? (
             <>
               <fieldset className="explainer-privacy-options">
                 <legend>Include in the request</legend>
@@ -210,7 +215,7 @@ export function ExplainerPanel({
 
           <button
             className="explainer-action"
-            disabled={!available || !canExplain || busy}
+            disabled={!available || offline || !canExplain || busy}
             onClick={() => void handleExplain()}
             title="Explain the selected trace step in plain English"
             type="button"

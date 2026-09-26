@@ -1,0 +1,74 @@
+/* Offline and update notices (OfflineStatus). Popovers stack above them. */
+.offline-notices {
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  left: 12px;
+  max-width: min(440px, calc(100vw - 24px));
+  pointer-events: none;
+  position: fixed;
+  z-index: 20;
+}
+
+.offline-notice {
+  align-items: center;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: 9px;
+  box-shadow: var(--shadow);
+  color: var(--text);
+  display: flex;
+  font-size: 12px;
+  gap: 8px;
+  line-height: 1.4;
+  padding: 7px 8px 7px 10px;
+  pointer-events: auto;
+}
+
+.offline-notice > svg {
+  color: var(--amber);
+  flex-shrink: 0;
+}
+
+.offline-notice-update > svg {
+  color: var(--accent);
+}
+
+.offline-notice > span {
+  flex: 1;
+  min-width: 0;
+}
+
+.offline-notice button {
+  flex-shrink: 0;
+  font-size: 12px;
+  padding: 4px 9px;
+}
+
+.offline-notice .offline-notice-action {
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+
+.offline-notice .offline-notice-dismiss {
+  justify-content: center;
+  padding: 4px;
+}
+
+@media (max-width: 720px) {
+  .offline-notices {
+    max-width: none;
+    right: 12px;
+  }
+
+  /* Clear the dashboard's sticky controls bar and mobile tabs. */
+  .mobile-workspace ~ .offline-notices {
+    bottom: calc(132px + env(safe-area-inset-bottom));
+  }
+
+  .offline-notice button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}

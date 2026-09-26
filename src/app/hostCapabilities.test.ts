@@ -32,19 +32,43 @@ describe('host capabilities', () => {
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 
-  it.each([
-    [
-      'an HTML app shell',
-      async () => new Response('<!doctype html>', { headers: { 'Content-Type': 'text/html' } }),
-    ],
-    ['a network failure', async () => Promise.reject(new TypeError('Failed to fetch'))],
-  ])('treats %s as a host without the API', async (_label, response) => {
-    vi.stubGlobal('fetch', vi.fn(response));
+  it('treats an HTML app shell as a host without the API', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () => new Response('<!doctype html>', { headers: { 'Content-Type': 'text/html' } }),
+      ),
+    );
     expect(await fetchHostCapabilities(false)).toEqual({
       accounts: false,
       history: false,
       ai: false,
       known: true,
     });
+  });
+
+  it('offers nothing while the host is unreachable and asks again later', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ accounts: true, history: true, ai: true }), {
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+    expect(await fetchHostCapabilities(false)).toEqual({
+      accounts: false,
+      history: false,
+      ai: false,
+      known: false,
+    });
+    expect(await fetchHostCapabilities(false)).toEqual({
+      accounts: true,
+      history: true,
+      ai: true,
+      known: true,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

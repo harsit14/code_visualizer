@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv } from 'vite';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { runnerUrl } from './src/runner/protocol';
+import { offlineShell, readThemeColors } from './src/offline/offlineShellPlugin';
 import react from '@vitejs/plugin-react';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
 import { dirname, join, resolve } from 'node:path';
@@ -27,9 +28,9 @@ const crossOriginIsolationHeaders = {
   'X-Content-Type-Options': 'nosniff',
 };
 
-function copyPyodideAssets() {
-  const pyodideDir = dirname(fileURLToPath(import.meta.resolve('pyodide')));
+const pyodideDir = dirname(fileURLToPath(import.meta.resolve('pyodide')));
 
+function copyPyodideAssets() {
   return viteStaticCopy({
     targets: PYODIDE_ASSETS.map((asset) => ({
       src: join(pyodideDir, asset).replace(/\\/g, '/'),
@@ -44,10 +45,15 @@ let buildOutDir = 'dist';
 export default defineConfig(({ mode }) => {
   const configured = process.env.VITE_RUNNER_URL ?? loadEnv(mode, process.cwd()).VITE_RUNNER_URL;
   const runnerOrigin = configured ? runnerUrl(configured).origin : null;
+  // VITE_SERVICE_WORKER=false ships a worker that removes itself; see docs/deployment.md.
+  const serviceWorker =
+    (process.env.VITE_SERVICE_WORKER ?? loadEnv(mode, process.cwd()).VITE_SERVICE_WORKER) !==
+    'false';
   return {
     base: appBase,
     define: {
       'import.meta.env.VITE_STATIC_HOST': JSON.stringify(staticHost),
+      'import.meta.env.VITE_SERVICE_WORKER': JSON.stringify(String(serviceWorker)),
     },
     optimizeDeps: {
       exclude: ['pyodide'],
@@ -60,6 +66,11 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       copyPyodideAssets(),
+      offlineShell({
+        enabled: serviceWorker,
+        pyodideVersion: JSON.parse(readFileSync(join(pyodideDir, 'package.json'), 'utf8')).version,
+        themeColors: readThemeColors(readFileSync('src/styles/tokens.css', 'utf8')),
+      }),
       {
         // Static hosts answer unknown paths with 404.html; serving the app there
         // makes deep links such as /code_visualizer/app survive a reload.

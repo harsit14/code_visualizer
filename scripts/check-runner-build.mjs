@@ -19,6 +19,9 @@ for (const name of [
   if (!existsSync(join(root, name))) throw new Error(`Runner artifact missing ${name}`);
 }
 if (existsSync(join(root, 'index.html'))) throw new Error('Runner must not include the app shell.');
+// The offline service worker belongs to the app origin only.
+for (const name of ['sw.js', 'manifest.webmanifest'])
+  if (existsSync(join(root, name))) throw new Error(`Runner must not ship ${name}.`);
 const files = readdirSync(join(root, 'assets'));
 for (const worker of ['pyodideWorker-', 'jsTraceWorker-'])
   if (!files.some((name) => name.startsWith(worker) && name.endsWith('.js')))
@@ -29,5 +32,7 @@ for (const file of files.filter((name) => name.endsWith('.js'))) {
     if (text.includes(secretName))
       throw new Error(`Account/server code leaked into runner bundle: ${secretName}`);
   }
+  if (text.includes('serviceWorker.register') || text.includes('codeviz:skip-waiting'))
+    throw new Error(`Runner bundle ${file} registers the app service worker.`);
 }
 console.log('Separate runner build and asset smoke check passed (test origin only).');
