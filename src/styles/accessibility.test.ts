@@ -47,6 +47,14 @@ function contrast(foreground: string, background: string): number {
   return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
 }
 
+describe('code legibility', () => {
+  it('turns off ligatures so operators such as <= and == show as typed', () => {
+    const body = ruleBlock(globalStyles, '\nbody {');
+    expect(body).toContain('font-variant-ligatures: none');
+    expect(body).toMatch(/'calt' 0/);
+  });
+});
+
 describe('dashboard accessibility styles', () => {
   it('keeps faint text above WCAG AA contrast in both dashboard themes', () => {
     const baseDark = ruleBlock(tokens, ":root[data-theme='dark']");

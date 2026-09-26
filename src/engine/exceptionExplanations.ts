@@ -48,7 +48,11 @@ const EXPLANATIONS: Record<string, ExceptionExplanation> = {
   NameError: {
     title: 'A name is being used before Python knows it.',
     detail: 'The variable or function name has not been defined in the current scope.',
-    checks: ['Check for typos.', 'Confirm the assignment runs before this line.'],
+    checks: [
+      'Check for typos; the message suggests a close name when there is one.',
+      'Confirm the assignment runs before this line.',
+      'LeetCode-style names such as defaultdict, Counter, deque, heappush and List work without imports; other modules need an import.',
+    ],
   },
   RecursionError: {
     title: 'The recursion went too deep.',

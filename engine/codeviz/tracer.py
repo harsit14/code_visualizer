@@ -23,6 +23,7 @@ import types
 from types import FrameType
 from typing import Any, Callable, Optional
 
+from .prelude import exception_message, is_hidden_prelude
 from .serialize import Snapshotter
 
 DEFAULT_MAX_STEPS = 3000
@@ -60,8 +61,11 @@ class Tracer:
         max_seconds: float = DEFAULT_MAX_SECONDS,
         stdout_len: Optional[Callable[[], int]] = None,
         count_only: bool = False,
+        hidden_globals: Optional[dict[str, Any]] = None,
     ) -> None:
         self.filename = filename
+        # Prelude names injected for the program; shown only once rebound.
+        self.hidden_globals = hidden_globals or {}
         self.snapshotter = snapshotter or Snapshotter()
         self.max_steps = max_steps
         self.max_seconds = max_seconds
@@ -108,6 +112,8 @@ class Tracer:
         for name, value in frame.f_locals.items():
             if name.startswith(_HIDDEN_PREFIXES) or name.startswith("__"):
                 continue
+            if is_hidden_prelude(name, value, self.hidden_globals):
+                continue
             snapshot[name] = self.snapshotter.snapshot(value)
         return snapshot
 
@@ -119,6 +125,8 @@ class Tracer:
             if isinstance(value, types.ModuleType):
                 continue
             if name in ("tree", "linked") and callable(value):
+                continue
+            if is_hidden_prelude(name, value, self.hidden_globals):
                 continue
             snapshot[name] = self.snapshotter.snapshot(value)
         return snapshot
@@ -176,7 +184,10 @@ class Tracer:
             exc_type, exc_value, _ = arg
             if exc_type is TraceLimitError:
                 return
-            step["exc"] = {"type": exc_type.__name__, "msg": str(exc_value)}
+            step["exc"] = {
+                "type": exc_type.__name__,
+                "msg": exception_message(exc_value, frame.f_locals, frame.f_globals),
+            }
         self.steps.append(step)
 
     def _trace(self, frame: FrameType, event: str, arg: Any) -> Optional[Callable]:
