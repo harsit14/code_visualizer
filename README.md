@@ -44,7 +44,8 @@ or understanding how state mutates one line at a time.
 - Generate editable Python function inputs for LeetCode-style snippets. As on
   LeetCode, `defaultdict`, `Counter`, `deque`, `heappush`, `bisect_left`, `inf`,
   `lru_cache`, `List` and similar names work without imports, and misspelled
-  names or attributes get a "Did you mean …?" hint.
+  names or attributes get a "Did you mean …?" hint (JavaScript and TypeScript
+  `ReferenceError`s too).
 - Save compact practice cases, add generated edge cases, run all cases, rerun
   only failed cases, and promote trusted actual output into expected output.
   Failing cases explain the difference, such as a wrong index, items in a
@@ -52,14 +53,26 @@ or understanding how state mutates one line at a time.
 - Keep a local practice notebook with pattern tags, review status, and notes for
   each code/function pair.
 - Save named local workspace revisions with cases, notes, inputs, watches,
-  breakpoints, bookmarks and replay; export and restore a complete exercise backup.
+  breakpoints, bookmarks and replay. Tag them by pattern, mark them for review,
+  search names, tags and code, and let open workspaces autosave. Export one
+  exercise or the whole library as a backup.
+- Keep a run as a baseline, edit the code and compare: the first divergent return
+  value, variable, output line or call is named, with a jump to that step.
+- Run complexity experiments: choose which input grows, see every sampled size
+  (including failures) on a chart, and read measured growth separately from a
+  loop-nesting heuristic.
+- Present a trace in a focused, larger-type layout with captioned checkpoints, and
+  export a self-contained HTML replay that plays without the app or a network.
+- Install the app and keep using saved workspaces, imported traces and lessons
+  offline; Python runs offline once its runtime has been cached.
 - Track pointer variables such as `i`, `left`, `right`, `lo`, `hi`, `prev`,
   `curr`, and `nxt`.
 - Inspect recursive execution with a persistent call tree.
 - Ask the hosted AI explainer to translate the current trace step into plain
   language.
 - Save signed-in history, share runnable links, import/export trace sessions,
-  and copy iframe embeds.
+  and copy iframe embeds. Signed-in users can review and sign out sessions,
+  download their data and delete their account.
 - Export animated SVG replays for notes, lessons, and writeups.
 - Switch between polished light and dark themes.
 
@@ -95,8 +108,10 @@ Use **Library → Save revision** to keep a named exercise on this device. Revis
 include code, inputs, cases, notebook, watches, breakpoints and replay. Edits and
 renames preserve the workspace identity; older revisions remain available.
 **Export workspace** backs up the current exercise, and **Restore backup** opens
-it as a new local workspace. Saves are explicit; reopen saved work from Library
-after a reload. See [local workspace and recovery details](docs/LOCAL-WORKSPACES.md).
+it as a new local workspace. Revisions are explicit; between them, an open saved
+workspace autosaves, and reopening it offers to restore or discard that autosave.
+Tags, review flags and search help find old exercises, and **Export library**
+archives everything at once. See [local workspace and recovery details](docs/LOCAL-WORKSPACES.md).
 
 ## Languages
 
@@ -149,8 +164,12 @@ Overlarge share links should be replaced with a trace export. JS traces stop aft
 
 - User code execution and trace generation happen in the browser.
 - Practice cases and notebook notes are stored locally in your browser.
-- AI explanations use only the selected trace step and surrounding code context.
+- AI explanations use only the selected trace step and surrounding code context,
+  and you can preview and trim exactly what is sent.
 - Signed-in history is stored for your account so traces can be reopened later.
+  You can download it with the rest of your account data, or delete the account.
+- The offline cache holds only the app and the Python runtime; API responses and
+  your data are never cached by the service worker.
 
 ## Quick Start
 
@@ -241,4 +260,4 @@ before changing a hosted deployment. No live accounts have been migrated.
 - Custom Python class instances render as attribute tables unless they match
   recognized `TreeNode` or `ListNode` shapes.
 - JavaScript and TypeScript tracing has no generated inputs, practice cases or
-  complexity sampling yet; those remain Python features.
+  complexity experiments yet; those remain Python features.
