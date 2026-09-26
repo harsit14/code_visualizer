@@ -3,6 +3,7 @@
  * stderr, truncation notices, and complexity hints.
  */
 import { AlertTriangle, Terminal, TrendingUp } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { explainException } from '../engine/exceptionExplanations';
 import { fitGrowth, formatValue, stdoutAtStep } from '../engine/trace';
 import type { ComplexityResult, Language, SessionResult, TraceStep } from '../engine/types';
@@ -16,6 +17,8 @@ type ConsolePanelProps = {
   complexityBusy: boolean;
   onMeasureComplexity: () => void;
   canMeasureComplexity: boolean;
+  /** Extra control shown beside the heading, such as "Keep as baseline". */
+  headerAction?: ReactNode;
 };
 
 function formatRuntime(ms: number | undefined): string | null {
@@ -55,6 +58,7 @@ export function ConsolePanel({
   complexityBusy,
   onMeasureComplexity,
   canMeasureComplexity,
+  headerAction,
 }: ConsolePanelProps) {
   const run = result?.run ?? null;
   const stdout = run ? stdoutAtStep(run.stdout, currentStep) : '';
@@ -77,6 +81,7 @@ export function ConsolePanel({
         <h2>
           <Terminal size={14} /> Console
         </h2>
+        {headerAction}
       </header>
 
       <div className="panel-scroll console-body">

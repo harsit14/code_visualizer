@@ -3,14 +3,17 @@ import {
   getDatabase,
   isDatabaseUniqueConstraintError,
   type AppDatabase,
+  type SessionUserRow,
   type SubscriptionRow,
   type UserRow,
 } from './database';
+import { deviceLabel } from './deviceLabel';
 import type { AuthUser, ServerEnv, UserSubscription } from './types';
 
 export const SESSION_COOKIE = 'cv_session';
 
 export const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
+const SESSION_TOUCH_INTERVAL_MS = 60 * 60 * 1000;
 const PASSWORD_HASH_ALGORITHM = 'hmac_sha256_v1';
 const LEGACY_PBKDF2_ALGORITHM = 'pbkdf2_sha256';
 const DEFAULT_LEGACY_PBKDF2_VERIFY_LIMIT = 20_000;
@@ -38,6 +41,8 @@ export class PasswordPepperMissingError extends Error {
 
 export type SessionContext = {
   subscription: UserSubscription | null;
+  /** SHA-256 of the session cookie; identifies the current session row. */
+  tokenHash: string;
   user: AuthUser;
 };
 
@@ -110,9 +115,37 @@ export async function getSessionContext(
     return null;
   }
 
+  await touchSession(db, request, tokenHash, row.session);
   const user = rowToUser(row);
   const subscription = await getSubscriptionForUser(db, user.id);
-  return { subscription, user };
+  return { subscription, tokenHash, user };
+}
+
+/** Records last use (at most hourly) and a coarse device label for the sessions list. */
+async function touchSession(
+  db: AppDatabase,
+  request: Request,
+  tokenHash: string,
+  session: SessionUserRow['session'],
+): Promise<void> {
+  // Before migration 0004 the metadata columns are absent, so nothing is written.
+  if (!session || session.last_used_at === undefined) {
+    return;
+  }
+  const lastUsed = session.last_used_at ? Date.parse(session.last_used_at) : 0;
+  if (Date.now() - lastUsed < SESSION_TOUCH_INTERVAL_MS) {
+    return;
+  }
+  try {
+    await db.updateSessionMetadata(tokenHash, {
+      last_used_at: nowIso(),
+      ...(session.device_label
+        ? {}
+        : { device_label: deviceLabel(request.headers.get('User-Agent')) }),
+    });
+  } catch {
+    // Metadata only; authentication already succeeded.
+  }
 }
 
 export async function findUserByEmail(

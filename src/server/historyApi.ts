@@ -1,5 +1,5 @@
 import { accountDatabaseMissing, getSessionContext } from './auth';
-import { getDatabase, type AppDatabase, type HistoryRow } from './database';
+import { getDatabase, isMissingSchemaError, type AppDatabase, type HistoryRow } from './database';
 import {
   isRecord,
   isRequestBodyTooLargeError,
@@ -11,7 +11,7 @@ import {
 } from './http';
 import type { ServerEnv } from './types';
 
-const HISTORY_LIMIT = 50;
+export const HISTORY_LIMIT = 50;
 const LIST_LIMIT = 30;
 const MAX_CODE_LENGTH = 200_000;
 const MAX_HISTORY_BODY_BYTES = 600_000;
@@ -19,6 +19,7 @@ const MAX_TITLE_LENGTH = 120;
 const MAX_INPUT_COUNT = 24;
 const MAX_INPUT_LENGTH = 10_000;
 const ID_PATTERN = /^[a-zA-Z0-9_-]{8,80}$/;
+const IDEMPOTENCY_KEY_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type Language = 'python' | 'javascript' | 'typescript';
 
@@ -91,6 +92,13 @@ async function saveHistory(env: ServerEnv, request: Request): Promise<Response> 
     return auth;
   }
 
+  // The client reuses one key across retries of the same save, so a retry
+  // after a lost acknowledgement returns the stored entry.
+  const idempotencyKey = request.headers.get('Idempotency-Key');
+  if (idempotencyKey !== null && !IDEMPOTENCY_KEY_PATTERN.test(idempotencyKey)) {
+    return jsonResponse({ error: 'Idempotency-Key must be a UUID.' }, 400);
+  }
+
   const body = await readHistoryJson(request);
   if (body instanceof Response) {
     return body;
@@ -119,7 +127,7 @@ async function saveHistory(env: ServerEnv, request: Request): Promise<Response> 
       user_id: auth.userId,
     });
   } else {
-    await auth.db.insertHistory({
+    const row: HistoryRow = {
       code: payload.code,
       created_at: now,
       example_id: payload.exampleId,
@@ -132,7 +140,16 @@ async function saveHistory(env: ServerEnv, request: Request): Promise<Response> 
       title: payload.title,
       updated_at: now,
       user_id: auth.userId,
-    });
+    };
+    if (idempotencyKey) {
+      const key = idempotencyKey.toLowerCase();
+      if (!(await insertHistoryOnce(auth.db, row, key))) {
+        const existing = await auth.db.findHistoryByIdempotencyKey(auth.userId, key);
+        return jsonResponse({ item: existing ? rowToHistoryItem(existing) : null });
+      }
+    } else {
+      await auth.db.insertHistory(row);
+    }
     await pruneHistory(auth.db, auth.userId);
   }
 
@@ -179,6 +196,19 @@ async function findOwnedHistoryId(
   return db.findOwnedHistoryId(id, userId);
 }
 
+/** False when this key was already saved. Before migration 0004, a plain insert. */
+async function insertHistoryOnce(db: AppDatabase, row: HistoryRow, key: string): Promise<boolean> {
+  try {
+    return await db.insertHistoryOnce(row, key);
+  } catch (error) {
+    if (!isMissingSchemaError(error)) {
+      throw error;
+    }
+    await db.insertHistory(row);
+    return true;
+  }
+}
+
 async function pruneHistory(db: AppDatabase, userId: string): Promise<void> {
   await db.pruneHistory(userId, HISTORY_LIMIT);
 }
@@ -218,7 +248,7 @@ function readHistoryPayload(value: unknown): HistoryPayload | null {
   };
 }
 
-function rowToHistoryItem(row: HistoryRow) {
+export function rowToHistoryItem(row: HistoryRow) {
   return {
     code: row.code,
     createdAt: row.created_at,

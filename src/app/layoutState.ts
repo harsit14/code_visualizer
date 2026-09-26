@@ -6,7 +6,8 @@ export type PanelId =
   | 'watch'
   | 'callStack'
   | 'explainer'
-  | 'console';
+  | 'console'
+  | 'compare';
 export type ColumnId = 'left' | 'center' | 'right';
 
 export type PanelVisibility = Record<PanelId, boolean>;
@@ -27,6 +28,7 @@ export const PANEL_DEFINITIONS: PanelDefinition[] = [
   { id: 'callStack', label: 'Call stack' },
   { id: 'explainer', label: 'Explainer' },
   { id: 'console', label: 'Console' },
+  { id: 'compare', label: 'Compare runs' },
 ];
 
 export const DEFAULT_PANEL_VISIBILITY: PanelVisibility = {
@@ -40,6 +42,8 @@ export const DEFAULT_PANEL_VISIBILITY: PanelVisibility = {
   callStack: true,
   explainer: false,
   console: true,
+  // Opened by "Keep as baseline" in the console, or from the panel menu.
+  compare: false,
 };
 
 export const LEARN_PANEL_VISIBILITY: PanelVisibility = {
@@ -51,6 +55,7 @@ export const LEARN_PANEL_VISIBILITY: PanelVisibility = {
   callStack: false,
   explainer: false,
   console: true,
+  compare: false,
 };
 
 export const FULL_PANEL_VISIBILITY: PanelVisibility = {
@@ -62,6 +67,7 @@ export const FULL_PANEL_VISIBILITY: PanelVisibility = {
   callStack: true,
   explainer: true,
   console: true,
+  compare: true,
 };
 
 /** Presentation mode: code, structures and variables only. It overrides the
@@ -98,6 +104,7 @@ export const DEFAULT_PANEL_WEIGHTS: PanelWeights = {
   callStack: 0.9,
   explainer: 1,
   console: 1.1,
+  compare: 1,
 };
 
 export function normalizePanelVisibility(value: unknown): PanelVisibility {

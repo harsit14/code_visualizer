@@ -4,8 +4,11 @@ import { MAX_CHECKPOINTS, normalizeCheckpoints } from '../engine/traceCheckpoint
 import { normalizeBookmarks, type TraceBookmark } from '../engine/traceSearch';
 import type { PracticeNotebook } from './practiceNotebook';
 import type { PracticeTestCase } from './practiceCases';
+import { EMPTY_META, parseWorkspaceMeta, type WorkspaceMeta } from './workspaceTags';
 
 export const MAX_WORKSPACE_BYTES = 25 * 1024 * 1024;
+/** Version 2 adds optional library metadata (tags, review state); version 1 still imports. */
+export const WORKSPACE_FORMAT_VERSION = 2;
 export type WorkspaceContent = {
   code: string;
   language: Language;
@@ -30,6 +33,7 @@ export type WorkspaceRevision = {
   savedAt: number;
   content: WorkspaceContent;
 };
+export type WorkspaceBackup = { workspace: WorkspaceRevision; meta: WorkspaceMeta };
 
 const record = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
@@ -42,7 +46,7 @@ const strings = (v: unknown): v is string[] =>
   Array.isArray(v) && v.length <= 500 && v.every(string);
 
 /** All fields are checked before the editor or local database is touched. */
-export function parseWorkspace(text: string): WorkspaceRevision {
+export function parseWorkspaceBackup(text: string): WorkspaceBackup {
   if (new TextEncoder().encode(text).length > MAX_WORKSPACE_BYTES) {
     throw new Error('Workspace backups must be no larger than 25 MB.');
   }
@@ -52,10 +56,28 @@ export function parseWorkspace(text: string): WorkspaceRevision {
   } catch {
     throw new Error('Workspace file is not valid JSON.');
   }
-  if (!record(value) || value.format !== 'code-visualizer-workspace' || value.version !== 1) {
-    throw new Error('Unsupported workspace backup. Choose a version 1 workspace export.');
+  if (
+    !record(value) ||
+    value.format !== 'code-visualizer-workspace' ||
+    (value.version !== 1 && value.version !== WORKSPACE_FORMAT_VERSION)
+  ) {
+    throw new Error('Unsupported workspace backup. Choose a version 1 or 2 workspace export.');
   }
-  const w = value.workspace;
+  const workspace = validateWorkspaceRevision(value.workspace);
+  return {
+    workspace,
+    meta:
+      value.version === 1 || value.meta === undefined
+        ? { ...EMPTY_META, tags: [] }
+        : parseWorkspaceMeta(value.meta),
+  };
+}
+
+export const parseWorkspace = (text: string): WorkspaceRevision =>
+  parseWorkspaceBackup(text).workspace;
+
+/** Checks one workspace object and returns only its known fields. */
+export function validateWorkspaceRevision(w: unknown): WorkspaceRevision {
   if (
     !record(w) ||
     !string(w.id) ||
@@ -184,8 +206,19 @@ export function parseWorkspace(text: string): WorkspaceRevision {
   };
 }
 
-export function serializeWorkspace(workspace: WorkspaceRevision): string {
-  const text = JSON.stringify({ format: 'code-visualizer-workspace', version: 1, workspace });
-  parseWorkspace(text);
+/** Encodes an already validated workspace; use serializeWorkspace for anything else. */
+export function encodeWorkspace(workspace: WorkspaceRevision, meta?: WorkspaceMeta): string {
+  return JSON.stringify({
+    format: 'code-visualizer-workspace',
+    version: WORKSPACE_FORMAT_VERSION,
+    workspace,
+    ...(meta ? { meta } : {}),
+  });
+}
+
+/** Meta is included in backups; stored revisions omit it because tags live on the head. */
+export function serializeWorkspace(workspace: WorkspaceRevision, meta?: WorkspaceMeta): string {
+  const text = encodeWorkspace(workspace, meta);
+  parseWorkspaceBackup(text);
   return text;
 }

@@ -45,6 +45,7 @@ const DEFAULT_EMBED_PANEL_VISIBILITY: PanelVisibility = {
   callStack: true,
   explainer: false,
   console: true,
+  compare: false,
 };
 
 function readStoredValue<T>(key: string, fallback: T, normalize: (value: unknown) => T): T {
