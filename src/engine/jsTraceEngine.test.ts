@@ -302,6 +302,35 @@ describe('runJavaScriptTrace', () => {
     expect(result.run!.steps.at(-1)!.stack[0].locals.status).toMatchObject({ v: 'SyntaxError!' });
   });
 
+  it('suggests close names for ReferenceErrors without changing what the program sees', () => {
+    const local = runJavaScriptTrace(
+      'function sum(nums) {\n  let total = 0;\n  for (const n of nums) totl += n;\n  return total;\n}\nsum([1]);',
+      'javascript',
+    );
+    expect(local.error?.msg).toBe("totl is not defined. Did you mean 'total'?");
+    const steps = local.run!.steps.filter((step) => step.event === 'exception');
+    expect(steps.map((step) => step.exc?.msg)).toEqual([
+      "totl is not defined. Did you mean 'total'?",
+      "totl is not defined. Did you mean 'total'?",
+    ]);
+
+    expect(runJavaScriptTrace('console.log(Math.mx(1, 2));', 'javascript').error?.msg).toBe(
+      'Math.mx is not a function',
+    );
+    expect(runJavaScriptTrace('Mathh.max(1, 2);', 'javascript').error?.msg).toBe(
+      "Mathh is not defined. Did you mean 'Math'?",
+    );
+    expect(runJavaScriptTrace('zzqqxx;', 'javascript').error?.msg).toBe('zzqqxx is not defined');
+
+    const caught = runJavaScriptTrace(
+      'const count = 1;\nlet message = "";\ntry {\n  cuont;\n} catch (error) {\n  message = error.message;\n}',
+      'javascript',
+    );
+    expect(caught.run!.steps.at(-1)!.stack[0].locals.message).toMatchObject({
+      v: 'cuont is not defined',
+    });
+  });
+
   it('shows block-scoped values only while initialized and prefers inner bindings', () => {
     const result = runJavaScriptTrace(
       'let x = "outer";\n{\n  let x = "inner";\n  x += "!";\n}\nx += "?";',
