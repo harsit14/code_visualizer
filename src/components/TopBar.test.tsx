@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { TopBar } from './TopBar';
 
-function renderTopBar() {
+function renderTopBar(overrides: Partial<Parameters<typeof TopBar>[0]> = {}) {
   return renderToStaticMarkup(
     <TopBar
       canExport
@@ -40,6 +40,7 @@ function renderTopBar() {
         stage: 'ready',
       }}
       theme="dark"
+      {...overrides}
     />,
   );
 }
@@ -66,5 +67,18 @@ describe('TopBar', () => {
     expect(html).toContain('aria-label="Open saved code history"');
     expect(html).toContain('aria-label="Switch to light mode"');
     expect(html).toContain('aria-label="Account"');
+  });
+
+  it('offers presentation and the standalone replay export when wired', () => {
+    expect(renderTopBar()).not.toContain('aria-label="Present"');
+    expect(renderTopBar()).not.toContain('Export replay');
+
+    const html = renderTopBar({ canPresent: true, onExportReplay: () => {}, onPresent: () => {} });
+    expect(html).toMatch(/<button aria-keyshortcuts="P" aria-label="Present"[^>]*type="button">/);
+    expect(html).toContain('Export replay');
+    expect(html).toContain('<kbd>P</kbd>');
+    expect(renderTopBar({ canPresent: false, onPresent: () => {} })).toMatch(
+      /aria-label="Present"[^>]*disabled=""/,
+    );
   });
 });

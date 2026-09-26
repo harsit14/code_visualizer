@@ -2,13 +2,20 @@ import { mobileTabs, type MobileTab } from '../app/useMobileWorkspace';
 export function MobileWorkspaceTabs({
   active,
   onChange,
+  tabs = mobileTabs,
 }: {
   active: MobileTab;
   onChange: (tab: MobileTab) => void;
+  tabs?: readonly MobileTab[];
 }) {
   return (
-    <div className="mobile-workspace-tabs" role="tablist" aria-label="Workspace view">
-      {mobileTabs.map((tab, index) => (
+    <div
+      className="mobile-workspace-tabs"
+      role="tablist"
+      aria-label="Workspace view"
+      style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}
+    >
+      {tabs.map((tab, index) => (
         <button
           key={tab}
           id={`mobile-tab-${tab}`}
@@ -21,18 +28,18 @@ export function MobileWorkspaceTabs({
           onKeyDown={(event) => {
             const next =
               event.key === 'ArrowRight'
-                ? (index + 1) % mobileTabs.length
+                ? (index + 1) % tabs.length
                 : event.key === 'ArrowLeft'
-                  ? (index + mobileTabs.length - 1) % mobileTabs.length
+                  ? (index + tabs.length - 1) % tabs.length
                   : event.key === 'Home'
                     ? 0
                     : event.key === 'End'
-                      ? mobileTabs.length - 1
+                      ? tabs.length - 1
                       : null;
             if (next === null) return;
             event.preventDefault();
-            onChange(mobileTabs[next]);
-            document.getElementById(`mobile-tab-${mobileTabs[next]}`)?.focus();
+            onChange(tabs[next]);
+            document.getElementById(`mobile-tab-${tabs[next]}`)?.focus();
           }}
         >
           {tab}

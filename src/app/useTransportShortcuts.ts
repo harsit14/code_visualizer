@@ -9,6 +9,11 @@ type UseTransportShortcutsOptions = {
   totalSteps: number;
   toggleBookmark?: () => void;
   openSearch?: () => void;
+  /** P toggles presentation, Escape leaves it; editing shortcuts pause meanwhile. */
+  presentation?: { active: boolean; toggle: () => void };
+  /** [ and ] jump between checkpoints; Page Up/Down too while presenting (clickers). */
+  previousCheckpoint?: () => void;
+  nextCheckpoint?: () => void;
 };
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -31,10 +36,21 @@ export function useTransportShortcuts({
   totalSteps,
   toggleBookmark,
   openSearch,
+  presentation,
+  previousCheckpoint,
+  nextCheckpoint,
 }: UseTransportShortcutsOptions) {
   useEffect(() => {
+    const presenting = presentation?.active ?? false;
     const onKeyDown = (event: KeyboardEvent) => {
+      // Escape leaves presentation even from the scrubber, which counts as typing.
+      if (presenting && event.key === 'Escape' && !event.defaultPrevented) {
+        event.preventDefault();
+        presentation?.toggle();
+        return;
+      }
       if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key === 'Enter') {
+        if (presenting) return;
         event.preventDefault();
         void run();
         return;
@@ -66,15 +82,36 @@ export function useTransportShortcuts({
           break;
         case 'b':
         case 'B':
-          if (toggleBookmark && totalSteps > 0) {
+          if (toggleBookmark && totalSteps > 0 && !presenting) {
             event.preventDefault();
             toggleBookmark();
           }
           break;
         case '/':
-          if (openSearch && totalSteps > 0) {
+          if (openSearch && totalSteps > 0 && !presenting) {
             event.preventDefault();
             openSearch();
+          }
+          break;
+        case 'p':
+        case 'P':
+          if (presentation && (presenting || totalSteps > 0)) {
+            event.preventDefault();
+            presentation.toggle();
+          }
+          break;
+        case '[':
+        case 'PageUp':
+          if (previousCheckpoint && (event.key === '[' || presenting)) {
+            event.preventDefault();
+            previousCheckpoint();
+          }
+          break;
+        case ']':
+        case 'PageDown':
+          if (nextCheckpoint && (event.key === ']' || presenting)) {
+            event.preventDefault();
+            nextCheckpoint();
           }
           break;
         default:
@@ -83,5 +120,17 @@ export function useTransportShortcuts({
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [jumpToStep, openSearch, run, stepBack, stepForward, toggleBookmark, togglePlay, totalSteps]);
+  }, [
+    jumpToStep,
+    nextCheckpoint,
+    openSearch,
+    presentation,
+    previousCheckpoint,
+    run,
+    stepBack,
+    stepForward,
+    toggleBookmark,
+    togglePlay,
+    totalSteps,
+  ]);
 }

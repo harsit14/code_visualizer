@@ -1,9 +1,11 @@
 /**
  * Trace search and bookmarks: find steps by variable change, value, line,
- * function, event or printed output, and keep annotated bookmarks.
+ * function, event or printed output, and keep annotated bookmarks. Bookmarks
+ * can be flagged as ordered presentation checkpoints captioned by their notes.
  */
-import { Bookmark, BookmarkCheck, Search, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Bookmark, BookmarkCheck, Flag, Search, X } from 'lucide-react';
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { checkpointCaptions } from '../engine/traceCheckpoints';
 import {
   parseTraceQuery,
   searchTrace,
@@ -22,7 +24,13 @@ type TraceFinderProps = {
   onBookmarkNote: (step: number, note: string) => void;
   /** Changing this value opens the finder and focuses the search box. */
   openRequest?: number;
+  /** Bookmarked steps in presentation order. */
+  checkpoints?: readonly number[];
+  onToggleCheckpoint?: (step: number) => void;
+  onMoveCheckpoint?: (step: number, direction: -1 | 1) => void;
 };
+
+const NO_CHECKPOINTS: readonly number[] = [];
 
 export function TraceFinder({
   steps,
@@ -33,6 +41,9 @@ export function TraceFinder({
   onToggleBookmark,
   onBookmarkNote,
   openRequest = 0,
+  checkpoints = NO_CHECKPOINTS,
+  onToggleCheckpoint,
+  onMoveCheckpoint,
 }: TraceFinderProps) {
   const menu = useRef<HTMLDetailsElement>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -44,6 +55,10 @@ export function TraceFinder({
     [query, steps, stdout],
   );
   const bookmarked = bookmarks.some((bookmark) => bookmark.step === step);
+  const ordered = useMemo(
+    () => checkpointCaptions(checkpoints, bookmarks),
+    [bookmarks, checkpoints],
+  );
 
   useEffect(() => {
     if (!openRequest || !menu.current) return;
@@ -121,7 +136,10 @@ export function TraceFinder({
           {bookmarks.length ? (
             <ul aria-label="Bookmarked steps">
               {bookmarks.map((bookmark) => (
-                <li className="trace-finder-bookmark" key={bookmark.step}>
+                <li
+                  className={`trace-finder-bookmark${onToggleCheckpoint ? ' has-checkpoint-toggle' : ''}`}
+                  key={bookmark.step}
+                >
                   <button
                     aria-current={bookmark.step === step ? 'step' : undefined}
                     className="trace-finder-hit"
@@ -138,6 +156,18 @@ export function TraceFinder({
                     placeholder="Add a note"
                     value={bookmark.note}
                   />
+                  {onToggleCheckpoint ? (
+                    <button
+                      aria-label={`Presentation checkpoint for step ${bookmark.step}`}
+                      aria-pressed={checkpoints.includes(bookmark.step)}
+                      className="icon-button trace-finder-checkpoint-toggle"
+                      onClick={() => onToggleCheckpoint(bookmark.step)}
+                      title="Use as a presentation checkpoint; its note becomes the caption"
+                      type="button"
+                    >
+                      <Flag size={12} />
+                    </button>
+                  ) : null}
                   <button
                     aria-label={`Remove bookmark on step ${bookmark.step}`}
                     className="icon-button"
@@ -154,6 +184,58 @@ export function TraceFinder({
               Bookmarks mark confusing steps; notes are saved with workspace revisions.
             </p>
           )}
+          {onToggleCheckpoint && bookmarks.length > 0 && ordered.length === 0 ? (
+            <p className="trace-finder-help">
+              Flag bookmarks as checkpoints to present them in order, with their notes as captions.
+            </p>
+          ) : null}
+          {ordered.length > 0 ? (
+            <div className="trace-finder-checkpoints">
+              <strong className="trace-finder-subheading" id="trace-finder-checkpoints-heading">
+                Presentation checkpoints
+              </strong>
+              <ol aria-labelledby="trace-finder-checkpoints-heading">
+                {ordered.map((checkpoint, index) => (
+                  <li className="trace-finder-checkpoint" key={checkpoint.step}>
+                    <button
+                      aria-current={checkpoint.step === step ? 'step' : undefined}
+                      className="trace-finder-hit"
+                      onClick={() => onJump(checkpoint.step)}
+                      type="button"
+                    >
+                      <span className="trace-finder-step">
+                        {index + 1}. Step {checkpoint.step}
+                      </span>
+                      <span className="trace-finder-detail">{checkpoint.note || 'No note'}</span>
+                    </button>
+                    {onMoveCheckpoint ? (
+                      <>
+                        <button
+                          aria-label={`Move checkpoint ${index + 1} earlier`}
+                          className="icon-button"
+                          disabled={index === 0}
+                          onClick={() => onMoveCheckpoint(checkpoint.step, -1)}
+                          type="button"
+                        >
+                          <ArrowUp size={12} />
+                        </button>
+                        <button
+                          aria-label={`Move checkpoint ${index + 1} later`}
+                          className="icon-button"
+                          disabled={index === ordered.length - 1}
+                          onClick={() => onMoveCheckpoint(checkpoint.step, 1)}
+                          type="button"
+                        >
+                          <ArrowDown size={12} />
+                        </button>
+                      </>
+                    ) : null}
+                  </li>
+                ))}
+              </ol>
+              <p className="trace-finder-help">Present with P; [ and ] jump between checkpoints.</p>
+            </div>
+          ) : null}
         </div>
       </div>
     </details>

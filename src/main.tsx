@@ -24,11 +24,13 @@ import './styles/components/variables-watch.css';
 import './styles/components/controls-bar.css';
 import './styles/components/learning.css';
 import './styles/components/algorithm-views.css';
+import './styles/components/complexity.css';
 import './styles/components/visual-refresh.css';
 import './styles/components/mobile-workspace.css';
 import './styles/components/account-settings.css';
 import './styles/components/workspace-library.css';
 import './styles/components/traced-light.css';
+import './styles/components/presentation.css';
 import './styles/components/offline.css';
 
 createRoot(document.getElementById('root')!).render(

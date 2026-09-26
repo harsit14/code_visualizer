@@ -1,4 +1,10 @@
-import { isAnalysisInfo, isEngineError, validateSessionResult } from '../engine/resultSchema';
+import {
+  COMPLEXITY_AXES,
+  isAnalysisInfo,
+  isComplexityResult,
+  isEngineError,
+  validateSessionResult,
+} from '../engine/resultSchema';
 import type { EngineRequest, Language, WorkerOutbound } from '../engine/types';
 
 export const RUNNER_PROTOCOL = 1;
@@ -71,6 +77,23 @@ export function validateRequest(value: unknown, language: Language): RequestKind
     throw new Error('Invalid operation or source.');
   if (!optional(request.function, (v) => text(v, 500)) || !optional(request.seed, finite))
     throw new Error('Invalid function or seed.');
+  if (
+    request.op === 'complexity' &&
+    (!optional(request.param, (v) => text(v, 500)) ||
+      !optional(request.axis, (v) => COMPLEXITY_AXES.some((axis) => axis === v)) ||
+      !optional(
+        request.sizes,
+        (v) =>
+          Array.isArray(v) &&
+          v.length <= 10 &&
+          v.every((size) => finite(size) && Number.isInteger(size) && size >= 1 && size <= 4096),
+      ) ||
+      !optional(
+        request.inputs,
+        (v) => Array.isArray(v) && v.length <= 100 && v.every((i) => text(i, 10_000)),
+      ))
+  )
+    throw new Error('Invalid complexity options.');
   if (request.options !== undefined) {
     const o = request.options;
     if (
@@ -158,18 +181,6 @@ export function validateResponse(value: unknown, language: Language, op: Request
   if (op === 'run') value.data = validateSessionResult(data, language);
   else if (op === 'analyze') {
     if (!isAnalysisInfo(data.analysis)) throw new Error('Invalid analysis response.');
-  } else if (
-    !(data.functionName === null || text(data.functionName, 500)) ||
-    !(data.seed === null || finite(data.seed)) ||
-    !Array.isArray(data.samples) ||
-    data.samples.length > 1000 ||
-    !data.samples.every(
-      (s) => record(s) && finite(s.n) && s.n >= 0 && finite(s.ops) && s.ops >= 0,
-    ) ||
-    !isEngineError(data.error) ||
-    !optional(data.truncated, (v) => typeof v === 'boolean') ||
-    !optional(data.truncationReason, (v) => v === null || text(v, 2000))
-  )
-    throw new Error('Invalid complexity response.');
+  } else if (!isComplexityResult(data)) throw new Error('Invalid complexity response.');
   return value;
 }

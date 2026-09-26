@@ -1,0 +1,213 @@
+/* ------------------------------------------------- presentation mode */
+
+.presentation-bar {
+  align-items: center;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  padding: 10px 14px;
+}
+
+/* Focus lands here programmatically on entry; keyboard users still see it. */
+.presentation-bar:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.presentation-brand {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
+.presentation-brand strong {
+  font-size: 15px;
+}
+
+.presentation-brand-hint {
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+.presentation-caption {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.presentation-caption-live {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.presentation-caption-label {
+  color: var(--amber);
+  font-family: var(--mono);
+  font-size: 12.5px;
+  letter-spacing: 0.04em;
+}
+
+.presentation-caption-text {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.presentation-caption-hint {
+  color: var(--text-dim);
+  font-size: 14px;
+  margin: 0;
+}
+
+.presentation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.presentation-actions button {
+  font-size: 14px;
+  min-height: 38px;
+}
+
+.presentation-actions button[aria-disabled='true'] {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.presentation-exit {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Larger type on stage. The skin's selectors carry two classes, so these do too. */
+.dashboard-instrument.presentation-mode .editor-host .cm-editor {
+  font-size: 17px;
+}
+
+.dashboard-instrument.presentation-mode .panel-header h2 {
+  font-size: 13.5px;
+}
+
+.dashboard-instrument.presentation-mode .var-table td,
+.dashboard-instrument.presentation-mode .step-change {
+  font-size: 16px;
+}
+
+.dashboard-instrument.presentation-mode .var-table th,
+.dashboard-instrument.presentation-mode .array-index {
+  font-size: 13px;
+  height: auto;
+}
+
+.dashboard-instrument.presentation-mode .array-cell,
+.dashboard-instrument.presentation-mode .data-card h3,
+.dashboard-instrument.presentation-mode .scrubber-meta {
+  font-size: 15px;
+}
+
+/* Presenting shows what the program did; tools that run code stay hidden. */
+.dashboard-instrument.presentation-mode .console-panel .complexity-block {
+  display: none;
+}
+
+.presentation-mode .controls-bar-presenting {
+  justify-content: center;
+}
+
+/* Trace finder: bookmark rows gain a checkpoint flag, and an ordered list. */
+.trace-finder-bookmark.has-checkpoint-toggle {
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+}
+
+.trace-finder-checkpoint-toggle[aria-pressed='true'] {
+  background: var(--amber-soft);
+  border-color: var(--amber);
+  color: var(--amber);
+}
+
+.trace-finder-checkpoints {
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 8px;
+}
+
+.trace-finder-subheading {
+  color: var(--text-faint);
+  font-size: 11.5px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.trace-finder-checkpoints ol {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.trace-finder-checkpoint {
+  align-items: center;
+  display: grid;
+  gap: 4px;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+@media (max-width: 720px) {
+  .presentation-bar {
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .presentation-brand-hint {
+    display: none;
+  }
+
+  .presentation-caption {
+    flex-basis: 100%;
+    order: 2;
+  }
+
+  .presentation-caption-text {
+    font-size: 17px;
+  }
+
+  .presentation-actions {
+    margin-left: auto;
+  }
+
+  .presentation-actions button,
+  .trace-finder-checkpoint button,
+  .trace-finder-checkpoint-toggle {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Icons carry the checkpoint buttons on phones; names stay in aria-labels. */
+  .presentation-action-label {
+    clip-path: inset(50%);
+    height: 1px;
+    overflow: hidden;
+    position: absolute;
+    white-space: nowrap;
+    width: 1px;
+  }
+
+  .dashboard-instrument.presentation-mode .editor-host .cm-editor {
+    font-size: 15px;
+  }
+
+  .dashboard-instrument.presentation-mode .var-table td {
+    font-size: 14.5px;
+  }
+}

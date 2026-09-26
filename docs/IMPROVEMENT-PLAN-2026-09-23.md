@@ -303,6 +303,72 @@ without the migration, IPv6 grouping, the migration in embedded PostgreSQL,
 redaction and bounds in the request builder, the preview, and in-session reuse.
 The browser check confirmed the local explanation and the static-host AI notice.
 
+## Thirteenth batch: LeetCode-style Python and name hints
+
+- The editor fonts rendered `<=`, `==` and `->` as ligatures (`≤`, `═`, `→`), which
+  learners read as different code. The app now disables ligatures and contextual
+  alternates, so code shows as typed.
+- Python solutions can use `defaultdict`, `Counter`, `deque`, `heappush`,
+  `bisect_left`, `inf`, `lru_cache`, `List` and similar names without imports, as on
+  LeetCode. Only names a program reads and never binds are injected, builtins are
+  never shadowed, and injected names stay out of Variables until rebound.
+- `NameError` and `AttributeError` messages end with "Did you mean …?" in the error
+  banner and the exception step. JavaScript and TypeScript `ReferenceError`s get
+  the same hint from names in scope; code that catches the error still sees the
+  native message.
+- A test checks that every engine module ships to the Pyodide worker.
+
+## Fourteenth batch: account session control, export and deletion (finding 6)
+
+- Signed-in users can list sessions (coarse device label, created and last-used
+  times, current session) and sign out one other session or all others. Revoked
+  sessions fail immediately.
+- "Download my data" exports a bounded, versioned JSON of profile, history,
+  sessions and usage, built field by field so no hash or token can appear.
+- Account deletion needs the typed email plus the current password or a fresh
+  email code. `delete_account()` removes usage, history, sessions and the user in
+  one transaction after re-checking the caller's session under a row lock.
+- History saves carry an idempotency key reused on retry, so a lost acknowledgement
+  no longer creates a duplicate entry.
+- Migration `0004_account_controls.sql` adds these; the Worker degrades gracefully
+  until it is applied.
+
+## Fifteenth batch: learning, library and offline features (Stage D)
+
+- **Compare runs.** "Keep as baseline" stores a completed run; after an edit and a
+  re-run, the Compare runs panel aligns both runs by call/return milestones (not
+  line numbers), names the first divergent return value, variable, output line,
+  exception or call, and jumps the replay to it. Results from before an edit are
+  never compared.
+- **Searchable library and autosave.** Workspaces have normalized tags, a
+  needs-review flag and review date. The Library searches names, tags and source
+  and filters by language, tag and review state. Saved workspaces autosave into
+  one replaceable slot with conflict checks across tabs; reopening offers Restore
+  or Discard. Whole-library archives export and import every workspace without
+  running code. IndexedDB moved to schema version 2.
+- **Offline and installable shell.** A generated service worker precaches the app
+  shell per build, caches the Pyodide runtime per version, never caches `/api/*`
+  or credentialed responses, and waits for "Update available — reload" before
+  switching builds. A manifest makes the app installable, and an offline indicator
+  explains what still works. Browser review found and fixed cache misses on hosts
+  that send `Vary: Origin`.
+- **Complexity experiments.** Learners choose which parameter grows (and which grid
+  axis), see every sampled size with its status and time, a chart with the fitted
+  curve, and "Measured growth ≈ O(…)" with a fit grade, kept separate from a
+  labelled loop-nesting heuristic. Failed samples are shown, never dropped.
+- **Teaching mode.** Presentation mode shows code, data, variables and output in
+  larger type, read-only, and restores the user's layout on exit. Bookmarks can be
+  ordered checkpoints whose notes become captions. "Export replay" writes one
+  self-contained HTML player with escaped data and a hash-pinned CSP.
+
+Validation: each feature merged with full CI (typecheck, lint, tests, build, smoke
+and runner checks) and engine tests; the combined suite on main has 764 frontend
+tests in 95 files and 202 engine tests, with landing JavaScript at 81 KB gzip.
+Every feature was also exercised in the browser: comparing `n * 2` with `n * 3`,
+tagging, autosave and restore, the service worker's update flow and offline cache
+reads, an O(n²) measurement, and presentation checkpoints plus a replay export
+containing a hostile string.
+
 ## Evidence and limits (original audit)
 
 | Check                                       | Result                                                                                                                                  |
@@ -510,4 +576,4 @@ A practical first batch is: (1) privilege protection, (2) practice equality repa
 - Test replay with 100, 1,000 and 3,000 steps and several structure sizes. Agree budgets after measuring baseline; a reasonable initial target is p95 step-to-render under 100 ms on a named reference device.
 - Measure first successful run, meaningful stepping after a run, successful failure-case debugging, saved-work recovery and return visits. Use privacy-preserving events; exclude code, inputs, locals, notebook text and full share URLs.
 
-Next remaining milestones: stage the isolated runner and managed accounts, verify the real browser/device matrix, and implement the remaining Stage D features (run comparison, teaching mode), workspace autosave/search and cloud sync. Phone navigation, save-failure recovery, explicit local workspace revisions/backups, parser-based JavaScript/TypeScript tracing, step explanations, trace search/bookmarks, failing-case explanations, guided lessons and algorithm views are implemented locally.
+Next remaining milestones: stage the isolated runner and managed accounts, apply migrations 0003 and 0004 to the hosted database, run the browser end-to-end suite in CI (Chromium, Firefox, WebKit and phone sizes) and verify the real device matrix, and finish idempotent cloud sync for the workspace library. Everything else in this plan is implemented: phone navigation, save-failure recovery, local workspace revisions, search, tags, autosave and archives, parser-based JavaScript/TypeScript tracing, step explanations, trace search and bookmarks, failing-case explanations, guided lessons, algorithm views, run comparison, teaching mode, complexity experiments, the offline shell, and account session control, export and deletion.

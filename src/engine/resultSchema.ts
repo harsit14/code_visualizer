@@ -103,6 +103,89 @@ export function isAnalysisInfo(v: unknown): boolean {
   );
 }
 
+const COMPLEXITY_STATUSES = [
+  'ok',
+  'exception',
+  'step-limit',
+  'time-limit',
+  'setup-error',
+  'skipped',
+] as const;
+export const COMPLEXITY_AXES = ['len', 'nodes', 'value', 'both', 'rows', 'cols'] as const;
+
+/** Bounded shape check for a complexity measurement before it is rendered. */
+export function isComplexityResult(v: unknown): boolean {
+  const text = (item: unknown, max: number) => str(item) && item.length <= max;
+  const texts = (item: unknown) =>
+    Array.isArray(item) && item.length <= 20 && item.every((entry) => text(entry, 1000));
+  const bounded = (item: unknown, max: number, check: (entry: unknown) => boolean) =>
+    Array.isArray(item) && item.length <= max && item.every(check);
+  const shortError = (item: unknown) =>
+    item === null || (record(item) && text(item.type, 200) && text(item.msg, 2000));
+  const sample = (s: unknown) =>
+    record(s) &&
+    number(s.n) &&
+    s.n >= 0 &&
+    number(s.ops) &&
+    s.ops >= 0 &&
+    optional(s.ms, nullableNumber) &&
+    optional(s.status, (status) => oneOf(status, COMPLEXITY_STATUSES)) &&
+    optional(s.error, shortError) &&
+    optional(s.note, (note) => note === null || text(note, 2000));
+  const dimension = (d: unknown) =>
+    d === null ||
+    (record(d) &&
+      text(d.id, 520) &&
+      text(d.param, 500) &&
+      oneOf(d.axis, COMPLEXITY_AXES) &&
+      text(d.kind, 100) &&
+      text(d.meaning, 1000) &&
+      integer(d.maxN));
+  const fit = (f: unknown) =>
+    f === null ||
+    (record(f) &&
+      text(f.model, 50) &&
+      text(f.label, 50) &&
+      number(f.error) &&
+      oneOf(f.quality, ['good', 'fair', 'poor']) &&
+      integer(f.samplesUsed) &&
+      (f.runnerUp === null ||
+        (record(f.runnerUp) && text(f.runnerUp.label, 50) && number(f.runnerUp.error))) &&
+      bounded(f.curve, 100, (p) => record(p) && number(p.n) && number(p.ops)));
+  const structure = (s: unknown) =>
+    s === null ||
+    (record(s) &&
+      (s.label === null || text(s.label, 50)) &&
+      integer(s.loopDepth) &&
+      bool(s.recursive) &&
+      texts(s.notes));
+  return (
+    record(v) &&
+    (v.functionName === null || text(v.functionName, 500)) &&
+    nullableNumber(v.seed) &&
+    bounded(v.samples, 1000, sample) &&
+    isEngineError(v.error) &&
+    optional(v.truncated, bool) &&
+    optional(v.truncationReason, (reason) => reason === null || text(reason, 2000)) &&
+    optional(v.dimension, dimension) &&
+    optional(v.fixed, (items) =>
+      bounded(
+        items,
+        100,
+        (item) =>
+          record(item) &&
+          text(item.name, 500) &&
+          text(item.literal, 200) &&
+          oneOf(item.source, ['current', 'generated']),
+      ),
+    ) &&
+    optional(v.fit, fit) &&
+    optional(v.caveats, texts) &&
+    optional(v.structure, structure) &&
+    optional(v.limits, (l) => record(l) && number(l.maxSteps) && number(l.maxSeconds))
+  );
+}
+
 export function validateSessionResult(result: unknown, language: Language): SessionResult {
   if (
     !record(result) ||
