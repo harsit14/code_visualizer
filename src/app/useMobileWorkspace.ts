@@ -11,6 +11,7 @@ export const panelMobileTab: Record<PanelId, MobileTab> = {
   watch: 'Inspect',
   callStack: 'Inspect',
   explainer: 'Inspect',
+  compare: 'Inspect',
 };
 const query = '(max-width: 720px)';
 function subscribe(listener: () => void) {

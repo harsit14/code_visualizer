@@ -1,0 +1,3444 @@
+{
+  "twoSum": {
+    "code": "def two_sum(nums, target):\n    seen = {}\n    for i in range(len(nums)):\n        need = target - nums[i]\n        if need in seen:\n            return [seen[need], i]\n        seen[nums[i]] = i\n    return []\n",
+    "result": {
+      "status": "ok",
+      "mode": "function",
+      "analysis": null,
+      "run": {
+        "functionName": "two_sum",
+        "inputs": [
+          { "name": "nums", "type": "list[int]", "literal": "[3, 2, 4]" },
+          { "name": "target", "type": "int", "literal": "6" }
+        ],
+        "seed": 1,
+        "returnValue": {
+          "k": "seq",
+          "t": "list",
+          "id": 3,
+          "items": [
+            { "k": "num", "t": "int", "v": "1" },
+            { "k": "num", "t": "int", "v": "2" }
+          ],
+          "len": 2,
+          "truncated": false
+        },
+        "exception": null,
+        "setupError": null,
+        "steps": [
+          {
+            "i": 0,
+            "event": "call",
+            "phase": "event",
+            "line": 1,
+            "func": "two_sum",
+            "stack": [
+              {
+                "id": "frame-4471939136",
+                "func": "two_sum",
+                "qualname": "two_sum",
+                "line": 1,
+                "locals": {
+                  "nums": {
+                    "k": "seq",
+                    "t": "list",
+                    "id": 1,
+                    "items": [
+                      { "k": "num", "t": "int", "v": "3" },
+                      { "k": "num", "t": "int", "v": "2" },
+                      { "k": "num", "t": "int", "v": "4" }
+                    ],
+                    "len": 3,
+                    "truncated": false
+                  },
+                  "target": { "k": "num", "t": "int", "v": "6" }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 1,
+            "event": "line",
+            "phase": "before",
+            "line": 2,
+            "func": "two_sum",
+            "stack": [
+              {
+                "id": "frame-4471939136",
+                "func": "two_sum",
+                "qualname": "two_sum",
+                "line": 2,
+                "locals": {
+                  "nums": {
+                    "k": "seq",
+                    "t": "list",
+                    "id": 1,
+                    "items": [
+                      { "k": "num", "t": "int", "v": "3" },
+                      { "k": "num", "t": "int", "v": "2" },
+                      { "k": "num", "t": "int", "v": "4" }
+                    ],
+                    "len": 3,
+                    "truncated": false
+                  },
+                  "target": { "k": "num", "t": "int", "v": "6" }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 2,
+            "event": "line",
+            "phase": "before",
+            "line": 3,
+            "func": "two_sum",
+            "stack": [
+              {
+                "id": "frame-4471939136",
+                "func": "two_sum",
+                "qualname": "two_sum",
+                "line": 3,
+                "locals": {
+                  "nums": {
+                    "k": "seq",
+                    "t": "list",
+                    "id": 1,
+                    "items": [
+                      { "k": "num", "t": "int", "v": "3" },
+                      { "k": "num", "t": "int", "v": "2" },
+                      { "k": "num", "t": "int", "v": "4" }
+                    ],
+                    "len": 3,
+                    "truncated": false
+                  },
+                  "target": { "k": "num", "t": "int", "v": "6" },
+                  "seen": {
+                    "k": "dict",
+                    "t": "dict",
+                    "id": 2,
+                    "entries": [],
+                    "len": 0,
+                    "truncated": false
+                  }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 3,
+            "event": "line",
+            "phase": "before",
+            "line": 4,
+            "func": "two_sum",
+            "stack": [
+              {
+                "id": "frame-4471939136",
+                "func": "two_sum",
+                "qualname": "two_sum",
+                "line": 4,
+                "locals": {
+                  "nums": {
+                    "k": "seq",
+                    "t": "list",
+                    "id": 1,
+                    "items": [
+                      { "k": "num", "t": "int", "v": "3" },
+                      { "k": "num", "t": "int", "v": "2" },
+                      { "k": "num", "t": "int", "v": "4" }
+                    ],
+                    "len": 3,
+                    "truncated": false
+                  },
+                  "target": { "k": "num", "t": "int", "v": "6" },
+                  "seen": {
+                    "k": "dict",
+                    "t": "dict",
+                    "id": 2,
+                    "entries": [],
+                    "len": 0,
+                    "truncated": false
+                  },
+                  "i": { "k": "num", "t": "int", "v": "0" }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 4,
+            "event": "line",
+            "phase": "before",
+            "line": 5,
+            "func": "two_sum",
+            "stack": [
+              {
+                "id": "frame-4471939136",
+                "func": "two_sum",
+                "qualname": "two_sum",
+                "line": 5,
+                "locals": {
+                  "nums": {
+                    "k": "seq",
+                    "t": "list",
+                    "id": 1,
+                    "items": [
+                      { "k": "num", "t": "int", "v": "3" },
+                      { "k": "num", "t": "int", "v": "2" },
+                      { "k": "num", "t": "int", "v": "4" }
+                    ],
+                    "len": 3,
+                    "truncated": false
+                  },
+                  "target": { "k": "num", "t": "int", "v": "6" },
+                  "seen": {
+                    "k": "dict",
+                    "t": "dict",
+                    "id": 2,
+                    "entries": [],
+                    "len": 0,
+                    "truncated": false
+                  },
+                  "i": { "k": "num", "t": "int", "v": "0" },
+                  "need": { "k": "num", "t": "int", "v": "3" }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 5,
+            "event": "line",
+            "phase": "before",
+            "line": 7,
+            "func": "two_sum",
+            "stack": [
+              {
+                "id": "frame-4471939136",
+                "func": "two_sum",
+                "qualname": "two_sum",
+                "line": 7,
+                "locals": {
+                  "nums": {
+                    "k": "seq",
+                    "t": "list",
+                    "id": 1,
+                    "items": [
+                      { "k": "num", "t": "int", "v": "3" },
+                      { "k": "num", "t": "int", "v": "2" },
+                      { "k": "num", "t": "int", "v": "4" }
+                    ],
+                    "len": 3,
+                    "truncated": false
+                  },
+                  "target": { "k": "num", "t": "int", "v": "6" },
+                  "seen": {
+                    "k": "dict",
+                    "t": "dict",
+                    "id": 2,
+                    "entries": [],
+                    "len": 0,
+                    "truncated": false
+                  },
+                  "i": { "k": "num", "t": "int", "v": "0" },
+                  "need": { "k": "num", "t": "int", "v": "3" }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 6,
+            "event": "line",
+            "phase": "before",
+            "line": 3,
+            "func": "two_sum",
+            "stack": [
+              {
+                "id": "frame-4471939136",
+                "func": "two_sum",
+                "qualname": "two_sum",
+                "line": 3,
+                "locals": {
+                  "nums": {
+                    "k": "seq",
+                    "t": "list",
+                    "id": 1,
+                    "items": [
+                      { "k": "num", "t": "int", "v": "3" },
+                      { "k": "num", "t": "int", "v": "2" },
+                      { "k": "num", "t": "int", "v": "4" }
+                    ],
+                    "len": 3,
+                    "truncated": false
+                  },
+                  "target": { "k": "num", "t": "int", "v": "6" },
+                  "seen": {
+                    "k": "dict",
+                    "t": "dict",
+                    "id": 2,
+                    "entries": [
+                      [
+                        { "k": "num", "t": "int", "v": "3" },
+                        { "k": "num", "t": "int", "v": "0" }
+                      ]
+                    ],
+                    "len": 1,
+                    "truncated": false
+                  },
+                  "i": { "k": "num", "t": "int", "v": "0" },
+                  "need": { "k": "num", "t": "int", "v": "3" }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 7,
+            "event": "line",
+            "phase": "before",
+            "line": 4,
+            "func": "two_sum",
+            "stack": [
+              {
+                "id": "frame-4471939136",
+                "func": "two_sum",
+                "qualname": "two_sum",
+                "line": 4,
+                "locals": {
+                  "nums": {
+                    "k": "seq",
+                    "t": "list",
+                    "id": 1,
+                    "items": [
+                      { "k": "num", "t": "int", "v": "3" },
+                      { "k": "num", "t": "int", "v": "2" },
+                      { "k": "num", "t": "int", "v": "4" }
+                    ],
+                    "len": 3,
+                    "truncated": false
+                  },
+                  "target": { "k": "num", "t": "int", "v": "6" },
+                  "seen": {
+                    "k": "dict",
+                    "t": "dict",
+                    "id": 2,
+                    "entries": [
+                      [
+                        { "k": "num", "t": "int", "v": "3" },
+                        { "k": "num", "t": "int", "v": "0" }
+                      ]
+                    ],
+                    "len": 1,
+                    "truncated": false
+                  },
+                  "i": { "k": "num", "t": "int", "v": "1" },
+                  "need": { "k": "num", "t": "int", "v": "3" }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 8,
+            "event": "line",
+            "phase": "before",
+            "line": 5,
+            "func": "two_sum",
+            "stack": [
+              {
+                "id": "frame-4471939136",
+                "func": "two_sum",
+                "qualname": "two_sum",
+                "line": 5,
+                "locals": {
+                  "nums": {
+                    "k": "seq",
+                    "t": "list",
+                    "id": 1,
+                    "items": [
+                      { "k": "num", "t": "int", "v": "3" },
+                      { "k": "num", "t": "int", "v": "2" },
+                      { "k": "num", "t": "int", "v": "4" }
+                    ],
+                    "len": 3,
+                    "truncated": false
+                  },
+                  "target": { "k": "num", "t": "int", "v": "6" },
+                  "seen": {
+                    "k": "dict",
+                    "t": "dict",
+                    "id": 2,
+                    "entries": [
+                      [
+                        { "k": "num", "t": "int", "v": "3" },
+                        { "k": "num", "t": "int", "v": "0" }
+                      ]
+                    ],
+                    "len": 1,
+                    "truncated": false
+                  },
+                  "i": { "k": "num", "t": "int", "v": "1" },
+                  "need": { "k": "num", "t": "int", "v": "4" }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 9,
+            "event": "line",
+            "phase": "before",
+            "line": 7,
+            "func": "two_sum",
+            "stack": [
+              {
+                "id": "frame-4471939136",
+                "func": "two_sum",
+                "qualname": "two_sum",
+                "line": 7,
+                "locals": {
+                  "nums": {
+                    "k": "seq",
+                    "t": "list",
+                    "id": 1,
+                    "items": [
+                      { "k": "num", "t": "int", "v": "3" },
+                      { "k": "num", "t": "int", "v": "2" },
+                      { "k": "num", "t": "int", "v": "4" }
+                    ],
+                    "len": 3,
+                    "truncated": false
+                  },
+                  "target": { "k": "num", "t": "int", "v": "6" },
+                  "seen": {
+                    "k": "dict",
+                    "t": "dict",
+                    "id": 2,
+                    "entries": [
+                      [
+                        { "k": "num", "t": "int", "v": "3" },
+                        { "k": "num", "t": "int", "v": "0" }
+                      ]
+                    ],
+                    "len": 1,
+                    "truncated": false
+                  },
+                  "i": { "k": "num", "t": "int", "v": "1" },
+                  "need": { "k": "num", "t": "int", "v": "4" }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 10,
+            "event": "line",
+            "phase": "before",
+            "line": 3,
+            "func": "two_sum",
+            "stack": [
+              {
+                "id": "frame-4471939136",
+                "func": "two_sum",
+                "qualname": "two_sum",
+                "line": 3,
+                "locals": {
+                  "nums": {
+                    "k": "seq",
+                    "t": "list",
+                    "id": 1,
+                    "items": [
+                      { "k": "num", "t": "int", "v": "3" },
+                      { "k": "num", "t": "int", "v": "2" },
+                      { "k": "num", "t": "int", "v": "4" }
+                    ],
+                    "len": 3,
+                    "truncated": false
+                  },
+                  "target": { "k": "num", "t": "int", "v": "6" },
+                  "seen": {
+                    "k": "dict",
+                    "t": "dict",
+                    "id": 2,
+                    "entries": [
+                      [
+                        { "k": "num", "t": "int", "v": "3" },
+                        { "k": "num", "t": "int", "v": "0" }
+                      ],
+                      [
+                        { "k": "num", "t": "int", "v": "2" },
+                        { "k": "num", "t": "int", "v": "1" }
+                      ]
+                    ],
+                    "len": 2,
+                    "truncated": false
+                  },
+                  "i": { "k": "num", "t": "int", "v": "1" },
+                  "need": { "k": "num", "t": "int", "v": "4" }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 11,
+            "event": "line",
+            "phase": "before",
+            "line": 4,
+            "func": "two_sum",
+            "stack": [
+              {
+                "id": "frame-4471939136",
+                "func": "two_sum",
+                "qualname": "two_sum",
+                "line": 4,
+                "locals": {
+                  "nums": {
+                    "k": "seq",
+                    "t": "list",
+                    "id": 1,
+                    "items": [
+                      { "k": "num", "t": "int", "v": "3" },
+                      { "k": "num", "t": "int", "v": "2" },
+                      { "k": "num", "t": "int", "v": "4" }
+                    ],
+                    "len": 3,
+                    "truncated": false
+                  },
+                  "target": { "k": "num", "t": "int", "v": "6" },
+                  "seen": {
+                    "k": "dict",
+                    "t": "dict",
+                    "id": 2,
+                    "entries": [
+                      [
+                        { "k": "num", "t": "int", "v": "3" },
+                        { "k": "num", "t": "int", "v": "0" }
+                      ],
+                      [
+                        { "k": "num", "t": "int", "v": "2" },
+                        { "k": "num", "t": "int", "v": "1" }
+                      ]
+                    ],
+                    "len": 2,
+                    "truncated": false
+                  },
+                  "i": { "k": "num", "t": "int", "v": "2" },
+                  "need": { "k": "num", "t": "int", "v": "4" }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 12,
+            "event": "line",
+            "phase": "before",
+            "line": 5,
+            "func": "two_sum",
+            "stack": [
+              {
+                "id": "frame-4471939136",
+                "func": "two_sum",
+                "qualname": "two_sum",
+                "line": 5,
+                "locals": {
+                  "nums": {
+                    "k": "seq",
+                    "t": "list",
+                    "id": 1,
+                    "items": [
+                      { "k": "num", "t": "int", "v": "3" },
+                      { "k": "num", "t": "int", "v": "2" },
+                      { "k": "num", "t": "int", "v": "4" }
+                    ],
+                    "len": 3,
+                    "truncated": false
+                  },
+                  "target": { "k": "num", "t": "int", "v": "6" },
+                  "seen": {
+                    "k": "dict",
+                    "t": "dict",
+                    "id": 2,
+                    "entries": [
+                      [
+                        { "k": "num", "t": "int", "v": "3" },
+                        { "k": "num", "t": "int", "v": "0" }
+                      ],
+                      [
+                        { "k": "num", "t": "int", "v": "2" },
+                        { "k": "num", "t": "int", "v": "1" }
+                      ]
+                    ],
+                    "len": 2,
+                    "truncated": false
+                  },
+                  "i": { "k": "num", "t": "int", "v": "2" },
+                  "need": { "k": "num", "t": "int", "v": "2" }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 13,
+            "event": "line",
+            "phase": "before",
+            "line": 6,
+            "func": "two_sum",
+            "stack": [
+              {
+                "id": "frame-4471939136",
+                "func": "two_sum",
+                "qualname": "two_sum",
+                "line": 6,
+                "locals": {
+                  "nums": {
+                    "k": "seq",
+                    "t": "list",
+                    "id": 1,
+                    "items": [
+                      { "k": "num", "t": "int", "v": "3" },
+                      { "k": "num", "t": "int", "v": "2" },
+                      { "k": "num", "t": "int", "v": "4" }
+                    ],
+                    "len": 3,
+                    "truncated": false
+                  },
+                  "target": { "k": "num", "t": "int", "v": "6" },
+                  "seen": {
+                    "k": "dict",
+                    "t": "dict",
+                    "id": 2,
+                    "entries": [
+                      [
+                        { "k": "num", "t": "int", "v": "3" },
+                        { "k": "num", "t": "int", "v": "0" }
+                      ],
+                      [
+                        { "k": "num", "t": "int", "v": "2" },
+                        { "k": "num", "t": "int", "v": "1" }
+                      ]
+                    ],
+                    "len": 2,
+                    "truncated": false
+                  },
+                  "i": { "k": "num", "t": "int", "v": "2" },
+                  "need": { "k": "num", "t": "int", "v": "2" }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 14,
+            "event": "return",
+            "phase": "event",
+            "line": 6,
+            "func": "two_sum",
+            "stack": [
+              {
+                "id": "frame-4471939136",
+                "func": "two_sum",
+                "qualname": "two_sum",
+                "line": 6,
+                "locals": {
+                  "nums": {
+                    "k": "seq",
+                    "t": "list",
+                    "id": 1,
+                    "items": [
+                      { "k": "num", "t": "int", "v": "3" },
+                      { "k": "num", "t": "int", "v": "2" },
+                      { "k": "num", "t": "int", "v": "4" }
+                    ],
+                    "len": 3,
+                    "truncated": false
+                  },
+                  "target": { "k": "num", "t": "int", "v": "6" },
+                  "seen": {
+                    "k": "dict",
+                    "t": "dict",
+                    "id": 2,
+                    "entries": [
+                      [
+                        { "k": "num", "t": "int", "v": "3" },
+                        { "k": "num", "t": "int", "v": "0" }
+                      ],
+                      [
+                        { "k": "num", "t": "int", "v": "2" },
+                        { "k": "num", "t": "int", "v": "1" }
+                      ]
+                    ],
+                    "len": 2,
+                    "truncated": false
+                  },
+                  "i": { "k": "num", "t": "int", "v": "2" },
+                  "need": { "k": "num", "t": "int", "v": "2" }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0,
+            "ret": {
+              "k": "seq",
+              "t": "list",
+              "id": 3,
+              "items": [
+                { "k": "num", "t": "int", "v": "1" },
+                { "k": "num", "t": "int", "v": "2" }
+              ],
+              "len": 2,
+              "truncated": false
+            }
+          }
+        ],
+        "opCount": 15,
+        "truncated": false,
+        "truncationReason": null,
+        "stdout": "",
+        "stderr": "",
+        "runtimeMs": 0,
+        "memoryMb": null,
+        "memoryIsEstimate": false,
+        "assessment": {
+          "status": "unscored",
+          "message": null,
+          "actualLiteral": "[1, 2]",
+          "expected": null
+        }
+      },
+      "error": null,
+      "durationMs": 0
+    }
+  },
+  "twoSumOffByOne": {
+    "code": "def two_sum(nums, target):\n    seen = {}\n    for i in range(len(nums) - 1):\n        need = target - nums[i]\n        if need in seen:\n            return [seen[need], i]\n        seen[nums[i]] = i\n    return []\n",
+    "result": {
+      "status": "ok",
+      "mode": "function",
+      "analysis": null,
+      "run": {
+        "functionName": "two_sum",
+        "inputs": [
+          { "name": "nums", "type": "list[int]", "literal": "[3, 2, 4]" },
+          { "name": "target", "type": "int", "literal": "6" }
+        ],
+        "seed": 1,
+        "returnValue": {
+          "k": "seq",
+          "t": "list",
+          "id": 3,
+          "items": [],
+          "len": 0,
+          "truncated": false
+        },
+        "exception": null,
+        "setupError": null,
+        "steps": [
+          {
+            "i": 0,
+            "event": "call",
+            "phase": "event",
+            "line": 1,
+            "func": "two_sum",
+            "stack": [
+              {
+                "id": "frame-4471939136",
+                "func": "two_sum",
+                "qualname": "two_sum",
+                "line": 1,
+                "locals": {
+                  "nums": {
+                    "k": "seq",
+                    "t": "list",
+                    "id": 1,
+                    "items": [
+                      { "k": "num", "t": "int", "v": "3" },
+                      { "k": "num", "t": "int", "v": "2" },
+                      { "k": "num", "t": "int", "v": "4" }
+                    ],
+                    "len": 3,
+                    "truncated": false
+                  },
+                  "target": { "k": "num", "t": "int", "v": "6" }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 1,
+            "event": "line",
+            "phase": "before",
+            "line": 2,
+            "func": "two_sum",
+            "stack": [
+              {
+                "id": "frame-4471939136",
+                "func": "two_sum",
+                "qualname": "two_sum",
+                "line": 2,
+                "locals": {
+                  "nums": {
+                    "k": "seq",
+                    "t": "list",
+                    "id": 1,
+                    "items": [
+                      { "k": "num", "t": "int", "v": "3" },
+                      { "k": "num", "t": "int", "v": "2" },
+                      { "k": "num", "t": "int", "v": "4" }
+                    ],
+                    "len": 3,
+                    "truncated": false
+                  },
+                  "target": { "k": "num", "t": "int", "v": "6" }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 2,
+            "event": "line",
+            "phase": "before",
+            "line": 3,
+            "func": "two_sum",
+            "stack": [
+              {
+                "id": "frame-4471939136",
+                "func": "two_sum",
+                "qualname": "two_sum",
+                "line": 3,
+                "locals": {
+                  "nums": {
+                    "k": "seq",
+                    "t": "list",
+                    "id": 1,
+                    "items": [
+                      { "k": "num", "t": "int", "v": "3" },
+                      { "k": "num", "t": "int", "v": "2" },
+                      { "k": "num", "t": "int", "v": "4" }
+                    ],
+                    "len": 3,
+                    "truncated": false
+                  },
+                  "target": { "k": "num", "t": "int", "v": "6" },
+                  "seen": {
+                    "k": "dict",
+                    "t": "dict",
+                    "id": 2,
+                    "entries": [],
+                    "len": 0,
+                    "truncated": false
+                  }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 3,
+            "event": "line",
+            "phase": "before",
+            "line": 4,
+            "func": "two_sum",
+            "stack": [
+              {
+                "id": "frame-4471939136",
+                "func": "two_sum",
+                "qualname": "two_sum",
+                "line": 4,
+                "locals": {
+                  "nums": {
+                    "k": "seq",
+                    "t": "list",
+                    "id": 1,
+                    "items": [
+                      { "k": "num", "t": "int", "v": "3" },
+                      { "k": "num", "t": "int", "v": "2" },
+                      { "k": "num", "t": "int", "v": "4" }
+                    ],
+                    "len": 3,
+                    "truncated": false
+                  },
+                  "target": { "k": "num", "t": "int", "v": "6" },
+                  "seen": {
+                    "k": "dict",
+                    "t": "dict",
+                    "id": 2,
+                    "entries": [],
+                    "len": 0,
+                    "truncated": false
+                  },
+                  "i": { "k": "num", "t": "int", "v": "0" }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 4,
+            "event": "line",
+            "phase": "before",
+            "line": 5,
+            "func": "two_sum",
+            "stack": [
+              {
+                "id": "frame-4471939136",
+                "func": "two_sum",
+                "qualname": "two_sum",
+                "line": 5,
+                "locals": {
+                  "nums": {
+                    "k": "seq",
+                    "t": "list",
+                    "id": 1,
+                    "items": [
+                      { "k": "num", "t": "int", "v": "3" },
+                      { "k": "num", "t": "int", "v": "2" },
+                      { "k": "num", "t": "int", "v": "4" }
+                    ],
+                    "len": 3,
+                    "truncated": false
+                  },
+                  "target": { "k": "num", "t": "int", "v": "6" },
+                  "seen": {
+                    "k": "dict",
+                    "t": "dict",
+                    "id": 2,
+                    "entries": [],
+                    "len": 0,
+                    "truncated": false
+                  },
+                  "i": { "k": "num", "t": "int", "v": "0" },
+                  "need": { "k": "num", "t": "int", "v": "3" }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 5,
+            "event": "line",
+            "phase": "before",
+            "line": 7,
+            "func": "two_sum",
+            "stack": [
+              {
+                "id": "frame-4471939136",
+                "func": "two_sum",
+                "qualname": "two_sum",
+                "line": 7,
+                "locals": {
+                  "nums": {
+                    "k": "seq",
+                    "t": "list",
+                    "id": 1,
+                    "items": [
+                      { "k": "num", "t": "int", "v": "3" },
+                      { "k": "num", "t": "int", "v": "2" },
+                      { "k": "num", "t": "int", "v": "4" }
+                    ],
+                    "len": 3,
+                    "truncated": false
+                  },
+                  "target": { "k": "num", "t": "int", "v": "6" },
+                  "seen": {
+                    "k": "dict",
+                    "t": "dict",
+                    "id": 2,
+                    "entries": [],
+                    "len": 0,
+                    "truncated": false
+                  },
+                  "i": { "k": "num", "t": "int", "v": "0" },
+                  "need": { "k": "num", "t": "int", "v": "3" }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 6,
+            "event": "line",
+            "phase": "before",
+            "line": 3,
+            "func": "two_sum",
+            "stack": [
+              {
+                "id": "frame-4471939136",
+                "func": "two_sum",
+                "qualname": "two_sum",
+                "line": 3,
+                "locals": {
+                  "nums": {
+                    "k": "seq",
+                    "t": "list",
+                    "id": 1,
+                    "items": [
+                      { "k": "num", "t": "int", "v": "3" },
+                      { "k": "num", "t": "int", "v": "2" },
+                      { "k": "num", "t": "int", "v": "4" }
+                    ],
+                    "len": 3,
+                    "truncated": false
+                  },
+                  "target": { "k": "num", "t": "int", "v": "6" },
+                  "seen": {
+                    "k": "dict",
+                    "t": "dict",
+                    "id": 2,
+                    "entries": [
+                      [
+                        { "k": "num", "t": "int", "v": "3" },
+                        { "k": "num", "t": "int", "v": "0" }
+                      ]
+                    ],
+                    "len": 1,
+                    "truncated": false
+                  },
+                  "i": { "k": "num", "t": "int", "v": "0" },
+                  "need": { "k": "num", "t": "int", "v": "3" }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 7,
+            "event": "line",
+            "phase": "before",
+            "line": 4,
+            "func": "two_sum",
+            "stack": [
+              {
+                "id": "frame-4471939136",
+                "func": "two_sum",
+                "qualname": "two_sum",
+                "line": 4,
+                "locals": {
+                  "nums": {
+                    "k": "seq",
+                    "t": "list",
+                    "id": 1,
+                    "items": [
+                      { "k": "num", "t": "int", "v": "3" },
+                      { "k": "num", "t": "int", "v": "2" },
+                      { "k": "num", "t": "int", "v": "4" }
+                    ],
+                    "len": 3,
+                    "truncated": false
+                  },
+                  "target": { "k": "num", "t": "int", "v": "6" },
+                  "seen": {
+                    "k": "dict",
+                    "t": "dict",
+                    "id": 2,
+                    "entries": [
+                      [
+                        { "k": "num", "t": "int", "v": "3" },
+                        { "k": "num", "t": "int", "v": "0" }
+                      ]
+                    ],
+                    "len": 1,
+                    "truncated": false
+                  },
+                  "i": { "k": "num", "t": "int", "v": "1" },
+                  "need": { "k": "num", "t": "int", "v": "3" }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 8,
+            "event": "line",
+            "phase": "before",
+            "line": 5,
+            "func": "two_sum",
+            "stack": [
+              {
+                "id": "frame-4471939136",
+                "func": "two_sum",
+                "qualname": "two_sum",
+                "line": 5,
+                "locals": {
+                  "nums": {
+                    "k": "seq",
+                    "t": "list",
+                    "id": 1,
+                    "items": [
+                      { "k": "num", "t": "int", "v": "3" },
+                      { "k": "num", "t": "int", "v": "2" },
+                      { "k": "num", "t": "int", "v": "4" }
+                    ],
+                    "len": 3,
+                    "truncated": false
+                  },
+                  "target": { "k": "num", "t": "int", "v": "6" },
+                  "seen": {
+                    "k": "dict",
+                    "t": "dict",
+                    "id": 2,
+                    "entries": [
+                      [
+                        { "k": "num", "t": "int", "v": "3" },
+                        { "k": "num", "t": "int", "v": "0" }
+                      ]
+                    ],
+                    "len": 1,
+                    "truncated": false
+                  },
+                  "i": { "k": "num", "t": "int", "v": "1" },
+                  "need": { "k": "num", "t": "int", "v": "4" }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 9,
+            "event": "line",
+            "phase": "before",
+            "line": 7,
+            "func": "two_sum",
+            "stack": [
+              {
+                "id": "frame-4471939136",
+                "func": "two_sum",
+                "qualname": "two_sum",
+                "line": 7,
+                "locals": {
+                  "nums": {
+                    "k": "seq",
+                    "t": "list",
+                    "id": 1,
+                    "items": [
+                      { "k": "num", "t": "int", "v": "3" },
+                      { "k": "num", "t": "int", "v": "2" },
+                      { "k": "num", "t": "int", "v": "4" }
+                    ],
+                    "len": 3,
+                    "truncated": false
+                  },
+                  "target": { "k": "num", "t": "int", "v": "6" },
+                  "seen": {
+                    "k": "dict",
+                    "t": "dict",
+                    "id": 2,
+                    "entries": [
+                      [
+                        { "k": "num", "t": "int", "v": "3" },
+                        { "k": "num", "t": "int", "v": "0" }
+                      ]
+                    ],
+                    "len": 1,
+                    "truncated": false
+                  },
+                  "i": { "k": "num", "t": "int", "v": "1" },
+                  "need": { "k": "num", "t": "int", "v": "4" }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 10,
+            "event": "line",
+            "phase": "before",
+            "line": 3,
+            "func": "two_sum",
+            "stack": [
+              {
+                "id": "frame-4471939136",
+                "func": "two_sum",
+                "qualname": "two_sum",
+                "line": 3,
+                "locals": {
+                  "nums": {
+                    "k": "seq",
+                    "t": "list",
+                    "id": 1,
+                    "items": [
+                      { "k": "num", "t": "int", "v": "3" },
+                      { "k": "num", "t": "int", "v": "2" },
+                      { "k": "num", "t": "int", "v": "4" }
+                    ],
+                    "len": 3,
+                    "truncated": false
+                  },
+                  "target": { "k": "num", "t": "int", "v": "6" },
+                  "seen": {
+                    "k": "dict",
+                    "t": "dict",
+                    "id": 2,
+                    "entries": [
+                      [
+                        { "k": "num", "t": "int", "v": "3" },
+                        { "k": "num", "t": "int", "v": "0" }
+                      ],
+                      [
+                        { "k": "num", "t": "int", "v": "2" },
+                        { "k": "num", "t": "int", "v": "1" }
+                      ]
+                    ],
+                    "len": 2,
+                    "truncated": false
+                  },
+                  "i": { "k": "num", "t": "int", "v": "1" },
+                  "need": { "k": "num", "t": "int", "v": "4" }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 11,
+            "event": "line",
+            "phase": "before",
+            "line": 8,
+            "func": "two_sum",
+            "stack": [
+              {
+                "id": "frame-4471939136",
+                "func": "two_sum",
+                "qualname": "two_sum",
+                "line": 8,
+                "locals": {
+                  "nums": {
+                    "k": "seq",
+                    "t": "list",
+                    "id": 1,
+                    "items": [
+                      { "k": "num", "t": "int", "v": "3" },
+                      { "k": "num", "t": "int", "v": "2" },
+                      { "k": "num", "t": "int", "v": "4" }
+                    ],
+                    "len": 3,
+                    "truncated": false
+                  },
+                  "target": { "k": "num", "t": "int", "v": "6" },
+                  "seen": {
+                    "k": "dict",
+                    "t": "dict",
+                    "id": 2,
+                    "entries": [
+                      [
+                        { "k": "num", "t": "int", "v": "3" },
+                        { "k": "num", "t": "int", "v": "0" }
+                      ],
+                      [
+                        { "k": "num", "t": "int", "v": "2" },
+                        { "k": "num", "t": "int", "v": "1" }
+                      ]
+                    ],
+                    "len": 2,
+                    "truncated": false
+                  },
+                  "i": { "k": "num", "t": "int", "v": "1" },
+                  "need": { "k": "num", "t": "int", "v": "4" }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 12,
+            "event": "return",
+            "phase": "event",
+            "line": 8,
+            "func": "two_sum",
+            "stack": [
+              {
+                "id": "frame-4471939136",
+                "func": "two_sum",
+                "qualname": "two_sum",
+                "line": 8,
+                "locals": {
+                  "nums": {
+                    "k": "seq",
+                    "t": "list",
+                    "id": 1,
+                    "items": [
+                      { "k": "num", "t": "int", "v": "3" },
+                      { "k": "num", "t": "int", "v": "2" },
+                      { "k": "num", "t": "int", "v": "4" }
+                    ],
+                    "len": 3,
+                    "truncated": false
+                  },
+                  "target": { "k": "num", "t": "int", "v": "6" },
+                  "seen": {
+                    "k": "dict",
+                    "t": "dict",
+                    "id": 2,
+                    "entries": [
+                      [
+                        { "k": "num", "t": "int", "v": "3" },
+                        { "k": "num", "t": "int", "v": "0" }
+                      ],
+                      [
+                        { "k": "num", "t": "int", "v": "2" },
+                        { "k": "num", "t": "int", "v": "1" }
+                      ]
+                    ],
+                    "len": 2,
+                    "truncated": false
+                  },
+                  "i": { "k": "num", "t": "int", "v": "1" },
+                  "need": { "k": "num", "t": "int", "v": "4" }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0,
+            "ret": { "k": "seq", "t": "list", "id": 3, "items": [], "len": 0, "truncated": false }
+          }
+        ],
+        "opCount": 13,
+        "truncated": false,
+        "truncationReason": null,
+        "stdout": "",
+        "stderr": "",
+        "runtimeMs": 0,
+        "memoryMb": null,
+        "memoryIsEstimate": false,
+        "assessment": {
+          "status": "unscored",
+          "message": null,
+          "actualLiteral": "[]",
+          "expected": null
+        }
+      },
+      "error": null,
+      "durationMs": 0
+    }
+  },
+  "fib": {
+    "code": "def fib(n):\n    if n < 2:\n        return n\n    return fib(n - 1) + fib(n - 2)\n",
+    "result": {
+      "status": "ok",
+      "mode": "function",
+      "analysis": null,
+      "run": {
+        "functionName": "fib",
+        "inputs": [{ "name": "n", "type": "int", "literal": "3" }],
+        "seed": 1,
+        "returnValue": { "k": "num", "t": "int", "v": "2" },
+        "exception": null,
+        "setupError": null,
+        "steps": [
+          {
+            "i": 0,
+            "event": "call",
+            "phase": "event",
+            "line": 1,
+            "func": "fib",
+            "stack": [
+              {
+                "id": "frame-4471451072",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 1,
+                "locals": { "n": { "k": "num", "t": "int", "v": "3" } }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 1,
+            "event": "line",
+            "phase": "before",
+            "line": 2,
+            "func": "fib",
+            "stack": [
+              {
+                "id": "frame-4471451072",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 2,
+                "locals": { "n": { "k": "num", "t": "int", "v": "3" } }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 2,
+            "event": "line",
+            "phase": "before",
+            "line": 4,
+            "func": "fib",
+            "stack": [
+              {
+                "id": "frame-4471451072",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "3" } }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 3,
+            "event": "call",
+            "phase": "event",
+            "line": 1,
+            "func": "fib",
+            "stack": [
+              {
+                "id": "frame-4471451072",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "3" } }
+              },
+              {
+                "id": "frame-4471446144",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 1,
+                "locals": { "n": { "k": "num", "t": "int", "v": "2" } }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 4,
+            "event": "line",
+            "phase": "before",
+            "line": 2,
+            "func": "fib",
+            "stack": [
+              {
+                "id": "frame-4471451072",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "3" } }
+              },
+              {
+                "id": "frame-4471446144",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 2,
+                "locals": { "n": { "k": "num", "t": "int", "v": "2" } }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 5,
+            "event": "line",
+            "phase": "before",
+            "line": 4,
+            "func": "fib",
+            "stack": [
+              {
+                "id": "frame-4471451072",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "3" } }
+              },
+              {
+                "id": "frame-4471446144",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "2" } }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 6,
+            "event": "call",
+            "phase": "event",
+            "line": 1,
+            "func": "fib",
+            "stack": [
+              {
+                "id": "frame-4471451072",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "3" } }
+              },
+              {
+                "id": "frame-4471446144",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "2" } }
+              },
+              {
+                "id": "frame-4471451296",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 1,
+                "locals": { "n": { "k": "num", "t": "int", "v": "1" } }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 7,
+            "event": "line",
+            "phase": "before",
+            "line": 2,
+            "func": "fib",
+            "stack": [
+              {
+                "id": "frame-4471451072",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "3" } }
+              },
+              {
+                "id": "frame-4471446144",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "2" } }
+              },
+              {
+                "id": "frame-4471451296",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 2,
+                "locals": { "n": { "k": "num", "t": "int", "v": "1" } }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 8,
+            "event": "line",
+            "phase": "before",
+            "line": 3,
+            "func": "fib",
+            "stack": [
+              {
+                "id": "frame-4471451072",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "3" } }
+              },
+              {
+                "id": "frame-4471446144",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "2" } }
+              },
+              {
+                "id": "frame-4471451296",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 3,
+                "locals": { "n": { "k": "num", "t": "int", "v": "1" } }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 9,
+            "event": "return",
+            "phase": "event",
+            "line": 3,
+            "func": "fib",
+            "stack": [
+              {
+                "id": "frame-4471451072",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "3" } }
+              },
+              {
+                "id": "frame-4471446144",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "2" } }
+              },
+              {
+                "id": "frame-4471451296",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 3,
+                "locals": { "n": { "k": "num", "t": "int", "v": "1" } }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0,
+            "ret": { "k": "num", "t": "int", "v": "1" }
+          },
+          {
+            "i": 10,
+            "event": "call",
+            "phase": "event",
+            "line": 1,
+            "func": "fib",
+            "stack": [
+              {
+                "id": "frame-4471451072",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "3" } }
+              },
+              {
+                "id": "frame-4471446144",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "2" } }
+              },
+              {
+                "id": "frame-4471451296",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 1,
+                "locals": { "n": { "k": "num", "t": "int", "v": "0" } }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 11,
+            "event": "line",
+            "phase": "before",
+            "line": 2,
+            "func": "fib",
+            "stack": [
+              {
+                "id": "frame-4471451072",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "3" } }
+              },
+              {
+                "id": "frame-4471446144",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "2" } }
+              },
+              {
+                "id": "frame-4471451296",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 2,
+                "locals": { "n": { "k": "num", "t": "int", "v": "0" } }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 12,
+            "event": "line",
+            "phase": "before",
+            "line": 3,
+            "func": "fib",
+            "stack": [
+              {
+                "id": "frame-4471451072",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "3" } }
+              },
+              {
+                "id": "frame-4471446144",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "2" } }
+              },
+              {
+                "id": "frame-4471451296",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 3,
+                "locals": { "n": { "k": "num", "t": "int", "v": "0" } }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 13,
+            "event": "return",
+            "phase": "event",
+            "line": 3,
+            "func": "fib",
+            "stack": [
+              {
+                "id": "frame-4471451072",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "3" } }
+              },
+              {
+                "id": "frame-4471446144",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "2" } }
+              },
+              {
+                "id": "frame-4471451296",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 3,
+                "locals": { "n": { "k": "num", "t": "int", "v": "0" } }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0,
+            "ret": { "k": "num", "t": "int", "v": "0" }
+          },
+          {
+            "i": 14,
+            "event": "return",
+            "phase": "event",
+            "line": 4,
+            "func": "fib",
+            "stack": [
+              {
+                "id": "frame-4471451072",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "3" } }
+              },
+              {
+                "id": "frame-4471446144",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "2" } }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0,
+            "ret": { "k": "num", "t": "int", "v": "1" }
+          },
+          {
+            "i": 15,
+            "event": "call",
+            "phase": "event",
+            "line": 1,
+            "func": "fib",
+            "stack": [
+              {
+                "id": "frame-4471451072",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "3" } }
+              },
+              {
+                "id": "frame-4471446144",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 1,
+                "locals": { "n": { "k": "num", "t": "int", "v": "1" } }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 16,
+            "event": "line",
+            "phase": "before",
+            "line": 2,
+            "func": "fib",
+            "stack": [
+              {
+                "id": "frame-4471451072",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "3" } }
+              },
+              {
+                "id": "frame-4471446144",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 2,
+                "locals": { "n": { "k": "num", "t": "int", "v": "1" } }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 17,
+            "event": "line",
+            "phase": "before",
+            "line": 3,
+            "func": "fib",
+            "stack": [
+              {
+                "id": "frame-4471451072",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "3" } }
+              },
+              {
+                "id": "frame-4471446144",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 3,
+                "locals": { "n": { "k": "num", "t": "int", "v": "1" } }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 18,
+            "event": "return",
+            "phase": "event",
+            "line": 3,
+            "func": "fib",
+            "stack": [
+              {
+                "id": "frame-4471451072",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "3" } }
+              },
+              {
+                "id": "frame-4471446144",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 3,
+                "locals": { "n": { "k": "num", "t": "int", "v": "1" } }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0,
+            "ret": { "k": "num", "t": "int", "v": "1" }
+          },
+          {
+            "i": 19,
+            "event": "return",
+            "phase": "event",
+            "line": 4,
+            "func": "fib",
+            "stack": [
+              {
+                "id": "frame-4471451072",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "3" } }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0,
+            "ret": { "k": "num", "t": "int", "v": "2" }
+          }
+        ],
+        "opCount": 20,
+        "truncated": false,
+        "truncationReason": null,
+        "stdout": "",
+        "stderr": "",
+        "runtimeMs": 0,
+        "memoryMb": null,
+        "memoryIsEstimate": false,
+        "assessment": {
+          "status": "unscored",
+          "message": null,
+          "actualLiteral": "2",
+          "expected": null
+        }
+      },
+      "error": null,
+      "durationMs": 0
+    }
+  },
+  "fibWrongBase": {
+    "code": "def fib(n):\n    if n < 2:\n        return 1\n    return fib(n - 1) + fib(n - 2)\n",
+    "result": {
+      "status": "ok",
+      "mode": "function",
+      "analysis": null,
+      "run": {
+        "functionName": "fib",
+        "inputs": [{ "name": "n", "type": "int", "literal": "3" }],
+        "seed": 1,
+        "returnValue": { "k": "num", "t": "int", "v": "3" },
+        "exception": null,
+        "setupError": null,
+        "steps": [
+          {
+            "i": 0,
+            "event": "call",
+            "phase": "event",
+            "line": 1,
+            "func": "fib",
+            "stack": [
+              {
+                "id": "frame-4471451072",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 1,
+                "locals": { "n": { "k": "num", "t": "int", "v": "3" } }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 1,
+            "event": "line",
+            "phase": "before",
+            "line": 2,
+            "func": "fib",
+            "stack": [
+              {
+                "id": "frame-4471451072",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 2,
+                "locals": { "n": { "k": "num", "t": "int", "v": "3" } }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 2,
+            "event": "line",
+            "phase": "before",
+            "line": 4,
+            "func": "fib",
+            "stack": [
+              {
+                "id": "frame-4471451072",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "3" } }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 3,
+            "event": "call",
+            "phase": "event",
+            "line": 1,
+            "func": "fib",
+            "stack": [
+              {
+                "id": "frame-4471451072",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "3" } }
+              },
+              {
+                "id": "frame-4471446144",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 1,
+                "locals": { "n": { "k": "num", "t": "int", "v": "2" } }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 4,
+            "event": "line",
+            "phase": "before",
+            "line": 2,
+            "func": "fib",
+            "stack": [
+              {
+                "id": "frame-4471451072",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "3" } }
+              },
+              {
+                "id": "frame-4471446144",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 2,
+                "locals": { "n": { "k": "num", "t": "int", "v": "2" } }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 5,
+            "event": "line",
+            "phase": "before",
+            "line": 4,
+            "func": "fib",
+            "stack": [
+              {
+                "id": "frame-4471451072",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "3" } }
+              },
+              {
+                "id": "frame-4471446144",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "2" } }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 6,
+            "event": "call",
+            "phase": "event",
+            "line": 1,
+            "func": "fib",
+            "stack": [
+              {
+                "id": "frame-4471451072",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "3" } }
+              },
+              {
+                "id": "frame-4471446144",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "2" } }
+              },
+              {
+                "id": "frame-4471451296",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 1,
+                "locals": { "n": { "k": "num", "t": "int", "v": "1" } }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 7,
+            "event": "line",
+            "phase": "before",
+            "line": 2,
+            "func": "fib",
+            "stack": [
+              {
+                "id": "frame-4471451072",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "3" } }
+              },
+              {
+                "id": "frame-4471446144",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "2" } }
+              },
+              {
+                "id": "frame-4471451296",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 2,
+                "locals": { "n": { "k": "num", "t": "int", "v": "1" } }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 8,
+            "event": "line",
+            "phase": "before",
+            "line": 3,
+            "func": "fib",
+            "stack": [
+              {
+                "id": "frame-4471451072",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "3" } }
+              },
+              {
+                "id": "frame-4471446144",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "2" } }
+              },
+              {
+                "id": "frame-4471451296",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 3,
+                "locals": { "n": { "k": "num", "t": "int", "v": "1" } }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 9,
+            "event": "return",
+            "phase": "event",
+            "line": 3,
+            "func": "fib",
+            "stack": [
+              {
+                "id": "frame-4471451072",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "3" } }
+              },
+              {
+                "id": "frame-4471446144",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "2" } }
+              },
+              {
+                "id": "frame-4471451296",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 3,
+                "locals": { "n": { "k": "num", "t": "int", "v": "1" } }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0,
+            "ret": { "k": "num", "t": "int", "v": "1" }
+          },
+          {
+            "i": 10,
+            "event": "call",
+            "phase": "event",
+            "line": 1,
+            "func": "fib",
+            "stack": [
+              {
+                "id": "frame-4471451072",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "3" } }
+              },
+              {
+                "id": "frame-4471446144",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "2" } }
+              },
+              {
+                "id": "frame-4471451296",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 1,
+                "locals": { "n": { "k": "num", "t": "int", "v": "0" } }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 11,
+            "event": "line",
+            "phase": "before",
+            "line": 2,
+            "func": "fib",
+            "stack": [
+              {
+                "id": "frame-4471451072",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "3" } }
+              },
+              {
+                "id": "frame-4471446144",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "2" } }
+              },
+              {
+                "id": "frame-4471451296",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 2,
+                "locals": { "n": { "k": "num", "t": "int", "v": "0" } }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 12,
+            "event": "line",
+            "phase": "before",
+            "line": 3,
+            "func": "fib",
+            "stack": [
+              {
+                "id": "frame-4471451072",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "3" } }
+              },
+              {
+                "id": "frame-4471446144",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "2" } }
+              },
+              {
+                "id": "frame-4471451296",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 3,
+                "locals": { "n": { "k": "num", "t": "int", "v": "0" } }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 13,
+            "event": "return",
+            "phase": "event",
+            "line": 3,
+            "func": "fib",
+            "stack": [
+              {
+                "id": "frame-4471451072",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "3" } }
+              },
+              {
+                "id": "frame-4471446144",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "2" } }
+              },
+              {
+                "id": "frame-4471451296",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 3,
+                "locals": { "n": { "k": "num", "t": "int", "v": "0" } }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0,
+            "ret": { "k": "num", "t": "int", "v": "1" }
+          },
+          {
+            "i": 14,
+            "event": "return",
+            "phase": "event",
+            "line": 4,
+            "func": "fib",
+            "stack": [
+              {
+                "id": "frame-4471451072",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "3" } }
+              },
+              {
+                "id": "frame-4471446144",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "2" } }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0,
+            "ret": { "k": "num", "t": "int", "v": "2" }
+          },
+          {
+            "i": 15,
+            "event": "call",
+            "phase": "event",
+            "line": 1,
+            "func": "fib",
+            "stack": [
+              {
+                "id": "frame-4471451072",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "3" } }
+              },
+              {
+                "id": "frame-4471446144",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 1,
+                "locals": { "n": { "k": "num", "t": "int", "v": "1" } }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 16,
+            "event": "line",
+            "phase": "before",
+            "line": 2,
+            "func": "fib",
+            "stack": [
+              {
+                "id": "frame-4471451072",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "3" } }
+              },
+              {
+                "id": "frame-4471446144",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 2,
+                "locals": { "n": { "k": "num", "t": "int", "v": "1" } }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 17,
+            "event": "line",
+            "phase": "before",
+            "line": 3,
+            "func": "fib",
+            "stack": [
+              {
+                "id": "frame-4471451072",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "3" } }
+              },
+              {
+                "id": "frame-4471446144",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 3,
+                "locals": { "n": { "k": "num", "t": "int", "v": "1" } }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 18,
+            "event": "return",
+            "phase": "event",
+            "line": 3,
+            "func": "fib",
+            "stack": [
+              {
+                "id": "frame-4471451072",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "3" } }
+              },
+              {
+                "id": "frame-4471446144",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 3,
+                "locals": { "n": { "k": "num", "t": "int", "v": "1" } }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0,
+            "ret": { "k": "num", "t": "int", "v": "1" }
+          },
+          {
+            "i": 19,
+            "event": "return",
+            "phase": "event",
+            "line": 4,
+            "func": "fib",
+            "stack": [
+              {
+                "id": "frame-4471451072",
+                "func": "fib",
+                "qualname": "fib",
+                "line": 4,
+                "locals": { "n": { "k": "num", "t": "int", "v": "3" } }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0,
+            "ret": { "k": "num", "t": "int", "v": "3" }
+          }
+        ],
+        "opCount": 20,
+        "truncated": false,
+        "truncationReason": null,
+        "stdout": "",
+        "stderr": "",
+        "runtimeMs": 0,
+        "memoryMb": null,
+        "memoryIsEstimate": false,
+        "assessment": {
+          "status": "unscored",
+          "message": null,
+          "actualLiteral": "3",
+          "expected": null
+        }
+      },
+      "error": null,
+      "durationMs": 0
+    }
+  },
+  "lookup": {
+    "code": "def lookup(prices, item):\n    if item in prices:\n        return prices[item]\n    return 0\n",
+    "result": {
+      "status": "ok",
+      "mode": "function",
+      "analysis": null,
+      "run": {
+        "functionName": "lookup",
+        "inputs": [
+          { "name": "prices", "type": "list[int]", "literal": "{'tea': 3}" },
+          { "name": "item", "type": "int", "literal": "'cake'" }
+        ],
+        "seed": 1,
+        "returnValue": { "k": "num", "t": "int", "v": "0" },
+        "exception": null,
+        "setupError": null,
+        "steps": [
+          {
+            "i": 0,
+            "event": "call",
+            "phase": "event",
+            "line": 1,
+            "func": "lookup",
+            "stack": [
+              {
+                "id": "frame-4472280416",
+                "func": "lookup",
+                "qualname": "lookup",
+                "line": 1,
+                "locals": {
+                  "prices": {
+                    "k": "dict",
+                    "t": "dict",
+                    "id": 1,
+                    "entries": [
+                      [
+                        { "k": "str", "v": "tea", "len": 3, "truncated": false },
+                        { "k": "num", "t": "int", "v": "3" }
+                      ]
+                    ],
+                    "len": 1,
+                    "truncated": false
+                  },
+                  "item": { "k": "str", "v": "cake", "len": 4, "truncated": false }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 1,
+            "event": "line",
+            "phase": "before",
+            "line": 2,
+            "func": "lookup",
+            "stack": [
+              {
+                "id": "frame-4472280416",
+                "func": "lookup",
+                "qualname": "lookup",
+                "line": 2,
+                "locals": {
+                  "prices": {
+                    "k": "dict",
+                    "t": "dict",
+                    "id": 1,
+                    "entries": [
+                      [
+                        { "k": "str", "v": "tea", "len": 3, "truncated": false },
+                        { "k": "num", "t": "int", "v": "3" }
+                      ]
+                    ],
+                    "len": 1,
+                    "truncated": false
+                  },
+                  "item": { "k": "str", "v": "cake", "len": 4, "truncated": false }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 2,
+            "event": "line",
+            "phase": "before",
+            "line": 4,
+            "func": "lookup",
+            "stack": [
+              {
+                "id": "frame-4472280416",
+                "func": "lookup",
+                "qualname": "lookup",
+                "line": 4,
+                "locals": {
+                  "prices": {
+                    "k": "dict",
+                    "t": "dict",
+                    "id": 1,
+                    "entries": [
+                      [
+                        { "k": "str", "v": "tea", "len": 3, "truncated": false },
+                        { "k": "num", "t": "int", "v": "3" }
+                      ]
+                    ],
+                    "len": 1,
+                    "truncated": false
+                  },
+                  "item": { "k": "str", "v": "cake", "len": 4, "truncated": false }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 3,
+            "event": "return",
+            "phase": "event",
+            "line": 4,
+            "func": "lookup",
+            "stack": [
+              {
+                "id": "frame-4472280416",
+                "func": "lookup",
+                "qualname": "lookup",
+                "line": 4,
+                "locals": {
+                  "prices": {
+                    "k": "dict",
+                    "t": "dict",
+                    "id": 1,
+                    "entries": [
+                      [
+                        { "k": "str", "v": "tea", "len": 3, "truncated": false },
+                        { "k": "num", "t": "int", "v": "3" }
+                      ]
+                    ],
+                    "len": 1,
+                    "truncated": false
+                  },
+                  "item": { "k": "str", "v": "cake", "len": 4, "truncated": false }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0,
+            "ret": { "k": "num", "t": "int", "v": "0" }
+          }
+        ],
+        "opCount": 4,
+        "truncated": false,
+        "truncationReason": null,
+        "stdout": "",
+        "stderr": "",
+        "runtimeMs": 0,
+        "memoryMb": null,
+        "memoryIsEstimate": false,
+        "assessment": {
+          "status": "unscored",
+          "message": null,
+          "actualLiteral": "0",
+          "expected": null
+        }
+      },
+      "error": null,
+      "durationMs": 0
+    }
+  },
+  "lookupUnsafe": {
+    "code": "def lookup(prices, item):\n    price = prices[item]\n    return price\n",
+    "result": {
+      "status": "error",
+      "mode": "function",
+      "analysis": null,
+      "run": {
+        "functionName": "lookup",
+        "inputs": [
+          { "name": "prices", "type": "list[int]", "literal": "{'tea': 3}" },
+          { "name": "item", "type": "int", "literal": "'cake'" }
+        ],
+        "seed": 1,
+        "returnValue": null,
+        "exception": {
+          "type": "KeyError",
+          "msg": "'cake'",
+          "traceback": "Traceback (most recent call last):\n  File \"<user_code>\", line 2, in lookup\nKeyError: 'cake'\n"
+        },
+        "setupError": null,
+        "steps": [
+          {
+            "i": 0,
+            "event": "call",
+            "phase": "event",
+            "line": 1,
+            "func": "lookup",
+            "stack": [
+              {
+                "id": "frame-4472282288",
+                "func": "lookup",
+                "qualname": "lookup",
+                "line": 1,
+                "locals": {
+                  "prices": {
+                    "k": "dict",
+                    "t": "dict",
+                    "id": 1,
+                    "entries": [
+                      [
+                        { "k": "str", "v": "tea", "len": 3, "truncated": false },
+                        { "k": "num", "t": "int", "v": "3" }
+                      ]
+                    ],
+                    "len": 1,
+                    "truncated": false
+                  },
+                  "item": { "k": "str", "v": "cake", "len": 4, "truncated": false }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 1,
+            "event": "line",
+            "phase": "before",
+            "line": 2,
+            "func": "lookup",
+            "stack": [
+              {
+                "id": "frame-4472282288",
+                "func": "lookup",
+                "qualname": "lookup",
+                "line": 2,
+                "locals": {
+                  "prices": {
+                    "k": "dict",
+                    "t": "dict",
+                    "id": 1,
+                    "entries": [
+                      [
+                        { "k": "str", "v": "tea", "len": 3, "truncated": false },
+                        { "k": "num", "t": "int", "v": "3" }
+                      ]
+                    ],
+                    "len": 1,
+                    "truncated": false
+                  },
+                  "item": { "k": "str", "v": "cake", "len": 4, "truncated": false }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 2,
+            "event": "exception",
+            "phase": "event",
+            "line": 2,
+            "func": "lookup",
+            "stack": [
+              {
+                "id": "frame-4472282288",
+                "func": "lookup",
+                "qualname": "lookup",
+                "line": 2,
+                "locals": {
+                  "prices": {
+                    "k": "dict",
+                    "t": "dict",
+                    "id": 1,
+                    "entries": [
+                      [
+                        { "k": "str", "v": "tea", "len": 3, "truncated": false },
+                        { "k": "num", "t": "int", "v": "3" }
+                      ]
+                    ],
+                    "len": 1,
+                    "truncated": false
+                  },
+                  "item": { "k": "str", "v": "cake", "len": 4, "truncated": false }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0,
+            "exc": { "type": "KeyError", "msg": "'cake'" }
+          },
+          {
+            "i": 3,
+            "event": "return",
+            "phase": "event",
+            "line": 2,
+            "func": "lookup",
+            "stack": [
+              {
+                "id": "frame-4472282288",
+                "func": "lookup",
+                "qualname": "lookup",
+                "line": 2,
+                "locals": {
+                  "prices": {
+                    "k": "dict",
+                    "t": "dict",
+                    "id": 1,
+                    "entries": [
+                      [
+                        { "k": "str", "v": "tea", "len": 3, "truncated": false },
+                        { "k": "num", "t": "int", "v": "3" }
+                      ]
+                    ],
+                    "len": 1,
+                    "truncated": false
+                  },
+                  "item": { "k": "str", "v": "cake", "len": 4, "truncated": false }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0,
+            "ret": { "k": "none" }
+          }
+        ],
+        "opCount": 4,
+        "truncated": false,
+        "truncationReason": null,
+        "stdout": "",
+        "stderr": "",
+        "runtimeMs": 0,
+        "memoryMb": null,
+        "memoryIsEstimate": false
+      },
+      "error": {
+        "type": "KeyError",
+        "msg": "'cake'",
+        "traceback": "Traceback (most recent call last):\n  File \"<user_code>\", line 2, in lookup\nKeyError: 'cake'\n"
+      },
+      "durationMs": 0
+    }
+  },
+  "lookupTea": {
+    "code": "def lookup(prices, item):\n    if item in prices:\n        return prices[item]\n    return 0\n",
+    "result": {
+      "status": "ok",
+      "mode": "function",
+      "analysis": null,
+      "run": {
+        "functionName": "lookup",
+        "inputs": [
+          { "name": "prices", "type": "list[int]", "literal": "{'tea': 3}" },
+          { "name": "item", "type": "int", "literal": "'tea'" }
+        ],
+        "seed": 1,
+        "returnValue": { "k": "num", "t": "int", "v": "3" },
+        "exception": null,
+        "setupError": null,
+        "steps": [
+          {
+            "i": 0,
+            "event": "call",
+            "phase": "event",
+            "line": 1,
+            "func": "lookup",
+            "stack": [
+              {
+                "id": "frame-4472284368",
+                "func": "lookup",
+                "qualname": "lookup",
+                "line": 1,
+                "locals": {
+                  "prices": {
+                    "k": "dict",
+                    "t": "dict",
+                    "id": 1,
+                    "entries": [
+                      [
+                        { "k": "str", "v": "tea", "len": 3, "truncated": false },
+                        { "k": "num", "t": "int", "v": "3" }
+                      ]
+                    ],
+                    "len": 1,
+                    "truncated": false
+                  },
+                  "item": { "k": "str", "v": "tea", "len": 3, "truncated": false }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 1,
+            "event": "line",
+            "phase": "before",
+            "line": 2,
+            "func": "lookup",
+            "stack": [
+              {
+                "id": "frame-4472284368",
+                "func": "lookup",
+                "qualname": "lookup",
+                "line": 2,
+                "locals": {
+                  "prices": {
+                    "k": "dict",
+                    "t": "dict",
+                    "id": 1,
+                    "entries": [
+                      [
+                        { "k": "str", "v": "tea", "len": 3, "truncated": false },
+                        { "k": "num", "t": "int", "v": "3" }
+                      ]
+                    ],
+                    "len": 1,
+                    "truncated": false
+                  },
+                  "item": { "k": "str", "v": "tea", "len": 3, "truncated": false }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 2,
+            "event": "line",
+            "phase": "before",
+            "line": 3,
+            "func": "lookup",
+            "stack": [
+              {
+                "id": "frame-4472284368",
+                "func": "lookup",
+                "qualname": "lookup",
+                "line": 3,
+                "locals": {
+                  "prices": {
+                    "k": "dict",
+                    "t": "dict",
+                    "id": 1,
+                    "entries": [
+                      [
+                        { "k": "str", "v": "tea", "len": 3, "truncated": false },
+                        { "k": "num", "t": "int", "v": "3" }
+                      ]
+                    ],
+                    "len": 1,
+                    "truncated": false
+                  },
+                  "item": { "k": "str", "v": "tea", "len": 3, "truncated": false }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 3,
+            "event": "return",
+            "phase": "event",
+            "line": 3,
+            "func": "lookup",
+            "stack": [
+              {
+                "id": "frame-4472284368",
+                "func": "lookup",
+                "qualname": "lookup",
+                "line": 3,
+                "locals": {
+                  "prices": {
+                    "k": "dict",
+                    "t": "dict",
+                    "id": 1,
+                    "entries": [
+                      [
+                        { "k": "str", "v": "tea", "len": 3, "truncated": false },
+                        { "k": "num", "t": "int", "v": "3" }
+                      ]
+                    ],
+                    "len": 1,
+                    "truncated": false
+                  },
+                  "item": { "k": "str", "v": "tea", "len": 3, "truncated": false }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0,
+            "ret": { "k": "num", "t": "int", "v": "3" }
+          }
+        ],
+        "opCount": 4,
+        "truncated": false,
+        "truncationReason": null,
+        "stdout": "",
+        "stderr": "",
+        "runtimeMs": 0,
+        "memoryMb": null,
+        "memoryIsEstimate": false,
+        "assessment": {
+          "status": "unscored",
+          "message": null,
+          "actualLiteral": "3",
+          "expected": null
+        }
+      },
+      "error": null,
+      "durationMs": 0
+    }
+  },
+  "report": {
+    "code": "def report(scores):\n    best = max(scores)\n    print(\"best\", best)\n    print(\"count\", len(scores))\n    return best\n",
+    "result": {
+      "status": "ok",
+      "mode": "function",
+      "analysis": null,
+      "run": {
+        "functionName": "report",
+        "inputs": [{ "name": "scores", "type": "list[int]", "literal": "[4, 9, 2]" }],
+        "seed": 1,
+        "returnValue": { "k": "num", "t": "int", "v": "9" },
+        "exception": null,
+        "setupError": null,
+        "steps": [
+          {
+            "i": 0,
+            "event": "call",
+            "phase": "event",
+            "line": 1,
+            "func": "report",
+            "stack": [
+              {
+                "id": "frame-4471569472",
+                "func": "report",
+                "qualname": "report",
+                "line": 1,
+                "locals": {
+                  "scores": {
+                    "k": "seq",
+                    "t": "list",
+                    "id": 1,
+                    "items": [
+                      { "k": "num", "t": "int", "v": "4" },
+                      { "k": "num", "t": "int", "v": "9" },
+                      { "k": "num", "t": "int", "v": "2" }
+                    ],
+                    "len": 3,
+                    "truncated": false
+                  }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 1,
+            "event": "line",
+            "phase": "before",
+            "line": 2,
+            "func": "report",
+            "stack": [
+              {
+                "id": "frame-4471569472",
+                "func": "report",
+                "qualname": "report",
+                "line": 2,
+                "locals": {
+                  "scores": {
+                    "k": "seq",
+                    "t": "list",
+                    "id": 1,
+                    "items": [
+                      { "k": "num", "t": "int", "v": "4" },
+                      { "k": "num", "t": "int", "v": "9" },
+                      { "k": "num", "t": "int", "v": "2" }
+                    ],
+                    "len": 3,
+                    "truncated": false
+                  }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 2,
+            "event": "line",
+            "phase": "before",
+            "line": 3,
+            "func": "report",
+            "stack": [
+              {
+                "id": "frame-4471569472",
+                "func": "report",
+                "qualname": "report",
+                "line": 3,
+                "locals": {
+                  "scores": {
+                    "k": "seq",
+                    "t": "list",
+                    "id": 1,
+                    "items": [
+                      { "k": "num", "t": "int", "v": "4" },
+                      { "k": "num", "t": "int", "v": "9" },
+                      { "k": "num", "t": "int", "v": "2" }
+                    ],
+                    "len": 3,
+                    "truncated": false
+                  },
+                  "best": { "k": "num", "t": "int", "v": "9" }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 3,
+            "event": "line",
+            "phase": "before",
+            "line": 4,
+            "func": "report",
+            "stack": [
+              {
+                "id": "frame-4471569472",
+                "func": "report",
+                "qualname": "report",
+                "line": 4,
+                "locals": {
+                  "scores": {
+                    "k": "seq",
+                    "t": "list",
+                    "id": 1,
+                    "items": [
+                      { "k": "num", "t": "int", "v": "4" },
+                      { "k": "num", "t": "int", "v": "9" },
+                      { "k": "num", "t": "int", "v": "2" }
+                    ],
+                    "len": 3,
+                    "truncated": false
+                  },
+                  "best": { "k": "num", "t": "int", "v": "9" }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 7
+          },
+          {
+            "i": 4,
+            "event": "line",
+            "phase": "before",
+            "line": 5,
+            "func": "report",
+            "stack": [
+              {
+                "id": "frame-4471569472",
+                "func": "report",
+                "qualname": "report",
+                "line": 5,
+                "locals": {
+                  "scores": {
+                    "k": "seq",
+                    "t": "list",
+                    "id": 1,
+                    "items": [
+                      { "k": "num", "t": "int", "v": "4" },
+                      { "k": "num", "t": "int", "v": "9" },
+                      { "k": "num", "t": "int", "v": "2" }
+                    ],
+                    "len": 3,
+                    "truncated": false
+                  },
+                  "best": { "k": "num", "t": "int", "v": "9" }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 15
+          },
+          {
+            "i": 5,
+            "event": "return",
+            "phase": "event",
+            "line": 5,
+            "func": "report",
+            "stack": [
+              {
+                "id": "frame-4471569472",
+                "func": "report",
+                "qualname": "report",
+                "line": 5,
+                "locals": {
+                  "scores": {
+                    "k": "seq",
+                    "t": "list",
+                    "id": 1,
+                    "items": [
+                      { "k": "num", "t": "int", "v": "4" },
+                      { "k": "num", "t": "int", "v": "9" },
+                      { "k": "num", "t": "int", "v": "2" }
+                    ],
+                    "len": 3,
+                    "truncated": false
+                  },
+                  "best": { "k": "num", "t": "int", "v": "9" }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 15,
+            "ret": { "k": "num", "t": "int", "v": "9" }
+          }
+        ],
+        "opCount": 6,
+        "truncated": false,
+        "truncationReason": null,
+        "stdout": "best 9\ncount 3\n",
+        "stderr": "",
+        "runtimeMs": 0,
+        "memoryMb": null,
+        "memoryIsEstimate": false,
+        "assessment": {
+          "status": "unscored",
+          "message": null,
+          "actualLiteral": "9",
+          "expected": null
+        }
+      },
+      "error": null,
+      "durationMs": 0
+    }
+  },
+  "reportChanged": {
+    "code": "def report(scores):\n    best = max(scores)\n    print(\"best\", best)\n    print(\"total\", sum(scores))\n    return best\n",
+    "result": {
+      "status": "ok",
+      "mode": "function",
+      "analysis": null,
+      "run": {
+        "functionName": "report",
+        "inputs": [{ "name": "scores", "type": "int", "literal": "[4, 9, 2]" }],
+        "seed": 1,
+        "returnValue": { "k": "num", "t": "int", "v": "9" },
+        "exception": null,
+        "setupError": null,
+        "steps": [
+          {
+            "i": 0,
+            "event": "call",
+            "phase": "event",
+            "line": 1,
+            "func": "report",
+            "stack": [
+              {
+                "id": "frame-4471569472",
+                "func": "report",
+                "qualname": "report",
+                "line": 1,
+                "locals": {
+                  "scores": {
+                    "k": "seq",
+                    "t": "list",
+                    "id": 1,
+                    "items": [
+                      { "k": "num", "t": "int", "v": "4" },
+                      { "k": "num", "t": "int", "v": "9" },
+                      { "k": "num", "t": "int", "v": "2" }
+                    ],
+                    "len": 3,
+                    "truncated": false
+                  }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 1,
+            "event": "line",
+            "phase": "before",
+            "line": 2,
+            "func": "report",
+            "stack": [
+              {
+                "id": "frame-4471569472",
+                "func": "report",
+                "qualname": "report",
+                "line": 2,
+                "locals": {
+                  "scores": {
+                    "k": "seq",
+                    "t": "list",
+                    "id": 1,
+                    "items": [
+                      { "k": "num", "t": "int", "v": "4" },
+                      { "k": "num", "t": "int", "v": "9" },
+                      { "k": "num", "t": "int", "v": "2" }
+                    ],
+                    "len": 3,
+                    "truncated": false
+                  }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 2,
+            "event": "line",
+            "phase": "before",
+            "line": 3,
+            "func": "report",
+            "stack": [
+              {
+                "id": "frame-4471569472",
+                "func": "report",
+                "qualname": "report",
+                "line": 3,
+                "locals": {
+                  "scores": {
+                    "k": "seq",
+                    "t": "list",
+                    "id": 1,
+                    "items": [
+                      { "k": "num", "t": "int", "v": "4" },
+                      { "k": "num", "t": "int", "v": "9" },
+                      { "k": "num", "t": "int", "v": "2" }
+                    ],
+                    "len": 3,
+                    "truncated": false
+                  },
+                  "best": { "k": "num", "t": "int", "v": "9" }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 0
+          },
+          {
+            "i": 3,
+            "event": "line",
+            "phase": "before",
+            "line": 4,
+            "func": "report",
+            "stack": [
+              {
+                "id": "frame-4471569472",
+                "func": "report",
+                "qualname": "report",
+                "line": 4,
+                "locals": {
+                  "scores": {
+                    "k": "seq",
+                    "t": "list",
+                    "id": 1,
+                    "items": [
+                      { "k": "num", "t": "int", "v": "4" },
+                      { "k": "num", "t": "int", "v": "9" },
+                      { "k": "num", "t": "int", "v": "2" }
+                    ],
+                    "len": 3,
+                    "truncated": false
+                  },
+                  "best": { "k": "num", "t": "int", "v": "9" }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 7
+          },
+          {
+            "i": 4,
+            "event": "line",
+            "phase": "before",
+            "line": 5,
+            "func": "report",
+            "stack": [
+              {
+                "id": "frame-4471569472",
+                "func": "report",
+                "qualname": "report",
+                "line": 5,
+                "locals": {
+                  "scores": {
+                    "k": "seq",
+                    "t": "list",
+                    "id": 1,
+                    "items": [
+                      { "k": "num", "t": "int", "v": "4" },
+                      { "k": "num", "t": "int", "v": "9" },
+                      { "k": "num", "t": "int", "v": "2" }
+                    ],
+                    "len": 3,
+                    "truncated": false
+                  },
+                  "best": { "k": "num", "t": "int", "v": "9" }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 16
+          },
+          {
+            "i": 5,
+            "event": "return",
+            "phase": "event",
+            "line": 5,
+            "func": "report",
+            "stack": [
+              {
+                "id": "frame-4471569472",
+                "func": "report",
+                "qualname": "report",
+                "line": 5,
+                "locals": {
+                  "scores": {
+                    "k": "seq",
+                    "t": "list",
+                    "id": 1,
+                    "items": [
+                      { "k": "num", "t": "int", "v": "4" },
+                      { "k": "num", "t": "int", "v": "9" },
+                      { "k": "num", "t": "int", "v": "2" }
+                    ],
+                    "len": 3,
+                    "truncated": false
+                  },
+                  "best": { "k": "num", "t": "int", "v": "9" }
+                }
+              }
+            ],
+            "globals": {},
+            "stdoutLen": 16,
+            "ret": { "k": "num", "t": "int", "v": "9" }
+          }
+        ],
+        "opCount": 6,
+        "truncated": false,
+        "truncationReason": null,
+        "stdout": "best 9\ntotal 15\n",
+        "stderr": "",
+        "runtimeMs": 0,
+        "memoryMb": null,
+        "memoryIsEstimate": false,
+        "assessment": {
+          "status": "unscored",
+          "message": null,
+          "actualLiteral": "9",
+          "expected": null
+        }
+      },
+      "error": null,
+      "durationMs": 0
+    }
+  }
+}
