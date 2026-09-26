@@ -17,6 +17,7 @@ import tracerPy from '../../engine/codeviz/tracer.py?raw';
 import runnerPy from '../../engine/codeviz/runner.py?raw';
 import assertionsPy from '../../engine/codeviz/assertions.py?raw';
 import apiPy from '../../engine/codeviz/api.py?raw';
+import preludePy from '../../engine/codeviz/prelude.py?raw';
 
 const ENGINE_FILES: Record<string, string> = {
   '__init__.py': enginInitPy,
@@ -28,6 +29,7 @@ const ENGINE_FILES: Record<string, string> = {
   'runner.py': runnerPy,
   'api.py': apiPy,
   'assertions.py': assertionsPy,
+  'prelude.py': preludePy,
 };
 
 let pyodidePromise: Promise<PyodideAPI> | null = null;

@@ -1,5 +1,6 @@
 import { instrumentScript, JsSourceError, TRACE_RUNTIME } from './jsInstrument';
 import { formatLogArgs, inspect } from './jsInspect';
+import { globalNames, withNameSuggestion } from './nameSuggestions';
 import { Snapshotter, TraceLimitError } from './jsSnapshot';
 import type {
   AnalysisInfo,
@@ -123,6 +124,8 @@ class TraceRecorder {
   private groupIndent = '';
   private counts = new Map<string, number>();
   private timers = new Map<string, number>();
+  // Hints worked out where an error was thrown, while its scope was still live.
+  private errorHints = new WeakMap<object, { raw: string; info: { type: string; msg: string } }>();
 
   constructor(private readonly snapshotter: Snapshotter) {}
 
@@ -138,6 +141,26 @@ class TraceRecorder {
     } finally {
       this.quiet -= 1;
     }
+  }
+
+  /** Error type and message, with a "Did you mean" hint from names in scope. */
+  private describeError(error: unknown): { type: string; msg: string } {
+    const raw = this.quietly(() => errorInfo(error));
+    const known = typeof error === 'object' && error !== null ? this.errorHints.get(error) : null;
+    // A caught and rethrown error may have had its message changed since.
+    if (known && known.raw === raw.msg) return known.info;
+    const info = withNameSuggestion(raw, () => {
+      // The innermost frame and module scope; a caller's locals are not in scope.
+      const live = this.frames.filter((frame) => !frame.ghost);
+      return [live[0], live[live.length - 1]]
+        .flatMap((frame) => (frame ? [...frame.base, ...frame.block] : []))
+        .map(([name]) => name)
+        .concat(globalNames());
+    });
+    if (typeof error === 'object' && error !== null) {
+      this.errorHints.set(error, { raw: raw.msg, info });
+    }
+    return info;
   }
 
   private stop(reason: string): TraceLimitError {
@@ -260,7 +283,7 @@ class TraceRecorder {
         return;
       }
       frame.threw = true;
-      this.record('exception', frame.line, { exc: this.quietly(() => errorInfo(error)) });
+      this.record('exception', frame.line, { exc: this.describeError(error) });
     },
     exit: (endLine: number) => {
       const frame = this.top();
@@ -290,7 +313,7 @@ class TraceRecorder {
 
   /** Records an uncaught exception at the innermost remaining frame. */
   fail(error: unknown): EngineError {
-    const info = this.quietly(() => errorInfo(error));
+    const info = this.describeError(error);
     const line = this.top()?.line ?? 1;
     this.record('exception', line, { exc: info }, true);
     return { ...info, line };

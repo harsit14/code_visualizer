@@ -26,6 +26,7 @@ import './styles/components/learning.css';
 import './styles/components/algorithm-views.css';
 import './styles/components/visual-refresh.css';
 import './styles/components/mobile-workspace.css';
+import './styles/components/account-settings.css';
 import './styles/components/workspace-library.css';
 import './styles/components/traced-light.css';
 
