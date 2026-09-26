@@ -15,6 +15,8 @@ export type HostCapabilities = {
 const STATIC_HOST = import.meta.env.VITE_STATIC_HOST === 'true';
 const UNKNOWN: HostCapabilities = { accounts: true, history: true, ai: true, known: false };
 const NONE: HostCapabilities = { accounts: false, history: false, ai: false, known: true };
+/** Unreachable (usually offline): nothing is offered, and the next call asks again. */
+const UNREACHABLE: HostCapabilities = { ...NONE, known: false };
 
 let request: Promise<HostCapabilities> | null = null;
 
@@ -35,7 +37,10 @@ export function fetchHostCapabilities(staticHost = STATIC_HOST): Promise<HostCap
         known: true,
       };
     })
-    .catch(() => NONE);
+    .catch(() => {
+      request = null;
+      return UNREACHABLE;
+    });
   return request;
 }
 
@@ -43,11 +48,16 @@ export function useHostCapabilities(): HostCapabilities {
   const [capabilities, setCapabilities] = useState<HostCapabilities>(STATIC_HOST ? NONE : UNKNOWN);
   useEffect(() => {
     let active = true;
-    void fetchHostCapabilities().then((next) => {
-      if (active) setCapabilities(next);
-    });
+    const load = () =>
+      void fetchHostCapabilities().then((next) => {
+        if (active) setCapabilities(next);
+      });
+    load();
+    // A page opened offline learns what the host offers once it reconnects.
+    window.addEventListener('online', load);
     return () => {
       active = false;
+      window.removeEventListener('online', load);
     };
   }, []);
   return capabilities;

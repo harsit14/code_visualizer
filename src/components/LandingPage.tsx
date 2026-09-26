@@ -30,6 +30,7 @@ import { encodeShareState } from '../app/shareState';
 import { useTheme } from '../app/theme';
 import { openDashboard } from '../app/routes';
 import { useHostCapabilities } from '../app/hostCapabilities';
+import { useOnline } from '../offline/useOnline';
 import { canWarmUpWhileIdle, warmUpDashboard, warmUpOnIntent } from '../app/warmup';
 import { AccountMenu } from './AccountMenu';
 import { useMenuDismiss } from './useMenuDismiss';
@@ -211,6 +212,7 @@ export function LandingPage() {
   const [activeSnippetId, setActiveSnippetId] = useState(snippetPresets[0].id);
   const { theme, toggleTheme } = useTheme();
   const capabilities = useHostCapabilities();
+  const online = useOnline();
   const [menuOpen, setMenuOpen] = useState(false);
   useMenuDismiss();
   const activeSnippet =
@@ -318,7 +320,7 @@ export function LandingPage() {
           >
             {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
           </button>
-          {capabilities.accounts ? <AccountMenu compact /> : null}
+          {capabilities.accounts && online ? <AccountMenu compact /> : null}
         </nav>
       </header>
 

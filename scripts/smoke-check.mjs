@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { extname, join, relative } from 'node:path';
+import { Script } from 'node:vm';
 import { gzipSync } from 'node:zlib';
 
 const root = process.cwd();
@@ -13,6 +14,12 @@ const requiredFiles = [
   'assets/pyodide/pyodide-lock.json',
   'assets/pyodide/pyodide.mjs',
   'assets/pyodide/python_stdlib.zip',
+  'manifest.webmanifest',
+  'sw.js',
+  'icons/icon-192.png',
+  'icons/icon-512.png',
+  'icons/icon-maskable-512.png',
+  'icons/apple-touch-icon.png',
 ];
 const requiredHeaders = [
   'Content-Security-Policy:',
@@ -120,6 +127,72 @@ if (process.env.GITHUB_PAGES === 'true') {
   const fallback = join(distDir, '404.html');
   if (!existsSync(fallback) || readFileSync(fallback, 'utf8') !== indexHtml) {
     failures.push('GitHub Pages build needs dist/404.html equal to index.html for deep links');
+  }
+}
+
+// Installable offline shell: manifest and service worker under the base path.
+const base =
+  process.env.VITE_BASE ?? (process.env.GITHUB_PAGES === 'true' ? '/code_visualizer/' : '/');
+const distPath = (url) => join(distDir, url.startsWith(base) ? url.slice(base.length) : url);
+const manifestPath = join(distDir, 'manifest.webmanifest');
+if (existsSync(manifestPath)) {
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+  if (manifest.scope !== base || !manifest.start_url?.startsWith(base)) {
+    failures.push(`manifest start_url and scope must be under ${base}`);
+  }
+  if (manifest.display !== 'standalone' || !manifest.theme_color || !manifest.background_color) {
+    failures.push('manifest needs display standalone and theme and background colours');
+  }
+  const icons = manifest.icons ?? [];
+  for (const size of ['192x192', '512x512']) {
+    if (!icons.some((icon) => icon.sizes === size && icon.type === 'image/png')) {
+      failures.push(`manifest has no ${size} PNG icon`);
+    }
+  }
+  if (!icons.some((icon) => icon.purpose === 'maskable')) {
+    failures.push('manifest has no maskable icon');
+  }
+  for (const icon of icons) {
+    if (!icon.src.startsWith(base) || !existsSync(distPath(icon.src))) {
+      failures.push(`manifest icon ${icon.src} is missing or outside ${base}`);
+    }
+  }
+}
+for (const [label, pattern] of [
+  ['manifest link', `<link rel="manifest" href="${base}manifest.webmanifest">`],
+  ['apple-touch-icon', `rel="apple-touch-icon" href="${base}icons/apple-touch-icon.png"`],
+  ['theme-color', '<meta name="theme-color"'],
+]) {
+  if (!indexHtml.includes(pattern)) failures.push(`index.html is missing the ${label}`);
+}
+
+const workerPath = join(distDir, 'sw.js');
+if (existsSync(workerPath)) {
+  const worker = readFileSync(workerPath, 'utf8');
+  try {
+    // Registered as a classic script, so it must not use import or export.
+    new Script(worker);
+  } catch (error) {
+    failures.push(`sw.js is not a classic script: ${error.message}`);
+  }
+  // offlineShellPlugin injects the build between these markers.
+  const [open, close] = ['/*codeviz-sw-build*/', '/*end-codeviz-sw-build*/'];
+  const start = worker.indexOf(open) + open.length;
+  const end = worker.indexOf(close, start);
+  const build = start >= open.length && end > start ? JSON.parse(worker.slice(start, end)) : null;
+  if (!build || worker.includes('__CODEVIZ_SW_BUILD__')) {
+    failures.push('sw.js has no injected precache manifest');
+  } else if (build.enabled) {
+    if (!indexHtml.includes(`${base}${build.shellEntry}`) || !build.precache.includes('./')) {
+      failures.push('sw.js does not precache the shell and its entry script');
+    }
+    for (const path of build.precache) {
+      const file = path === './' ? 'index.html' : path;
+      if (!existsSync(join(distDir, file))) failures.push(`sw.js precaches missing ${path}`);
+      if (/^assets\/pyodide\/|\.map$|^api\//.test(file)) {
+        failures.push(`sw.js must not precache ${path}`);
+      }
+    }
   }
 }
 
