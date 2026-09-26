@@ -1,0 +1,238 @@
+/* Compare runs: verdict, first difference and side-by-side summaries. */
+
+.compare-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  justify-content: flex-end;
+}
+
+.compare-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.compare-body > .panel-empty {
+  padding: 8px 0;
+}
+
+.compare-verdict {
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  font-size: 12.5px;
+  gap: 2px;
+  padding: 8px 10px;
+}
+
+.compare-verdict strong {
+  font-size: 13.5px;
+}
+
+.compare-verdict span {
+  color: var(--text-dim);
+}
+
+.compare-verdict-same {
+  background: var(--green-soft);
+  border-color: color-mix(in srgb, var(--green) 40%, var(--border));
+}
+
+.compare-verdict-same strong {
+  color: var(--green);
+}
+
+.compare-verdict-same-outcome,
+.compare-verdict-incomplete {
+  background: var(--amber-soft);
+  border-color: color-mix(in srgb, var(--amber) 40%, var(--border));
+}
+
+.compare-verdict-different {
+  background: var(--red-soft);
+  border-color: color-mix(in srgb, var(--red) 35%, var(--border));
+}
+
+.compare-verdict-different strong {
+  color: var(--red);
+}
+
+.compare-note {
+  color: var(--amber);
+  font-size: 12px;
+  margin: 0;
+}
+
+.compare-divergence {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 10px;
+}
+
+.compare-divergence h3,
+.compare-summary caption {
+  color: var(--text-dim);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  margin: 0;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.compare-divergence-summary {
+  font-size: 13px;
+  margin: 0;
+}
+
+.compare-sides {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+.compare-side {
+  background: var(--bg-inset);
+  border-radius: 7px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 7px 9px;
+}
+
+.compare-side h4 {
+  font-size: 12px;
+  margin: 0;
+}
+
+.compare-side-meta {
+  color: var(--text-faint);
+  font-size: 11.5px;
+  margin: 0;
+}
+
+.compare-side-value {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  overflow-wrap: anywhere;
+}
+
+.compare-source {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  display: flex;
+  font-family: var(--mono);
+  font-size: 12px;
+  gap: 8px;
+  margin: 0;
+  overflow-x: auto;
+  padding: 4px 8px;
+}
+
+.compare-source-number {
+  color: var(--text-faint);
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.compare-jump {
+  align-self: flex-start;
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  color: var(--accent);
+}
+
+.compare-jump[aria-current='step'] {
+  background: var(--accent-soft);
+}
+
+.compare-summary {
+  border-collapse: collapse;
+  font-size: 12px;
+  table-layout: fixed;
+  width: 100%;
+}
+
+.compare-summary caption {
+  padding-bottom: 4px;
+}
+
+.compare-summary th,
+.compare-summary td {
+  border-top: 1px solid var(--border);
+  overflow-wrap: anywhere;
+  padding: 5px 6px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.compare-summary thead th {
+  border-top: 0;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.compare-summary tbody th {
+  color: var(--text-dim);
+  font-weight: 500;
+  width: 28%;
+}
+
+.compare-summary td {
+  font-family: var(--mono);
+}
+
+.compare-summary tr.is-different td {
+  background: var(--amber-soft);
+}
+
+.compare-summary tr.is-different th {
+  box-shadow: inset 3px 0 0 var(--amber);
+  color: var(--text);
+}
+
+.compare-output {
+  font-family: var(--mono);
+  font-size: 12px;
+  margin: 0;
+  max-height: 120px;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+
+.compare-baseline-code summary {
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.compare-baseline-code pre {
+  background: var(--bg-inset);
+  border-radius: 7px;
+  font-family: var(--mono);
+  font-size: 12px;
+  margin: 6px 0 0;
+  max-height: 220px;
+  overflow: auto;
+  padding: 8px 10px;
+}
+
+@media (max-width: 720px) {
+  .compare-panel .panel-header-action,
+  .compare-jump,
+  .compare-baseline-code summary {
+    min-height: 44px;
+  }
+
+  .compare-baseline-code summary {
+    align-items: center;
+    display: flex;
+  }
+}

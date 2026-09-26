@@ -42,14 +42,19 @@ export async function listCodeHistory(): Promise<CodeHistoryItem[]> {
   return payload.items;
 }
 
+/** Send the same `idempotencyKey` when retrying a save so it cannot be stored twice. */
 export async function saveCodeHistory(
   payload: SaveCodeHistoryPayload,
   signal?: AbortSignal,
+  idempotencyKey?: string,
 ): Promise<CodeHistoryItem | null> {
   const response = await requestJson<HistoryItemPayload>('/api/history', {
     signal,
     body: JSON.stringify(payload),
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}),
+    },
     method: 'POST',
   });
   return response.item;

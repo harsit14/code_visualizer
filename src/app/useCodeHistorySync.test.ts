@@ -36,6 +36,9 @@ describe('history saving privacy and recovery', () => {
     expect(saveCodeHistory).toHaveBeenCalledWith(
       expect.objectContaining({ code: options.code }),
       expect.any(AbortSignal),
+      expect.stringMatching(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+      ),
     );
   });
   it('shows failures and retries the current run', async () => {
@@ -67,6 +70,44 @@ describe('history saving privacy and recovery', () => {
     act(() => result.current.setHistorySyncEnabled(true));
     await waitFor(() => expect(result.current.historySaveStatus).toBe('saved'));
     expect(vi.mocked(saveCodeHistory).mock.calls[1][0].id).toBeNull();
+  });
+  it('reuses one idempotency key until the save is confirmed', async () => {
+    vi.mocked(saveCodeHistory).mockRejectedValueOnce(new Error('Network lost the reply'));
+    const { result, rerender } = renderHook((props) => useCodeHistorySync(props), {
+      initialProps: options,
+    });
+    act(() => result.current.setHistorySyncEnabled(true));
+    await waitFor(() => expect(result.current.historySaveStatus).toBe('failed'));
+    act(() => result.current.retryHistorySave());
+    await waitFor(() => expect(result.current.historySaveStatus).toBe('saved'));
+    const [first, retry] = vi.mocked(saveCodeHistory).mock.calls;
+    expect(retry[2]).toBe(first[2]);
+    // Confirmed: the next save updates by ID with a fresh key.
+    rerender({ ...options, result: runJavaScriptTrace('let x = 1;', 'javascript') });
+    await waitFor(() => expect(saveCodeHistory).toHaveBeenCalledTimes(3));
+    const next = vi.mocked(saveCodeHistory).mock.calls[2];
+    expect(next[0].id).toBe('owned-history');
+    expect(next[2]).not.toBe(first[2]);
+  });
+  it('uses a new key for different code and after an account change', async () => {
+    vi.mocked(saveCodeHistory).mockRejectedValue(new Error('Offline'));
+    const { result, rerender } = renderHook((props) => useCodeHistorySync(props), {
+      initialProps: options,
+    });
+    act(() => result.current.setHistorySyncEnabled(true));
+    await waitFor(() => expect(result.current.historySaveStatus).toBe('failed'));
+    const changedCode = 'let y = 2;';
+    rerender({
+      ...options,
+      code: changedCode,
+      result: runJavaScriptTrace(changedCode, 'javascript'),
+    });
+    await waitFor(() => expect(saveCodeHistory).toHaveBeenCalledTimes(2));
+    act(() => window.dispatchEvent(new Event('cv-account-changed')));
+    act(() => result.current.setHistorySyncEnabled(true));
+    await waitFor(() => expect(saveCodeHistory).toHaveBeenCalledTimes(3));
+    const keys = vi.mocked(saveCodeHistory).mock.calls.map((call) => call[2]);
+    expect(new Set(keys).size).toBe(3);
   });
   it('does not leave a missing confirmation spinning forever', async () => {
     vi.mocked(saveCodeHistory).mockResolvedValueOnce(null);

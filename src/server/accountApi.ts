@@ -30,6 +30,7 @@ import {
   rejectUntrustedBrowserRequest,
   requestBodyTooLargeResponse,
 } from './http';
+import { handleAccountControlsApi } from './accountControlsApi';
 import { handleHistoryApi } from './historyApi';
 import { enforceAuthRateLimit } from './rateLimit';
 import {
@@ -55,6 +56,11 @@ export async function handleAccountApi(request: Request, env: ServerEnv): Promis
     const historyResponse = await handleHistoryApi(request, env);
     if (historyResponse) {
       return historyResponse;
+    }
+
+    const accountControlsResponse = await handleAccountControlsApi(request, env);
+    if (accountControlsResponse) {
+      return accountControlsResponse;
     }
 
     if (url.pathname === '/api/capabilities') {

@@ -14,26 +14,30 @@ export function managedAuthEnabled(env: ServerEnv): boolean {
   return env.MANAGED_AUTH_ENABLED === 'true';
 }
 
+function providerUrl(env: ServerEnv): URL | null {
+  try {
+    const url = new URL(env.SUPABASE_URL ?? '');
+    return url.protocol !== 'https:' ||
+      url.username ||
+      url.password ||
+      url.pathname !== '/' ||
+      url.search ||
+      url.hash
+      ? null
+      : url;
+  } catch {
+    return null;
+  }
+}
+
 async function providerRequest(
   env: ServerEnv,
   path: 'otp' | 'verify',
   body: object,
 ): Promise<unknown> {
   const key = env.SUPABASE_ANON_KEY?.trim();
-  let url: URL;
-  try {
-    url = new URL(env.SUPABASE_URL ?? '');
-    if (
-      url.protocol !== 'https:' ||
-      url.username ||
-      url.password ||
-      url.pathname !== '/' ||
-      url.search ||
-      url.hash ||
-      !key
-    )
-      throw new Error();
-  } catch {
+  const url = providerUrl(env);
+  if (!url || !key) {
     throw new ManagedAuthError('Email sign-in is not configured. Please try again later.');
   }
   let response: Response;
@@ -94,4 +98,28 @@ export async function verifyEmailCode(
   // Provider access/refresh tokens are deliberately discarded; the app issues its own
   // opaque HttpOnly session, checked against the provider identity by SQL on each use.
   return user.id;
+}
+
+/**
+ * Removes the provider's copy of a deleted account's email identity. Best effort:
+ * the app account is already gone, and a leftover provider record only means the
+ * same email starts a new, empty account next time.
+ */
+export async function deleteProviderIdentity(env: ServerEnv, subject: string): Promise<boolean> {
+  const url = providerUrl(env);
+  const key = env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  if (!url || !key || !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(subject)) {
+    return false;
+  }
+  try {
+    const response = await fetch(new URL(`/auth/v1/admin/users/${subject}`, url), {
+      method: 'DELETE',
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+      signal: AbortSignal.timeout(10_000),
+      redirect: 'error',
+    });
+    return response.ok || response.status === 404;
+  } catch {
+    return false;
+  }
 }

@@ -7,8 +7,9 @@ import { WorkspaceLibrary } from '../components/WorkspaceLibrary';
 import { useWorkspaceLibrary } from './useWorkspaceLibrary';
 import type { WorkspaceContent } from './workspaceFormat';
 import { panelMobileTab, useMobileWorkspace } from './useMobileWorkspace';
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
+import { GitCompare } from 'lucide-react';
 import { CallStackPanel } from '../components/CallStackPanel';
 import { ConsolePanel } from '../components/ConsolePanel';
 import { ControlsBar } from '../components/ControlsBar';
@@ -44,10 +45,18 @@ import { useCodeHistorySync } from './useCodeHistorySync';
 import { useHostCapabilities } from './hostCapabilities';
 import { useOnline } from '../offline/useOnline';
 import { useResizableLayout } from './useResizableLayout';
+import { useRunBaseline } from './useRunBaseline';
 import { useSession } from './useSession';
 import { useTraceNavigation } from './useTraceNavigation';
 import { useTraceTransfer } from './useTraceTransfer';
 import { useTransportShortcuts } from './useTransportShortcuts';
+
+// The comparison view and engine load only once the panel is shown.
+const RunComparisonPanel = lazy(() =>
+  import('../components/RunComparisonPanel').then((module) => ({
+    default: module.RunComparisonPanel,
+  })),
+);
 
 const DASHBOARD_ONBOARDING_STORAGE_KEY = 'cv-dashboard-onboarding-v1';
 const EMBED_SEARCH_PARAM = 'embed';
@@ -225,6 +234,16 @@ export function DashboardApp({ onOpenLanding }: DashboardAppProps) {
     },
     [session.result],
   );
+  const { baseline, canKeepBaseline, keepBaseline, clearBaseline } = useRunBaseline({
+    code: session.code,
+    language: session.language,
+    result: session.result,
+  });
+  const keepRunAsBaseline = useCallback(() => {
+    keepBaseline();
+    togglePanelVisibility('compare', true);
+  }, [keepBaseline, togglePanelVisibility]);
+
   // A guided lesson is active while its unedited example is loaded.
   const lesson = session.language === 'python' ? getLesson(exampleId) : undefined;
   const lessonCheckpoints = useMemo(
@@ -761,7 +780,56 @@ export function DashboardApp({ onOpenLanding }: DashboardAppProps) {
               currentStep={session.currentStep}
               onMeasureComplexity={() => void session.measureComplexity()}
               result={session.result}
+              headerAction={
+                // Phones always show Compare runs under Inspect, which has its own button.
+                embedMode || mobile ? undefined : (
+                  <button
+                    className="panel-header-action"
+                    disabled={!canKeepBaseline || session.isBusy}
+                    onClick={keepRunAsBaseline}
+                    title="Keep this run to compare with the next one"
+                    type="button"
+                  >
+                    <GitCompare size={12} />
+                    {baseline && baseline.result === session.result
+                      ? 'Kept as baseline'
+                      : 'Keep as baseline'}
+                  </button>
+                )
+              }
             />
+          </ErrorBoundary>,
+        )
+      : null,
+    visiblePanels.compare && !embedMode
+      ? panelSlot(
+          'compare',
+          <ErrorBoundary
+            className="compare-panel"
+            resetKeys={[session.result, baseline]}
+            title="Compare runs"
+          >
+            {mobile && mobileTab !== 'Inspect' ? null : (
+              <Suspense
+                fallback={
+                  <section className="panel compare-panel" aria-label="Compare runs">
+                    <p className="panel-empty">Loading the comparison…</p>
+                  </section>
+                }
+              >
+                <RunComparisonPanel
+                  baseline={baseline}
+                  code={session.code}
+                  isBusy={session.isBusy}
+                  language={session.language}
+                  onClearBaseline={clearBaseline}
+                  onJump={session.jumpToStep}
+                  onKeepBaseline={keepRunAsBaseline}
+                  result={session.result}
+                  step={session.step}
+                />
+              </Suspense>
+            )}
           </ErrorBoundary>,
         )
       : null,
