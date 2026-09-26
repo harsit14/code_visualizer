@@ -18,6 +18,39 @@ describe('parseTraceImport', () => {
     expect(imported.step).toBe(exported.result.run!.steps.length - 1);
   });
 
+  it('carries bookmarks and ordered checkpoints, and imports older files without them', () => {
+    const exported = {
+      ...payload(),
+      bookmarks: [
+        { step: 1, note: 'second' },
+        { step: 0, note: 'first' },
+        { step: 400, note: 'outside the trace' },
+      ],
+      checkpoints: [1, 0, 1, 400],
+    };
+    const imported = parseTraceImport(JSON.stringify(exported));
+    expect(imported.bookmarks).toEqual([
+      { step: 0, note: 'first' },
+      { step: 1, note: 'second' },
+    ]);
+    expect(imported.checkpoints).toEqual([1, 0]);
+    const legacy = parseTraceImport(JSON.stringify(payload()));
+    expect(legacy.bookmarks).toEqual([]);
+    expect(legacy.checkpoints).toEqual([]);
+  });
+
+  it.each([
+    { bookmarks: [{ step: -1, note: '' }] },
+    { bookmarks: [{ step: 0, note: 5 }] },
+    { bookmarks: 'none' },
+    { checkpoints: ['0'] },
+    { checkpoints: Array.from({ length: 501 }, () => 0) },
+  ])('rejects malformed annotations %#', (annotations) => {
+    expect(() => parseTraceImport(JSON.stringify({ ...payload(), ...annotations }))).toThrow(
+      'Invalid trace bookmarks or checkpoints.',
+    );
+  });
+
   it('normalizes legacy timing while validating the same trace structure', () => {
     const legacy = { ...payload(), version: 1, language: undefined };
     legacy.result.run!.steps.forEach((s) => {

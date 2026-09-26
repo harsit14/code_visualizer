@@ -27,6 +27,7 @@ import './styles/components/algorithm-views.css';
 import './styles/components/visual-refresh.css';
 import './styles/components/mobile-workspace.css';
 import './styles/components/traced-light.css';
+import './styles/components/presentation.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

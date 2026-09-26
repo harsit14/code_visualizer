@@ -12,6 +12,7 @@ import {
   FULL_PANEL_VISIBILITY,
   LEARN_PANEL_VISIBILITY,
   PANEL_DEFINITIONS,
+  PRESENTATION_COLUMN_WEIGHTS,
   normalizePanelVisibility,
   normalizeWeights,
   type ColumnId,
@@ -127,7 +128,15 @@ function workbenchColumns(columnIds: readonly ColumnId[], weights: ColumnWeights
     .join(' ');
 }
 
-export function useResizableLayout(embedMode: boolean) {
+/**
+ * `presentation` temporarily replaces the visible panels and sizes. The user's
+ * own choices stay in state (and storage) untouched, so leaving presentation
+ * restores them exactly.
+ */
+export function useResizableLayout(
+  embedMode: boolean,
+  presentation: PanelVisibility | null = null,
+) {
   const [panelVisibility, setPanelVisibility] = useState<PanelVisibility>(() =>
     embedMode ? { ...DEFAULT_EMBED_PANEL_VISIBILITY } : readStoredPanelVisibility(),
   );
@@ -373,9 +382,10 @@ export function useResizableLayout(embedMode: boolean) {
     [],
   );
 
+  const activeColumnWeights = presentation ? PRESENTATION_COLUMN_WEIGHTS : columnWeights;
   const columnsTemplate = useCallback(
-    (columnIds: readonly ColumnId[]) => workbenchColumns(columnIds, columnWeights),
-    [columnWeights],
+    (columnIds: readonly ColumnId[]) => workbenchColumns(columnIds, activeColumnWeights),
+    [activeColumnWeights],
   );
 
   const panelControls = useMemo(
@@ -391,10 +401,10 @@ export function useResizableLayout(embedMode: boolean) {
     adjustColumnPair,
     adjustPanelPair,
     columnsTemplate,
-    columnWeights,
+    columnWeights: activeColumnWeights,
     panelControls,
-    panelVisibility,
-    panelWeights,
+    panelVisibility: presentation ?? panelVisibility,
+    panelWeights: presentation ? DEFAULT_PANEL_WEIGHTS : panelWeights,
     registerColumn,
     registerPanelSlot,
     resetLayout,

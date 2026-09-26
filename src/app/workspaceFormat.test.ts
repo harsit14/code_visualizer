@@ -32,6 +32,12 @@ describe('complete workspace backups', () => {
     (p: ReturnType<typeof JSON.parse>) => {
       p.workspace.content.bookmarks = [{ step: 1, note: 7 }];
     },
+    (p: ReturnType<typeof JSON.parse>) => {
+      p.workspace.content.checkpoints = [1.5];
+    },
+    (p: ReturnType<typeof JSON.parse>) => {
+      p.workspace.content.checkpoints = { 0: 1 };
+    },
   ])('rejects malformed/future/nested fields before use', (mutate) => {
     const payload = JSON.parse(serializeWorkspace(workspaceRevision()));
     mutate(payload);
@@ -52,6 +58,22 @@ describe('complete workspace backups', () => {
     expect(parseWorkspace(JSON.stringify(payload)).content.bookmarks).toEqual([
       { step: 0, note: 'start' },
     ]);
+  });
+  it('keeps checkpoint order, loads older backups without checkpoints and drops unbookmarked ones', () => {
+    const workspace = workspaceRevision();
+    workspace.content.result!.run!.steps.push({ ...workspace.content.result!.run!.steps[1], i: 2 });
+    workspace.content.bookmarks = [
+      { step: 1, note: 'loop' },
+      { step: 2, note: 'done' },
+    ];
+    workspace.content.checkpoints = [2, 1];
+    expect(parseWorkspace(serializeWorkspace(workspace)).content.checkpoints).toEqual([2, 1]);
+
+    const payload = JSON.parse(serializeWorkspace(workspace));
+    delete payload.workspace.content.checkpoints;
+    expect(parseWorkspace(JSON.stringify(payload)).content.checkpoints).toEqual([]);
+    payload.workspace.content.checkpoints = [0, 2, 2, 1];
+    expect(parseWorkspace(JSON.stringify(payload)).content.checkpoints).toEqual([2, 1]);
   });
   it('stops unfinished cases and clamps replay position', () => {
     const workspace = workspaceRevision();

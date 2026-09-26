@@ -64,9 +64,28 @@ export const FULL_PANEL_VISIBILITY: PanelVisibility = {
   console: true,
 };
 
+/** Presentation mode: code, structures and variables only. It overrides the
+    user's layout while active and never replaces the stored choices. */
+export const PRESENTATION_PANEL_VISIBILITY: PanelVisibility = {
+  code: true,
+  inputs: false,
+  data: true,
+  variables: true,
+  watch: false,
+  callStack: false,
+  explainer: false,
+  console: false,
+};
+
 export const DEFAULT_COLUMN_WEIGHTS: ColumnWeights = {
   left: 1.05,
   center: 1.35,
+  right: 1,
+};
+
+export const PRESENTATION_COLUMN_WEIGHTS: ColumnWeights = {
+  left: 1.25,
+  center: 1.25,
   right: 1,
 };
 

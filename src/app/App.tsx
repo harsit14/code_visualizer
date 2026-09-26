@@ -1,12 +1,12 @@
 /**
- * App shell: layout, theme, share links, trace export/import, and wiring
- * between the session hook and the dashboard panels.
+ * App shell: layout, theme, share links, trace export/import, presentation
+ * mode, and wiring between the session hook and the dashboard panels.
  */
 import { MobileWorkspaceTabs } from '../components/MobileWorkspaceTabs';
 import { WorkspaceLibrary } from '../components/WorkspaceLibrary';
 import { useWorkspaceLibrary } from './useWorkspaceLibrary';
 import type { WorkspaceContent } from './workspaceFormat';
-import { panelMobileTab, useMobileWorkspace } from './useMobileWorkspace';
+import { mobileTabs, panelMobileTab, useMobileWorkspace } from './useMobileWorkspace';
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { CallStackPanel } from '../components/CallStackPanel';
@@ -19,12 +19,20 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 import { ExplainerPanel } from '../components/ExplainerPanel';
 import { InputsPanel } from '../components/InputsPanel';
 import { LessonCard } from '../components/LessonCard';
+import { PresentationBar } from '../components/PresentationBar';
 import { TraceFinder } from '../components/TraceFinder';
 import { LogoMark } from '../components/LogoMark';
 import { TopBar } from '../components/TopBar';
 import { VariablesPanel } from '../components/VariablesPanel';
 import { WatchPanel } from '../components/WatchPanel';
 import { describeStepChange } from '../engine/stepChange';
+import {
+  checkpointCaptions,
+  checkpointNavigation,
+  moveCheckpoint,
+  normalizeCheckpoints,
+  toggleCheckpoint,
+} from '../engine/traceCheckpoints';
 import { normalizeBookmarks, type TraceBookmark } from '../engine/traceSearch';
 import type { Language, SessionResult } from '../engine/types';
 import { CUSTOM_CODE_ID, DEFAULT_EXAMPLE_ID, getExample } from '../examples/examples';
@@ -36,7 +44,14 @@ import {
 } from '../lessons/lessons';
 import { loadStoredCodeDraft } from './codeDraft';
 import { useDraftPersistence } from './useDraftPersistence';
-import { pairPercentage, type ColumnId, type PanelId } from './layoutState';
+import {
+  pairPercentage,
+  PRESENTATION_PANEL_VISIBILITY,
+  type ColumnId,
+  type PanelId,
+  type PanelVisibility,
+} from './layoutState';
+import type { ImportedTrace } from './traceImport';
 import type { CodeHistoryItem } from './historyClient';
 import { decodeShareHash } from './shareState';
 import { useTheme } from './theme';
@@ -92,7 +107,9 @@ type DashboardAppProps = {
 };
 
 const NO_BOOKMARKS: TraceBookmark[] = [];
+const NO_CHECKPOINTS: number[] = [];
 const NO_ANSWERS: Record<number, LessonAnswer> = {};
+const PRESENTATION_MOBILE_TABS = mobileTabs.filter((tab) => tab !== 'Inputs');
 
 export function DashboardApp({ onOpenLanding }: DashboardAppProps) {
   const { mobile, mobileTab, setMobileTab } = useMobileWorkspace();
@@ -116,6 +133,9 @@ export function DashboardApp({ onOpenLanding }: DashboardAppProps) {
   );
   const [watchedVariables, setWatchedVariables] = useState<string[]>([]);
   const { draftAvailable, draftStatus, queueDraft, flushDraft } = useDraftPersistence();
+  // Presentation overrides the visible panels while it is on; null otherwise.
+  const [presentation, setPresentation] = useState<PanelVisibility | null>(null);
+  const presentButtonRef = useRef<HTMLButtonElement>(null);
   const {
     adjustColumnPair,
     adjustPanelPair,
@@ -132,7 +152,7 @@ export function DashboardApp({ onOpenLanding }: DashboardAppProps) {
     startColumnResize,
     startPanelResize,
     togglePanelVisibility,
-  } = useResizableLayout(embedMode);
+  } = useResizableLayout(embedMode, presentation);
   // Only actual typing produces a draft; programmatic loads (examples,
   // history, imports, the restore itself) must not overwrite it.
   const userEditedRef = useRef(false);
@@ -185,26 +205,59 @@ export function DashboardApp({ onOpenLanding }: DashboardAppProps) {
   });
 
   // Bookmarks belong to one recorded trace; a new run or edit starts empty.
+  // Checkpoints are bookmarked steps in presentation order.
   const [bookmarkState, setBookmarkState] = useState<{
     owner: SessionResult | null;
     items: TraceBookmark[];
-  }>({ owner: null, items: NO_BOOKMARKS });
-  const bookmarks =
-    bookmarkState.owner === session.result && session.result ? bookmarkState.items : NO_BOOKMARKS;
+    checkpoints: number[];
+  }>({ owner: null, items: NO_BOOKMARKS, checkpoints: NO_CHECKPOINTS });
+  const ownsBookmarks = bookmarkState.owner === session.result && Boolean(session.result);
+  const bookmarks = ownsBookmarks ? bookmarkState.items : NO_BOOKMARKS;
+  const checkpoints = ownsBookmarks ? bookmarkState.checkpoints : NO_CHECKPOINTS;
   const toggleBookmark = useCallback(
     (target: number) => {
       if (!session.result) return;
       setBookmarkState((state) => {
-        const items = state.owner === session.result ? state.items : NO_BOOKMARKS;
+        const owned = state.owner === session.result;
+        const items = owned ? state.items : NO_BOOKMARKS;
+        const nextItems = items.some((bookmark) => bookmark.step === target)
+          ? items.filter((bookmark) => bookmark.step !== target)
+          : normalizeBookmarks([...items, { step: target, note: '' }], session.totalSteps);
         return {
           owner: session.result,
-          items: items.some((bookmark) => bookmark.step === target)
-            ? items.filter((bookmark) => bookmark.step !== target)
-            : normalizeBookmarks([...items, { step: target, note: '' }], session.totalSteps),
+          items: nextItems,
+          // Removing a bookmark also removes its checkpoint.
+          checkpoints: normalizeCheckpoints(owned ? state.checkpoints : NO_CHECKPOINTS, nextItems),
         };
       });
     },
     [session.result, session.totalSteps],
+  );
+  const toggleCheckpointStep = useCallback(
+    (target: number) => {
+      setBookmarkState((state) =>
+        state.owner === session.result
+          ? {
+              ...state,
+              checkpoints: normalizeCheckpoints(
+                toggleCheckpoint(state.checkpoints, target),
+                state.items,
+              ),
+            }
+          : state,
+      );
+    },
+    [session.result],
+  );
+  const moveCheckpointStep = useCallback(
+    (target: number, direction: -1 | 1) => {
+      setBookmarkState((state) =>
+        state.owner === session.result
+          ? { ...state, checkpoints: moveCheckpoint(state.checkpoints, target, direction) }
+          : state,
+      );
+    },
+    [session.result],
   );
   const setBookmarkNote = useCallback(
     (target: number, note: string) => {
@@ -294,9 +347,11 @@ export function DashboardApp({ onOpenLanding }: DashboardAppProps) {
       result: session.result,
       step: session.step,
       bookmarks,
+      checkpoints,
     }),
     [
       bookmarks,
+      checkpoints,
       session.code,
       session.language,
       session.functionOverride,
@@ -323,7 +378,11 @@ export function DashboardApp({ onOpenLanding }: DashboardAppProps) {
       setExampleId(null);
       setWatchedVariables(content.watches);
       restoreBreakpoints(content.breakpoints);
-      setBookmarkState({ owner: content.result, items: content.bookmarks });
+      setBookmarkState({
+        owner: content.result,
+        items: content.bookmarks,
+        checkpoints: content.checkpoints,
+      });
       session.restoreWorkspace(content);
     },
     session.enableWorkspacePersistence,
@@ -345,17 +404,7 @@ export function DashboardApp({ onOpenLanding }: DashboardAppProps) {
   }, [activeWorkspace, confirmWorkspaceReplace, detachWorkspace, leaveWorkspace]);
 
   const handleImportedTrace = useCallback(
-    ({
-      code,
-      language,
-      result,
-      step,
-    }: {
-      code: string;
-      language: Language;
-      result: Parameters<typeof importSession>[1];
-      step: number;
-    }) => {
+    ({ code, language, result, step, bookmarks, checkpoints }: ImportedTrace) => {
       if (!replaceWorkspace()) return;
       clearHistoryItemId();
       flushDraft();
@@ -364,6 +413,7 @@ export function DashboardApp({ onOpenLanding }: DashboardAppProps) {
       setWatchedVariables([]);
       resetTraceNavigation();
       importSession(code, result, step, language);
+      setBookmarkState({ owner: result, items: bookmarks, checkpoints });
     },
     [clearHistoryItemId, flushDraft, importSession, resetTraceNavigation, replaceWorkspace],
   );
@@ -373,13 +423,18 @@ export function DashboardApp({ onOpenLanding }: DashboardAppProps) {
     embedLabel,
     handleEmbed,
     handleExport,
+    handleExportReplay,
     handleExportSvg,
     handleImport,
     handleShare,
     importLabel,
     importTitle,
+    replayNotice,
+    dismissReplayNotice,
     shareLabel,
   } = useTraceTransfer({
+    bookmarks,
+    checkpoints,
     code: session.code,
     exampleId,
     functionOverride: session.functionOverride,
@@ -391,6 +446,71 @@ export function DashboardApp({ onOpenLanding }: DashboardAppProps) {
     step: session.step,
   });
 
+  const canPresent = !embedMode && session.totalSteps > 0;
+  // The trace can disappear under presentation (for example a restored
+  // workspace without a run); leave rather than present an empty stage.
+  if (presentation && !canPresent) setPresentation(null);
+  const presenting = presentation !== null && canPresent;
+  const togglePresentation = useCallback(() => {
+    if (presenting) {
+      setPresentation(null);
+      return;
+    }
+    if (!canPresent) return;
+    setPresentation({
+      ...PRESENTATION_PANEL_VISIBILITY,
+      // Output stays on stage only for programs that print.
+      console: Boolean(session.result?.run?.stdout),
+    });
+    if (mobileTab === 'Inputs') setMobileTab('Code');
+  }, [canPresent, mobileTab, presenting, session.result, setMobileTab]);
+  // The toggle is unmounted while presenting; return focus to it afterwards.
+  const wasPresenting = useRef(false);
+  useEffect(() => {
+    if (wasPresenting.current && !presenting) presentButtonRef.current?.focus();
+    wasPresenting.current = presenting;
+  }, [presenting]);
+
+  const orderedCheckpoints = useMemo(
+    () => checkpointCaptions(checkpoints, bookmarks),
+    [bookmarks, checkpoints],
+  );
+  const checkpointNav = useMemo(
+    () => checkpointNavigation(checkpoints, session.step),
+    [checkpoints, session.step],
+  );
+  const jumpToCheckpoint = useCallback(
+    (index: number | null) => {
+      if (index !== null) jumpToStep(checkpoints[index]);
+    },
+    [checkpoints, jumpToStep],
+  );
+  // While presenting, playback pauses on arriving at a checkpoint so its
+  // caption can be read; pressing Play again continues from there.
+  const playbackOrigin = useRef<number | null>(null);
+  useEffect(() => {
+    if (!playing) {
+      playbackOrigin.current = null;
+      return;
+    }
+    if (playbackOrigin.current === null) {
+      playbackOrigin.current = session.step;
+      return;
+    }
+    if (
+      presenting &&
+      !openCheckpoint &&
+      session.step !== playbackOrigin.current &&
+      checkpoints.includes(session.step)
+    ) {
+      togglePlay();
+    }
+  }, [checkpoints, openCheckpoint, playing, presenting, session.step, togglePlay]);
+
+  const presentationShortcut = useMemo(
+    () => (embedMode ? undefined : { active: presenting, toggle: togglePresentation }),
+    [embedMode, presenting, togglePresentation],
+  );
   useTransportShortcuts({
     jumpToStep,
     run: session.run,
@@ -400,6 +520,9 @@ export function DashboardApp({ onOpenLanding }: DashboardAppProps) {
     totalSteps: session.totalSteps,
     toggleBookmark: () => toggleBookmark(session.step),
     openSearch: () => setFinderRequest((request) => request + 1),
+    presentation: presentationShortcut,
+    previousCheckpoint: () => jumpToCheckpoint(checkpointNav.previous),
+    nextCheckpoint: () => jumpToCheckpoint(checkpointNav.next),
   });
 
   // Analyze the initial snippet so the inputs panel is ready pre-run.
@@ -549,9 +672,12 @@ export function DashboardApp({ onOpenLanding }: DashboardAppProps) {
   const previousStep = session.step > 0 ? session.steps[session.step - 1] : undefined;
   const showInputs = session.language === 'python' && session.analysis?.mode === 'function';
 
-  const visiblePanels = mobile
-    ? Object.fromEntries(Object.keys(panelVisibility).map((key) => [key, true]))
-    : panelVisibility;
+  // Phones show every panel behind tabs, except while presenting.
+  const visiblePanels =
+    mobile && !presenting
+      ? Object.fromEntries(Object.keys(panelVisibility).map((key) => [key, true]))
+      : panelVisibility;
+  const readOnlyCode = embedMode || presenting;
 
   const leftSlots: PanelSlotConfig[] = [
     visiblePanels.code
@@ -570,13 +696,13 @@ export function DashboardApp({ onOpenLanding }: DashboardAppProps) {
               errorLine={errorLine}
               executionCounts={executionCounts}
               language={session.language}
-              onChange={embedMode ? () => {} : handleCodeChange}
+              onChange={readOnlyCode ? () => {} : handleCodeChange}
               onCursorLineChange={setCursorLine}
-              onRunToLine={embedMode ? undefined : runToLine}
-              onToggleBreakpoint={embedMode ? undefined : toggleBreakpoint}
+              onRunToLine={readOnlyCode ? undefined : runToLine}
+              onToggleBreakpoint={readOnlyCode ? undefined : toggleBreakpoint}
               focusRequest={editorFocus}
               ranLine={stepChange?.line ?? null}
-              readOnly={embedMode}
+              readOnly={readOnlyCode}
               theme={theme}
             />
           </ErrorBoundary>,
@@ -659,7 +785,8 @@ export function DashboardApp({ onOpenLanding }: DashboardAppProps) {
               currentStep={session.currentStep}
               frameIndex={session.selectedFrameIndex}
               lessonCard={
-                lesson ? (
+                // Lesson predictions take typed answers, so they stay off stage.
+                lesson && !presenting ? (
                   <LessonCard
                     answers={lessonAnswers}
                     checkpoints={lessonCheckpoints}
@@ -750,7 +877,9 @@ export function DashboardApp({ onOpenLanding }: DashboardAppProps) {
             <ConsolePanel
               language={session.language}
               atLastStep={atLastStep}
-              canMeasureComplexity={session.language === 'python' && showInputs && !session.isBusy}
+              canMeasureComplexity={
+                session.language === 'python' && showInputs && !session.isBusy && !presenting
+              }
               complexity={session.complexity}
               complexityBusy={session.complexityBusy}
               currentStep={session.currentStep}
@@ -787,7 +916,7 @@ export function DashboardApp({ onOpenLanding }: DashboardAppProps) {
           >
             {slot.content}
           </div>
-          {!mobile && index < slots.length - 1 ? (
+          {!mobile && !presenting && index < slots.length - 1 ? (
             <div
               aria-label={`Resize ${slot.id} and ${slots[index + 1].id}`}
               aria-orientation="horizontal"
@@ -818,10 +947,19 @@ export function DashboardApp({ onOpenLanding }: DashboardAppProps) {
 
   return (
     <div
-      className={`app-shell dashboard-instrument${embedMode ? ' app-shell-embed' : ''}${mobile ? ' mobile-workspace' : ''}`}
+      className={`app-shell dashboard-instrument${embedMode ? ' app-shell-embed' : ''}${mobile ? ' mobile-workspace' : ''}${presenting ? ' presentation-mode' : ''}`}
     >
       <section className="dashboard-stage" aria-label="Code Visualizer dashboard">
-        {embedMode ? (
+        {presenting ? (
+          <PresentationBar
+            checkpoints={orderedCheckpoints}
+            navigation={checkpointNav}
+            onExit={togglePresentation}
+            onJump={jumpToStep}
+            onToggleTheme={toggleTheme}
+            theme={theme}
+          />
+        ) : embedMode ? (
           <header className="embed-bar">
             <span className="embed-brand">
               <LogoMark />
@@ -879,8 +1017,12 @@ export function DashboardApp({ onOpenLanding }: DashboardAppProps) {
             onEmbed={() => void handleEmbed()}
             onExampleChange={handleExampleChange}
             onExport={handleExport}
+            onExportReplay={() => void handleExportReplay()}
             onExportSvg={handleExportSvg}
             onImport={handleImport}
+            onPresent={togglePresentation}
+            canPresent={canPresent}
+            presentButtonRef={presentButtonRef}
             onOpenHistoryItem={handleOpenHistoryItem}
             onLanguageChange={handleLanguageChange}
             onOpenLanding={() => {
@@ -901,6 +1043,7 @@ export function DashboardApp({ onOpenLanding }: DashboardAppProps) {
         )}
 
         {!embedMode &&
+          !presenting &&
           (draftStatus !== 'idle' || (historySyncEnabled && historySaveStatus !== 'idle')) && (
             <div className="persistence-status">
               {!embedMode && draftStatus !== 'idle' && (
@@ -942,7 +1085,7 @@ export function DashboardApp({ onOpenLanding }: DashboardAppProps) {
               )}
             </div>
           )}
-        {importError ? (
+        {importError && !presenting ? (
           <div className="dashboard-onboarding" role="alert">
             <span>Import failed: {importError}</span>
             <button type="button" onClick={dismissImportError}>
@@ -950,12 +1093,26 @@ export function DashboardApp({ onOpenLanding }: DashboardAppProps) {
             </button>
           </div>
         ) : null}
+        {replayNotice && !presenting ? (
+          <div className="dashboard-onboarding" role={replayNotice.error ? 'alert' : 'status'}>
+            <span>{replayNotice.text}</span>
+            <button type="button" onClick={dismissReplayNotice}>
+              Dismiss
+            </button>
+          </div>
+        ) : null}
 
-        {!embedMode && !mobile && showDashboardOnboarding ? (
+        {!embedMode && !mobile && !presenting && showDashboardOnboarding ? (
           <DashboardOnboardingBar onDismiss={dismissDashboardOnboarding} />
         ) : null}
 
-        {mobile && <MobileWorkspaceTabs active={mobileTab} onChange={setMobileTab} />}
+        {mobile && (
+          <MobileWorkspaceTabs
+            active={mobileTab}
+            onChange={setMobileTab}
+            tabs={presenting ? PRESENTATION_MOBILE_TABS : undefined}
+          />
+        )}
         {mobile && session.currentStep && (
           <button
             type="button"
@@ -974,7 +1131,7 @@ export function DashboardApp({ onOpenLanding }: DashboardAppProps) {
             <code>{session.code.split('\n')[session.currentStep.line - 1] ?? ''}</code>
           </button>
         )}
-        {mobile && openCheckpoint && mobileTab !== 'Inspect' ? (
+        {mobile && openCheckpoint && !presenting && mobileTab !== 'Inspect' ? (
           <button
             className="mobile-lesson-prompt"
             onClick={() => setMobileTab('Inspect')}
@@ -1003,7 +1160,7 @@ export function DashboardApp({ onOpenLanding }: DashboardAppProps) {
             visibleColumns.map((columnId, index) => (
               <Fragment key={columnId}>
                 {renderPanelStack(columnId, columnSlots[columnId])}
-                {!mobile && index < visibleColumns.length - 1 ? (
+                {!mobile && !presenting && index < visibleColumns.length - 1 ? (
                   <div
                     aria-label={`Resize ${columnId} and ${visibleColumns[index + 1]} columns`}
                     aria-orientation="vertical"
@@ -1071,18 +1228,24 @@ export function DashboardApp({ onOpenLanding }: DashboardAppProps) {
           status={session.status}
           step={session.step}
           totalSteps={session.totalSteps}
-          bookmarkSteps={bookmarks.map((bookmark) => bookmark.step)}
+          bookmarkSteps={presenting ? checkpoints : bookmarks.map((bookmark) => bookmark.step)}
+          presenting={presenting}
           traceTools={
-            <TraceFinder
-              bookmarks={bookmarks}
-              onBookmarkNote={setBookmarkNote}
-              onJump={session.jumpToStep}
-              onToggleBookmark={toggleBookmark}
-              openRequest={finderRequest}
-              step={session.step}
-              steps={session.steps}
-              stdout={run?.stdout ?? ''}
-            />
+            presenting ? undefined : (
+              <TraceFinder
+                bookmarks={bookmarks}
+                checkpoints={checkpoints}
+                onBookmarkNote={setBookmarkNote}
+                onJump={session.jumpToStep}
+                onMoveCheckpoint={moveCheckpointStep}
+                onToggleBookmark={toggleBookmark}
+                onToggleCheckpoint={toggleCheckpointStep}
+                openRequest={finderRequest}
+                step={session.step}
+                steps={session.steps}
+                stdout={run?.stdout ?? ''}
+              />
+            )
           }
         />
       </section>
