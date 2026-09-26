@@ -33,6 +33,7 @@ import { useSessionPlayback, type PlaybackSpeed } from './useSessionPlayback';
 import type { WorkspaceContent } from './workspaceFormat';
 import type {
   AnalysisInfo,
+  ComplexityOptions,
   ComplexityResult,
   FunctionInfo,
   Language,
@@ -839,50 +840,54 @@ export function useSession(initialCode: string, initialOptions: InitialSessionOp
     );
   }, [runPracticeCaseBatch, testCases]);
 
-  const measureComplexity = useCallback(async () => {
-    if (
-      languageRef.current !== 'python' ||
-      isBusy ||
-      complexityBusy ||
-      operationPendingRef.current
-    ) {
-      return;
-    }
-    const revision = revisionRef.current;
-    const isCurrent = () => mountedRef.current && revisionRef.current === revision;
-    operationPendingRef.current = true;
-    setComplexityBusy(true);
-    try {
-      const data = (await getClient().request(
-        {
-          op: 'complexity',
-          source: code,
-          function: functionOverride ?? undefined,
-          seed: seed ?? undefined,
-        },
-        { timeoutMs: RUN_TIMEOUT_MS * 2 },
-      )) as ComplexityResult;
-      if (isCurrent()) setComplexity(data);
-    } catch (error) {
-      if (!isCurrent()) return;
-      setComplexity({
-        functionName: null,
-        seed: null,
-        samples: [],
-        error: {
-          type: error instanceof Error ? error.name : 'ClientError',
-          msg: error instanceof Error ? error.message : String(error),
-        },
-      });
-    } finally {
-      operationPendingRef.current = false;
-      if (mountedRef.current) {
-        setComplexityBusy(false);
-        if (!isCurrent() && stoppedRevisionRef.current !== revisionRef.current)
-          scheduleAnalyze(codeRef.current, languageRef.current);
+  const measureComplexity = useCallback(
+    async (options: ComplexityOptions = {}) => {
+      if (
+        languageRef.current !== 'python' ||
+        isBusy ||
+        complexityBusy ||
+        operationPendingRef.current
+      ) {
+        return;
       }
-    }
-  }, [code, complexityBusy, functionOverride, getClient, isBusy, scheduleAnalyze, seed]);
+      const revision = revisionRef.current;
+      const isCurrent = () => mountedRef.current && revisionRef.current === revision;
+      operationPendingRef.current = true;
+      setComplexityBusy(true);
+      try {
+        const data = (await getClient().request(
+          {
+            op: 'complexity',
+            source: code,
+            function: functionOverride ?? undefined,
+            seed: seed ?? undefined,
+            ...options,
+          },
+          { timeoutMs: RUN_TIMEOUT_MS * 2 },
+        )) as ComplexityResult;
+        if (isCurrent()) setComplexity(data);
+      } catch (error) {
+        if (!isCurrent()) return;
+        setComplexity({
+          functionName: null,
+          seed: null,
+          samples: [],
+          error: {
+            type: error instanceof Error ? error.name : 'ClientError',
+            msg: error instanceof Error ? error.message : String(error),
+          },
+        });
+      } finally {
+        operationPendingRef.current = false;
+        if (mountedRef.current) {
+          setComplexityBusy(false);
+          if (!isCurrent() && stoppedRevisionRef.current !== revisionRef.current)
+            scheduleAnalyze(codeRef.current, languageRef.current);
+        }
+      }
+    },
+    [code, complexityBusy, functionOverride, getClient, isBusy, scheduleAnalyze, seed],
+  );
 
   /** Restore an exported session (replay without re-running). */
   const importSession = useCallback(

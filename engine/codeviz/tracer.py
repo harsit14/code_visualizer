@@ -100,7 +100,16 @@ class Tracer:
                     f"Execution exceeded {self.max_seconds:.0f}s and was stopped."
                 )
                 raise TraceLimitError(self.truncation_reason)
-        if not self.count_only and len(self.steps) >= self.max_steps:
+        if self.count_only:
+            # Counting runs keep no steps, so cap the events themselves.
+            if self.op_count > self.max_steps:
+                self.truncated = True
+                self.truncation_reason = (
+                    f"Step limit of {self.max_steps:,} trace events reached; "
+                    "execution was stopped."
+                )
+                raise TraceLimitError(self.truncation_reason)
+        elif len(self.steps) >= self.max_steps:
             self.truncated = True
             self.truncation_reason = (
                 f"Trace limit of {self.max_steps} steps reached; execution was stopped."

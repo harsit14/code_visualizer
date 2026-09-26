@@ -11,6 +11,8 @@ Modules:
     inputgen:   Seeded generation of test inputs for inferred types.
     tracer:     sys.settrace tracer with step/time safeguards.
     runner:     Orchestration of analysis + generation + traced execution.
+    complexity: Input sizing, growth fitting and loop-structure hints for
+                complexity experiments.
 """
 
 __version__ = "2.0.0"
