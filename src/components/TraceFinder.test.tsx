@@ -64,6 +64,42 @@ describe('TraceFinder', () => {
     expect(props.onJump).toHaveBeenCalledWith(3);
   });
 
+  it('flags bookmarks as ordered checkpoints and reorders them', () => {
+    const onToggleCheckpoint = vi.fn();
+    const onMoveCheckpoint = vi.fn();
+    const props = renderFinder({
+      bookmarks: [
+        { step: 1, note: 'start' },
+        { step: 3, note: 'loop' },
+        { step: 4, note: '' },
+      ],
+      checkpoints: [3, 1],
+      onMoveCheckpoint,
+      onToggleCheckpoint,
+      step: 1,
+    });
+    expect(
+      screen.getByRole('button', { name: 'Presentation checkpoint for step 3', pressed: true }),
+    ).toBeTruthy();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Presentation checkpoint for step 4', pressed: false }),
+    );
+    expect(onToggleCheckpoint).toHaveBeenCalledWith(4);
+
+    const list = screen.getByRole('list', { name: 'Presentation checkpoints' });
+    const items = [...list.querySelectorAll('li')].map((item) => item.textContent);
+    expect(items[0]).toContain('1. Step 3loop');
+    expect(items[1]).toContain('2. Step 1start');
+    expect(
+      (screen.getByRole('button', { name: 'Move checkpoint 1 earlier' }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Move checkpoint 2 earlier' }));
+    expect(onMoveCheckpoint).toHaveBeenCalledWith(1, -1);
+    fireEvent.click(screen.getByText('1. Step 3'));
+    expect(props.onJump).toHaveBeenCalledWith(3);
+  });
+
   it('opens and focuses the search box on request', () => {
     const { rerender } = render(
       <TraceFinder

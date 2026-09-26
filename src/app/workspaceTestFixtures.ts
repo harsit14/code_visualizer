@@ -31,6 +31,7 @@ export function workspaceContent(): WorkspaceContent {
     breakpoints: [1],
     step: 1,
     bookmarks: [{ step: 1, note: 'Why is this line reached?' }],
+    checkpoints: [1],
     result: {
       status: 'ok',
       mode: 'script',

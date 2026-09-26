@@ -50,6 +50,8 @@ type ControlsBarProps = {
   traceTools?: ReactNode;
   /** Steps marked on the scrubber. */
   bookmarkSteps?: readonly number[];
+  /** Presentation keeps playback only: no run, editing-driven jumps or inputs. */
+  presenting?: boolean;
 };
 
 function describeStep(step: TraceStep | undefined): string {
@@ -134,6 +136,7 @@ export function ControlsBar({
   status,
   traceTools,
   bookmarkSteps = [],
+  presenting = false,
 }: ControlsBarProps) {
   const [expanded, setExpanded] = useState(false);
   const hasTrace = totalSteps > 0;
@@ -185,28 +188,30 @@ export function ControlsBar({
 
   return (
     <footer
-      className={`controls-bar${hasTrace ? '' : ' controls-bar-prerun'}${expanded ? ' mobile-controls-expanded' : ''}`}
+      className={`controls-bar${hasTrace ? '' : ' controls-bar-prerun'}${expanded ? ' mobile-controls-expanded' : ''}${presenting ? ' controls-bar-presenting' : ''}`}
       aria-label="Playback controls"
     >
-      <ControlTip text={runTitle}>
-        <button
-          className="run-button"
-          onClick={isBusy ? onStop : runtimeFailed ? onRetryRuntime : onRun}
-          type="button"
-        >
-          {isBusy ? (
-            <Square size={14} />
-          ) : runtimeFailed ? (
-            <RotateCcw size={14} />
-          ) : (
-            <Play size={14} />
-          )}
-          {isBusy ? 'Stop' : runtimeFailed ? 'Retry runtime' : 'Run'}
-          {!hasTrace && !isBusy && !runtimeFailed ? (
-            <span className="run-shortcut-badge">{runShortcutLabel}</span>
-          ) : null}
-        </button>
-      </ControlTip>
+      {presenting ? null : (
+        <ControlTip text={runTitle}>
+          <button
+            className="run-button"
+            onClick={isBusy ? onStop : runtimeFailed ? onRetryRuntime : onRun}
+            type="button"
+          >
+            {isBusy ? (
+              <Square size={14} />
+            ) : runtimeFailed ? (
+              <RotateCcw size={14} />
+            ) : (
+              <Play size={14} />
+            )}
+            {isBusy ? 'Stop' : runtimeFailed ? 'Retry runtime' : 'Run'}
+            {!hasTrace && !isBusy && !runtimeFailed ? (
+              <span className="run-shortcut-badge">{runShortcutLabel}</span>
+            ) : null}
+          </button>
+        </ControlTip>
+      )}
 
       {!hasTrace ? (
         <div className="pretrace-actions">
@@ -299,28 +304,32 @@ export function ControlsBar({
                 <CornerDownRight size={15} />
               </button>
             </ControlTip>
-            <ControlTip secondary text={breakpointTitle}>
-              <button
-                aria-label="Run to breakpoint"
-                className="debug-nav-button"
-                disabled={!canRunToBreakpoint}
-                onClick={onRunToBreakpoint}
-                type="button"
-              >
-                <CircleDot size={15} />
-              </button>
-            </ControlTip>
-            <ControlTip secondary text={cursorTitle}>
-              <button
-                aria-label="Run to cursor"
-                className="debug-nav-button"
-                disabled={!canRunToCursor}
-                onClick={onRunToCursor}
-                type="button"
-              >
-                <Crosshair size={15} />
-              </button>
-            </ControlTip>
+            {presenting ? null : (
+              <>
+                <ControlTip secondary text={breakpointTitle}>
+                  <button
+                    aria-label="Run to breakpoint"
+                    className="debug-nav-button"
+                    disabled={!canRunToBreakpoint}
+                    onClick={onRunToBreakpoint}
+                    type="button"
+                  >
+                    <CircleDot size={15} />
+                  </button>
+                </ControlTip>
+                <ControlTip secondary text={cursorTitle}>
+                  <button
+                    aria-label="Run to cursor"
+                    className="debug-nav-button"
+                    disabled={!canRunToCursor}
+                    onClick={onRunToCursor}
+                    type="button"
+                  >
+                    <Crosshair size={15} />
+                  </button>
+                </ControlTip>
+              </>
+            )}
           </div>
           {traceTools}
 
@@ -369,17 +378,21 @@ export function ControlsBar({
             <div className="scrubber-meta">
               <span className="step-meta">{describeStep(currentStep)}</span>
               <span className="step-count">
-                <input
-                  aria-label="Jump to step"
-                  className="step-jump"
-                  disabled={!hasTrace}
-                  max={Math.max(totalSteps - 1, 0)}
-                  min={0}
-                  onChange={(event) => onJump(Number(event.target.value))}
-                  title={stepJumpTitle}
-                  type="number"
-                  value={hasTrace ? step : 0}
-                />
+                {presenting ? (
+                  <span>{step}</span>
+                ) : (
+                  <input
+                    aria-label="Jump to step"
+                    className="step-jump"
+                    disabled={!hasTrace}
+                    max={Math.max(totalSteps - 1, 0)}
+                    min={0}
+                    onChange={(event) => onJump(Number(event.target.value))}
+                    title={stepJumpTitle}
+                    type="number"
+                    value={hasTrace ? step : 0}
+                  />
+                )}
                 / {Math.max(totalSteps - 1, 0)}
               </span>
             </div>
@@ -400,17 +413,19 @@ export function ControlsBar({
             <span>{speed}×</span>
           </div>
 
-          <ControlTip secondary text={resetTitle}>
-            <button
-              aria-label="Reset trace to first step"
-              className="ghost-button"
-              disabled={!hasTrace}
-              onClick={() => onJump(0)}
-              type="button"
-            >
-              <RotateCcw size={14} />
-            </button>
-          </ControlTip>
+          {presenting ? null : (
+            <ControlTip secondary text={resetTitle}>
+              <button
+                aria-label="Reset trace to first step"
+                className="ghost-button"
+                disabled={!hasTrace}
+                onClick={() => onJump(0)}
+                type="button"
+              >
+                <RotateCcw size={14} />
+              </button>
+            </ControlTip>
+          )}
         </>
       )}
     </footer>

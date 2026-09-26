@@ -1,5 +1,6 @@
 import type { Language, SessionResult } from '../engine/types';
 import { validateSessionResult } from '../engine/resultSchema';
+import { MAX_CHECKPOINTS, normalizeCheckpoints } from '../engine/traceCheckpoints';
 import { normalizeBookmarks, type TraceBookmark } from '../engine/traceSearch';
 import type { PracticeNotebook } from './practiceNotebook';
 import type { PracticeTestCase } from './practiceCases';
@@ -22,6 +23,8 @@ export type WorkspaceContent = {
   step: number;
   /** Annotated trace steps; absent in backups written before bookmarks existed. */
   bookmarks: TraceBookmark[];
+  /** Bookmarked steps in presentation order; absent before checkpoints existed. */
+  checkpoints: number[];
 };
 export type WorkspaceRevision = {
   id: string;
@@ -128,6 +131,16 @@ export function validateWorkspaceRevision(w: unknown): WorkspaceRevision {
     throw new Error('Invalid workspace bookmarks.');
   }
   if (
+    c.checkpoints !== undefined &&
+    !(
+      Array.isArray(c.checkpoints) &&
+      c.checkpoints.length <= MAX_CHECKPOINTS &&
+      c.checkpoints.every(integer)
+    )
+  ) {
+    throw new Error('Invalid workspace checkpoints.');
+  }
+  if (
     !record(c.notebook) ||
     !string(c.notebook.notes) ||
     !string(c.notebook.patterns) ||
@@ -162,6 +175,10 @@ export function validateWorkspaceRevision(w: unknown): WorkspaceRevision {
   }
   const result = c.result === null ? null : validateSessionResult(c.result, c.language as Language);
   const content = c as WorkspaceContent;
+  const bookmarks = normalizeBookmarks(
+    (content.bookmarks ?? []).map(({ step, note }) => ({ step, note })),
+    result?.run?.steps.length ?? 0,
+  );
   // Pick known fields, discarding unrelated properties from untrusted files.
   return {
     id: w.id,
@@ -183,10 +200,8 @@ export function validateWorkspaceRevision(w: unknown): WorkspaceRevision {
       breakpoints: [...new Set(content.breakpoints)],
       result,
       step: Math.min(content.step, Math.max(0, (result?.run?.steps.length ?? 0) - 1)),
-      bookmarks: normalizeBookmarks(
-        (content.bookmarks ?? []).map(({ step, note }) => ({ step, note })),
-        result?.run?.steps.length ?? 0,
-      ),
+      bookmarks,
+      checkpoints: normalizeCheckpoints(content.checkpoints ?? [], bookmarks),
     },
   };
 }

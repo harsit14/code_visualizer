@@ -30,6 +30,7 @@ import './styles/components/mobile-workspace.css';
 import './styles/components/account-settings.css';
 import './styles/components/workspace-library.css';
 import './styles/components/traced-light.css';
+import './styles/components/presentation.css';
 import './styles/components/offline.css';
 
 createRoot(document.getElementById('root')!).render(

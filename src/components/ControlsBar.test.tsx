@@ -133,4 +133,23 @@ describe('ControlsBar', () => {
     expect(html).toContain('aria-live="polite"');
     expect(html).toContain('Playing. Step 1 of 2.');
   });
+
+  it('keeps only playback controls while presenting', () => {
+    const html = renderControls({
+      currentStep: traceStep,
+      presenting: true,
+      totalSteps: 2,
+      traceTools: <span>trace search</span>,
+    });
+
+    expect(html).toContain('controls-bar-presenting');
+    expect(html).toContain('aria-label="Next step"');
+    expect(html).toContain('aria-label="Trace position"');
+    expect(html).toContain('aria-label="Step over"');
+    expect(html).not.toContain('run-button');
+    expect(html).not.toContain('Run to breakpoint');
+    expect(html).not.toContain('Run to cursor');
+    expect(html).not.toContain('aria-label="Jump to step"');
+    expect(html).not.toContain('Reset trace to first step');
+  });
 });

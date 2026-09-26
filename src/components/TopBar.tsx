@@ -1,19 +1,21 @@
 /**
- * Top bar: branding, example picker, theme toggle, share link,
- * trace export/import, layout controls, shortcuts, and runtime status.
+ * Top bar: branding, example picker, theme toggle, share link, presentation
+ * toggle, trace export/import, layout controls, shortcuts, and runtime status.
  */
 import {
   ArrowLeft,
   Code2,
   Columns3,
   Download,
+  FileCode,
   FileImage,
   Link2,
   Moon,
+  Presentation,
   Sun,
   Upload,
 } from 'lucide-react';
-import { useRef, type ReactNode } from 'react';
+import { useRef, type ReactNode, type Ref } from 'react';
 import { AccountMenu } from './AccountMenu';
 import { HistoryMenu } from './HistoryMenu';
 import { LogoMark } from './LogoMark';
@@ -51,6 +53,12 @@ type TopBarProps = {
   canExport: boolean;
   onExport: () => void;
   onExportSvg: () => void;
+  /** Standalone HTML replay; hidden when the host does not offer it. */
+  onExportReplay?: () => void;
+  /** Presentation mode toggle; hidden when absent. */
+  onPresent?: () => void;
+  canPresent?: boolean;
+  presentButtonRef?: Ref<HTMLButtonElement>;
   onOpenHistoryItem: (item: CodeHistoryItem) => void;
   onImport: (file: File) => void;
   onResetLayout: () => void;
@@ -72,6 +80,8 @@ const SHORTCUTS = [
   { keys: ['End'], label: 'Jump to end' },
   { keys: ['B'], label: 'Bookmark this step' },
   { keys: ['/'], label: 'Search the trace' },
+  { keys: ['P'], label: 'Present (Esc exits)' },
+  { keys: ['[', ']'], label: 'Previous or next checkpoint' },
   { keys: ['Click gutter'], label: 'Toggle breakpoint' },
   { keys: ['Right click line'], label: 'Run to line' },
 ];
@@ -98,6 +108,10 @@ export function TopBar({
   canExport,
   onExport,
   onExportSvg,
+  onExportReplay,
+  onPresent,
+  canPresent = false,
+  presentButtonRef,
   onOpenHistoryItem,
   onOpenLanding,
   onImport,
@@ -188,6 +202,25 @@ export function TopBar({
               <Link2 size={14} />
               <span className="top-action-label">{shareLabel}</span>
             </button>
+            {onPresent ? (
+              <button
+                aria-keyshortcuts="P"
+                aria-label="Present"
+                className="top-present-button"
+                disabled={!canPresent}
+                onClick={onPresent}
+                ref={presentButtonRef}
+                title={
+                  canPresent
+                    ? 'Present: larger type, focused panels and checkpoint captions (P)'
+                    : 'Run code first to present its trace'
+                }
+                type="button"
+              >
+                <Presentation size={14} />
+                <span className="top-action-label">Present</span>
+              </button>
+            ) : null}
             {showHistory ? (
               <HistoryMenu onOpen={onOpenHistoryItem} refreshToken={historyRefreshToken} />
             ) : null}
@@ -258,6 +291,18 @@ export function TopBar({
                       <FileImage size={14} />
                       <span>Export SVG</span>
                     </button>
+                    {onExportReplay ? (
+                      <button
+                        className="panel-menu-action"
+                        disabled={!canExport}
+                        onClick={onExportReplay}
+                        title="Download one HTML file that replays this run offline, with checkpoint captions"
+                        type="button"
+                      >
+                        <FileCode size={14} />
+                        <span>Export replay</span>
+                      </button>
+                    ) : null}
                     <button
                       className="panel-menu-action"
                       onClick={() => fileInputRef.current?.click()}
